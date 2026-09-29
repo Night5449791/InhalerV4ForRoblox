@@ -433,7 +433,7 @@ followed by `cloneref(game:GetService(...))` service locals, `gameCamera`, `lplr
 - `TwoSlider`'s `props.Function` is never invoked from `SetValue`.
 - `entitylib.Events.EntityRemoving` is never fired (use `EntityRemoved`).
 - `drawing.lua` returns the string `'1'` when unsupported — callers must check the return value.
-- Download URLs are inconsistent: `src/loader.lua`, `src/main.lua`, `src/guis/new/init.lua`, `getvapeasset.lua` and every game base use `raw.githubusercontent.com/7GrandDadPGN/VapeCompiled/...`, while `NewMainScript.lua` (the fork entry point) and the CI destination are `Night5449791/VapeCompiled`. A commit sha written by one is not guaranteed to resolve against the other — pick one origin for all files before relying on reinject/teleport reload.
+- Download URLs are inconsistent: `src/loader.lua`, `src/main.lua`, `src/guis/new/init.lua`, `getvapeasset.lua` and every game base use `raw.githubusercontent.com/Night5449791/VapeCompiled/...`, while `NewMainScript.lua` (the fork entry point) and the CI destination are `Night5449791/VapeCompiled`. A commit sha written by one is not guaranteed to resolve against the other — pick one origin for all files before relying on reinject/teleport reload.
 - Inside a module's option callbacks, never assume a `module` local exists — only the module variable declared at the top of the file (or `vape.Modules.X`) resolves. This pattern caused two `attempt to index nil` crashes in `prison life/World/KickExploit.lua`.
 - `prediction.SolveTrajectory` returns an aim point, and `nil` on no solution.
 - `bedwars/6872274481 - game/base.lua:33-36` currently kicks the player — BedWars is retired.
