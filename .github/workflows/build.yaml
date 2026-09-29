@@ -11,46 +11,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Clone source files
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Clone destination files
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: Night5449791/VapeCompiled
         token: ${{ secrets.ACTIONS_GITHUB_TOKEN }}
         path: "./VapeCompiled"
-        persist-credentials: false
 
     - name: Clone bundler
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: Night5449791/VapeBundler
         path: "./VapeBundler"
 
     - name: Copy bundler configuration
-      run: mv ./.github/workflows/workflowConfig.json ./VapeBundler/config.json
+      run: |-
+        mv ./.github/workflows/workflowConfig.json ./VapeBundler/config.json
 
     - name: Install node packages
-      run: |
+      run: |-
         cd ./VapeBundler
         npm i
 
     - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
+      uses: actions/setup-node@v6
 
     - name: Run Bundler
-      run: node ./VapeBundler/index.js prod
+      run: |-
+        node ./VapeBundler/index.js prod
 
     - name: Setup git commit
-      run: |
+      run: |-
         git config --global user.name "github-actions[bot]"
         git config --global user.email "username@users.noreply.github.com"
 
     - name: Push commit
-      run: |
+      run: |-
         cd ./VapeCompiled
         git add .
-        git diff --staged --quiet || git commit -m "Updated Inhaler"
-        git push https://x-access-token:${{ secrets.ACTIONS_GITHUB_TOKEN }}@github.com/Night5449791/VapeCompiled.git HEAD:main
+        git commit -m "Updated Inhaler"
+        git push origin
