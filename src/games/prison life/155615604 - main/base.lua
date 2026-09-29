@@ -57,14 +57,14 @@ local function canClick()
 	local mousePosition = (inputService:GetMouseLocation() - guiService:GetGuiInset())
 
 	for _, hit in lplr.PlayerGui:GetGuiObjectsAtPosition(mousePosition.X, mousePosition.Y) do
-		local obj = v:FindFirstAncestorOfClass('ScreenGui')
+		local obj = hit:FindFirstAncestorOfClass('ScreenGui')
 		if hit.Active and hit.Visible and obj and obj.Enabled then
 			return false
 		end
 	end
 
 	for _, hit in coreGui:GetGuiObjectsAtPosition(mousePosition.X, mousePosition.Y) do
-		local obj = v:FindFirstAncestorOfClass('ScreenGui')
+		local obj = hit:FindFirstAncestorOfClass('ScreenGui')
 		if hit.Active and hit.Visible and obj and obj.Enabled then
 			return false
 		end

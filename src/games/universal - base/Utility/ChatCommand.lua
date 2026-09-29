@@ -1,39 +1,20 @@
 local ChatCommand
 
 local options = {}
-local viewConnection
-local followModule, followOldMove
-local followPlayer
-local followConnection
-local teamsService = cloneref(game:GetService('Teams'))
-local teleportService = cloneref(game:GetService('TeleportService'))
 local teamAliases = {
 	g = 'Guards',
 	guards = 'Guards',
 	i = 'Inmates',
-	inmates = 'Inmates'
+	inmates = 'Inmates',
+	c = 'Criminals',
+	criminals = 'Criminals'
 }
+local teamsService = cloneref(game:GetService('Teams'))
+local viewConnection, viewEntity
+local followModule, followOldMove, followPlayer, followConnection
 
 local function trim(text)
 	return text and text:match('^%s*(.-)%s*$') or nil
-end
-
-local function setListValue(list, value, enabled)
-	if list and enabled ~= (table.find(list.ListEnabled, value) ~= nil) then
-		list:ChangeValue(value)
-	end
-end
-
-local function clearListValues(list)
-	if not list then return 0 end
-
-	local count = #list.List
-	if count == 0 and #list.ListEnabled == 0 then return 0 end
-
-	table.clear(list.List)
-	table.clear(list.ListEnabled)
-	list:ChangeValue()
-	return count
 end
 
 local function disconnect(connection)
@@ -44,16 +25,37 @@ local function disconnect(connection)
 	return nil
 end
 
--- Camera
-
 local function getLocalHumanoid()
 	local character = lplr.Character
 	return character and character:FindFirstChildOfClass('Humanoid')
 		or (entitylib.character and entitylib.character.Humanoid)
 end
 
+-- Lists
+
+local function setListValue(list, value, enabled)
+	if list and list.ListEnabled and enabled ~= (table.find(list.ListEnabled, value) ~= nil) then
+		list:ChangeValue(value)
+	end
+end
+
+local function clearListValues(list)
+	if not list or not list.List then return 0 end
+
+	local count = #list.List
+	if count == 0 and #list.ListEnabled == 0 then return 0 end
+
+	table.clear(list.List)
+	table.clear(list.ListEnabled)
+	list:ChangeValue()
+	return count
+end
+
+-- Camera
+
 local function clearViewConnection()
 	viewConnection = disconnect(viewConnection)
+	viewEntity = nil
 end
 
 local function restoreCamera()
@@ -74,16 +76,24 @@ local function findEntity(prefix, includeDead)
 
 	local lowered = prefix:lower()
 	local length = #lowered
+	local partial
+
 	for _, entity in entitylib.List do
-		if entity and entity.Humanoid and (includeDead or entity.Humanoid.Health > 0) then
+		if entity.Humanoid and (includeDead or entity.Humanoid.Health > 0) then
 			local player = entity.Player
-			local name = player and player.Name
-			local displayName = player and player.DisplayName
-			if (name and name:lower():sub(1, length) == lowered) or (displayName and displayName:lower():sub(1, length) == lowered) then
-				return entity
+			if player then
+				if player.Name:lower() == lowered then
+					return entity
+				end
+
+				if not partial and (player.Name:lower():sub(1, length) == lowered or player.DisplayName:lower():sub(1, length) == lowered) then
+					partial = entity
+				end
 			end
 		end
 	end
+
+	return partial
 end
 
 local function findPlayer(prefix, allowLeft)
@@ -95,51 +105,23 @@ local function findPlayer(prefix, allowLeft)
 		return entity.Player
 	end
 
-	if allowLeft then
-		return playersService:FindFirstChild(prefix)
-	end
-end
+	if not allowLeft then return end
 
--- KickExploit bridge
+	local lowered = prefix:lower()
+	local length = #lowered
+	local partial
 
-local function kickModule()
-	return vape.Modules.KickExploit
-end
+	for _, plr in playersService:GetPlayers() do
+		if plr.Name:lower() == lowered or plr.DisplayName:lower() == lowered then
+			return plr
+		end
 
-local function setKickTarget(name, enabled)
-	local module = kickModule()
-	if module then
-		setListValue(module.Options['Targets'], name, enabled)
-	end
-end
-
-local function clearAllTargets()
-	local count = clearListValues(vape.Categories.Targets)
-	notif('Blacklist', count > 0 and 'Cleared '..count..' target'..plural(count) or 'No targets to clear.', 5)
-end
-
-local function setKickEnabled(module, enabled)
-	if module.Enabled ~= enabled then
-		module:Toggle()
-	end
-end
-
-local function startKick(mode, text)
-	local module = kickModule()
-	if not module then return end
-
-	module.Options['Mode']:SetValue(mode)
-	setKickEnabled(module, true)
-	notif('KickExploit', text, 5)
-end
-
-local function stopKick()
-	local module = kickModule()
-	if module then
-		setKickEnabled(module, false)
+		if not partial and (plr.Name:lower():sub(1, length) == lowered or plr.DisplayName:lower():sub(1, length) == lowered) then
+			partial = plr
+		end
 	end
 
-	notif('KickExploit', 'Kick disabled.', 5)
+	return partial
 end
 
 -- Follow
@@ -240,49 +222,63 @@ local function clickTeamButton(teamName)
 	return false
 end
 
+local function findTeam(name)
+	name = trim(name)
+	if not name or name == '' then return end
+
+	local team = teamsService:FindFirstChild(teamAliases[name:lower()] or name)
+	if team then
+		return team
+	end
+
+	local lowered = name:lower()
+	for _, child in teamsService:GetChildren() do
+		if child.Name:lower():sub(1, #lowered) == lowered then
+			return child
+		end
+	end
+end
+
 local function handleTeam(args)
 	if not options.ChangeTeam.Enabled then return end
 
-	local command = args and args:match('^%S+$')
-	local teamName = command and teamAliases[command:lower()]
-	if not teamName then return end
+	local targetTeam = findTeam(args and args:match('^%S+$'))
+	if not targetTeam then return end
 
 	ChatCommand:Clean(task.spawn(function()
 		local remotes = replicatedStorage:FindFirstChild('Remotes')
 		local requestTeamChange = remotes and remotes:FindFirstChild('RequestTeamChange')
 		local neutral = teamsService:FindFirstChild('Neutral')
-		local targetTeam = teamsService:FindFirstChild(teamName)
-		if not targetTeam then return end
 
-		if lplr.Team ~= neutral then
-			if requestTeamChange and neutral then
-				requestTeamChange:InvokeServer(neutral, 1)
-			end
+		if lplr.Team ~= neutral and neutral and requestTeamChange then
+			requestTeamChange:InvokeServer(neutral, 1)
 			task.wait(1.5)
 		end
 
-		if not clickTeamButton(teamName) and requestTeamChange then
+		if not clickTeamButton(targetTeam.Name) and requestTeamChange then
 			requestTeamChange:InvokeServer(targetTeam, 1)
 		end
 	end))
 end
 
+-- Reload / servers
+
 local function handleReload()
 	if not options.ReloadVape.Enabled then return end
 
-	if delfile then
-		delfile('newvape/main.lua')
-	end
-
-	if delfolder then
-		for _, folder in {'newvape/libraries', 'newvape/games', 'newvape/guis'} do
-			if isfolder and isfolder(folder) then
-				delfolder(folder)
-			end
+	local success, err = pcall(function()
+		vape:Save()
+		shared.vapereload = true
+		if shared.VapeDeveloper then
+			loadstring(readfile('newvape/loader.lua'), 'loader')()
+		else
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeCompiled/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
 		end
-	end
+	end)
 
-	loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/VapeV4ForRoblox/main/NewMainScript.lua', true))()
+	if not success then
+		notif('ChatCommand', 'Failed to reload : '..tostring(err), 5, 'warning')
+	end
 end
 
 local function handleHop()
@@ -304,6 +300,8 @@ local function handleRejoin()
 	end
 end
 
+-- Whitelist / target lists
+
 local function handleWhitelist(args, remove)
 	if not options.Whitelist.Enabled then return end
 
@@ -315,6 +313,11 @@ local function handleWhitelist(args, remove)
 
 	setListValue(vape.Categories.Friends, player.Name, not remove)
 	notif('Whitelist', player.DisplayName..' has been '..(remove and 'unwhitelisted.' or 'whitelisted.'), 5)
+end
+
+local function clearAllTargets()
+	local count = clearListValues(vape.Categories.Targets)
+	notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
 end
 
 local function handleTargets(args, remove)
@@ -338,6 +341,51 @@ local function handleTargets(args, remove)
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
+-- KickExploit bridge
+
+local function kickModule()
+	return vape.Modules.KickExploit
+end
+
+local function setKickTarget(name, enabled)
+	local module = kickModule()
+	if module then
+		setListValue(module.Options['Targets'], name, enabled)
+	end
+end
+
+local function setKickMode(mode)
+	local module = kickModule()
+	if module and module.Options['Mode'] then
+		module.Options['Mode']:SetValue(mode)
+	end
+end
+
+local function startKick(mode, text)
+	local module = kickModule()
+	if not module then return end
+
+	setKickMode(mode)
+	if not module.Enabled then
+		module:Toggle()
+	end
+
+	if module.Enabled then
+		notif('KickExploit', text, 5)
+	else
+		notif('KickExploit', 'KickExploit failed to enable.', 5, 'warning')
+	end
+end
+
+local function stopKick()
+	local module = kickModule()
+	if module and module.Enabled then
+		module:Toggle()
+	end
+
+	notif('KickExploit', 'Kick disabled.', 5)
+end
+
 local function handleKick(args)
 	if not options.Kick.Enabled then return end
 
@@ -353,7 +401,7 @@ local function handleKick(args)
 	if lowered == 'all' then
 		startKick('All', 'Flinging all players.')
 		return
-	elseif lowered == 'none' then
+	elseif lowered == 'none' or lowered == 'off' or lowered == 'stop' then
 		stopKick()
 		return
 	end
@@ -361,7 +409,6 @@ local function handleKick(args)
 	local player = findPlayer(name, true)
 	if not player then
 		notif('KickExploit', 'No player found.', 5, 'warning')
-		module.Options['Mode']:SetValue("All")
 		return
 	end
 
@@ -369,6 +416,8 @@ local function handleKick(args)
 	setListValue(vape.Categories.Targets, player.Name, true)
 	startKick('Individual', 'Flinging '..player.Name..'.')
 end
+
+-- Movement / camera commands
 
 local function handleTP(args)
 	if not options.PlayerTP.Enabled then return end
@@ -393,78 +442,15 @@ local function handleFollow(args)
 	end
 
 	startFollow(target.Player)
-	notif('ChatCommand', 'Following '..target.Player.DisplayName..'.', 5)
+	if followPlayer then
+		notif('ChatCommand', 'Following '..target.Player.DisplayName..'.', 5)
+	end
 end
 
 local function handleUnfollow()
 	stopFollow()
 	notif('ChatCommand', 'Stopped following.', 5)
 end
-
-local function handleView(args)
-	if not options.PlayerView.Enabled then return end
-
-	local target = findEntity(args)
-	if not target or not target.Humanoid then
-		notif('ChatCommand', 'No living player found.', 5, 'warning')
-		return
-	end
-
-	clearViewConnection()
-	gameCamera.CameraSubject = target.Humanoid
-	viewConnection = target.Humanoid.Died:Connect(restoreCamera)
-end
-
-local function onChatted(message)
-	message = trim(message)
-	if message:sub(1, 1) ~= '.' then return end
-
-	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
-	command = command and command:lower()
-	args = args ~= '' and args or nil
-	if not command then return end
-
-	if command == 'team' then
-		handleTeam(args)
-	elseif command == 'reload' then
-		handleReload()
-	elseif command == 'hop' or command == 'serverhop' then
-		handleHop()
-	elseif command == 'rj' or command == 'rejoin' then
-		handleRejoin()
-	elseif command == 'wl' or command == 'whitelist' then
-		handleWhitelist(args, false)
-	elseif command == 'unwl' or command == 'unwhitelist' then
-		handleWhitelist(args, true)
-	elseif command == 'target' or command == 'blacklist' then
-		handleTargets(args, false)
-	elseif command == 'untarget' or command == 'unblacklist' then
-		handleTargets(args, true)
-	elseif command == 'kick' then
-		handleKick(args)
-	elseif command == 'unview' then
-		restoreCamera()
-	elseif command == 'follow' then
-		handleFollow(args)
-	elseif command == 'unfollow' then
-		handleUnfollow()
-	elseif command == 'tp' then
-		handleTP(args)
-	elseif command == 'view' then
-		handleView(args)
-	end
-end
-
-ChatCommand = vape.Categories.Utility:CreateModule({
-	Name = 'ChatCommand',
-	Function = function(callback)
-		if not callback then return end
-
-		ChatCommand:Clean(restoreCamera)
-		ChatCommand:Clean(stopFollow)
-		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
-	end
-})
 
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
@@ -481,11 +467,97 @@ local toggles = {
 	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
-	{Name = 'ChangeTeam', Tooltip = '.team <g/i>'},
+	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none'}
 }
+
+local function handleView(args)
+	if not options.PlayerView.Enabled then return end
+
+	local target = findEntity(args)
+	if not target or not target.Humanoid then
+		notif('ChatCommand', 'No living player found.', 5, 'warning')
+		return
+	end
+
+	clearViewConnection()
+	viewEntity = target
+	gameCamera.CameraSubject = target.Humanoid
+	viewConnection = target.Humanoid.Died:Connect(restoreCamera)
+end
+
+local function handleHelp()
+	local enabled = {}
+	for _, toggle in toggles do
+		if options[toggle.Name].Enabled then
+			table.insert(enabled, toggle.Tooltip:gsub('\n', ' / '))
+		end
+	end
+
+	table.sort(enabled)
+	notif('ChatCommand', #enabled > 0 and table.concat(enabled, '\n') or 'No commands enabled.', 8)
+end
+
+local function onChatted(message)
+	message = trim(message)
+	if message:sub(1, 1) ~= '.' then return end
+
+	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
+	command = command and command:lower()
+	args = args ~= '' and args or nil
+	if not command then return end
+
+	if command == 'help' then
+		handleHelp()
+	elseif command == 'tp' then
+		handleTP(args)
+	elseif command == 'follow' then
+		handleFollow(args)
+	elseif command == 'unfollow' then
+		handleUnfollow()
+	elseif command == 'view' then
+		handleView(args)
+	elseif command == 'unview' then
+		restoreCamera()
+	elseif command == 'wl' or command == 'whitelist' then
+		handleWhitelist(args, false)
+	elseif command == 'unwl' or command == 'unwhitelist' then
+		handleWhitelist(args, true)
+	elseif command == 'target' or command == 'blacklist' then
+		handleTargets(args, false)
+	elseif command == 'untarget' or command == 'unblacklist' then
+		handleTargets(args, true)
+	elseif command == 'kick' then
+		handleKick(args)
+	elseif command == 'team' then
+		handleTeam(args)
+	elseif command == 'hop' or command == 'serverhop' then
+		handleHop()
+	elseif command == 'rj' or command == 'rejoin' then
+		handleRejoin()
+	elseif command == 'reload' then
+		handleReload()
+	end
+end
+
+ChatCommand = vape.Categories.Utility:CreateModule({
+	Name = 'ChatCommand',
+	Function = function(callback)
+		if not callback then return end
+
+		ChatCommand:Clean(restoreCamera)
+		ChatCommand:Clean(stopFollow)
+		ChatCommand:Clean(entitylib.Events.EntityRemoved:Connect(function(entity)
+			if entity == viewEntity then
+				restoreCamera()
+			end
+		end))
+		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
+	end,
+	Tooltip = 'Chat commands, every command is a toggleable option\n.help lists the enabled commands'
+})
 
 for _, toggle in toggles do
 	options[toggle.Name] = ChatCommand:CreateToggle({

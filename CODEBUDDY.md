@@ -45,7 +45,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/VapeV4Fo
 
 Three layers under `src/`, all loaded at runtime as independent chunks:
 
-### `src/libraries/` — 6 standalone chunks, each `return <table>`
+### `src/libraries/` — 5 standalone chunks, each `return <table>`
 
 Loaded via `loadstring(downloadFile('newvape/libraries/<name>.lua'), ...)()` and usually registered into `vape.Libraries`.
 
@@ -56,7 +56,6 @@ Loaded via `loadstring(downloadFile('newvape/libraries/<name>.lua'), ...)()` and
 | `prediction.lua` | `module` — projectile ballistics | SilentAim, ProjectileAimbot |
 | `drawing.lua` | id / `'1'` / nil — Actor comm-channel Drawing bridge | frontlines, redliner |
 | `vm.lua` | Fiu Luau bytecode VM | jailbreak |
-| `json.lua` | `jsonlib.read/write` | currently unreferenced |
 
 ### `src/guis/new/` — the single GUI
 
@@ -83,11 +82,11 @@ A game folder is `base.lua` plus per-category subfolders (`Combat/`, `Blatant/`,
 
 | Game dir | Products |
 |---|---|
-| `universal - base/` | `universal.lua` (62 modules, always loaded) |
-| `bedwars/` | `6872265039.lua` (lobby), `6872274481.lua` (game, 69 modules) + 2 subplace redirects |
-| `jailbreak/` | `606849621.lua` (22 modules) + 2 redirects |
-| `prison life/` | `155615604.lua` (37 modules) + 1 redirect |
-| `frontlines/` | `5938036553.lua` (12) + 3 redirects |
+| `universal - base/` | `universal.lua` (70 modules, always loaded) |
+| `bedwars/` | `6872265039.lua` (lobby, 2), `6872274481.lua` (game, 69) + 2 subplace redirects |
+| `jailbreak/` | `606849621.lua` (24) + 2 redirects |
+| `prison life/` | `155615604.lua` (39) + 1 redirect |
+| `frontlines/` | `5938036553.lua` (15) + 3 redirects |
 | `blocktales/` | `16483433878.lua` (11) + 1 redirect |
 | `skywars voxel/` | `8768229691.lua` (14) + 5 redirects |
 | `1.8arena/` | `77790193039862.lua` (14) + 1 redirect |
@@ -95,7 +94,8 @@ A game folder is `base.lua` plus per-category subfolders (`Combat/`, `Blatant/`,
 | `redliner/` | `115875349872417.lua` (11) + 2 redirects |
 | `132768098780837 - blockwars/` | `132768098780837.lua` (11) — no subplace layer |
 | `893973440 - flee the facility/` | `893973440.lua` (7) — no subplace layer |
-| `uninspired prison game/` | `122866991746914.lua` — base only |
+
+**Duplicate module names across universal and a game are intentional**: `CreateModule` calls `vape:Remove(props.Name)` first, and `main.lua` loads `universal.lua` **before** `<PlaceId>.lua`, so a game file with the same `Name` silently replaces the universal one. Do not keep two copies of the same module name — move what is truly generic into `universal - base/` and detect game features at runtime (e.g. `vape.Modules.KickExploit`).
 
 ---
 
@@ -396,7 +396,9 @@ Some games forward varargs: `loadstring(..., 'frontlines')(...)`. Note `skywars 
 
 Helpers shared by every universal module and every game: `addBlur`, `calculateMoveVector`, `isFriend(plr, recolor)`, `isTarget(plr)`, `canClick()`, `getTableSize`, `getTool()`, `notif(...)`, `removeTags`, `serverHop(pointer, filter)`, `updateVelocity()`, `motorMove(target, cf)`, plus the `SpeedMethods` table.
 
-Two `run(function() … end)` blocks: (1) `:330-383` overrides `entitylib.getUpdateConnections` (injecting `Friend`/`Target`), `entitylib.targetCheck`, `entitylib.getEntityColor`, then wires `vape:Clean` for `entitylib.kill()`, Friends/Targets `Update` events, `LocalAdded`, and camera changes; (2) `:385-939` builds the whitelist system — `whitelist:get/isingame/tag/getplayer/playeradded/process/newchat/oldchat/hook/announce/update` and `whitelist.commands` (`crash`, `deletemap`, `chat`, `framerate`, `gravity`, `jump`, `kick`, `kill`, `reveal`, `shutdown`, `toggle`, `trip`, `uninject`, `void`), with a 10-second poll loop. The file's last line is `entitylib.start()`.
+Two `run(function() … end)` blocks: (1) `:330-383` overrides `entitylib.getUpdateConnections` (injecting `Friend`/`Target`), `entitylib.targetCheck`, `entitylib.getEntityColor`, then wires `vape:Clean` for `entitylib.kill()`, Friends/Targets `Update` events, `LocalAdded`, and camera changes; (2) `:385-939` builds the whitelist system — `whitelist:get/isingame/tag/getplayer/playeradded/process/newchat/oldchat/hook/announce/update` and `whitelist.commands` (`crash`, `deletemap`, `framerate`, `gravity`, `jump`, `kick`, `kill`, `reveal`, `shutdown`, `toggle`, `trip`, `uninject`, `void`), with a 10-second poll loop. The file's last line is `entitylib.start()`.
+
+Universal also ships `Utility/ChatCommand.lua` — the `.`-prefixed chat command module (`.tp`, `.follow`, `.unfollow`, `.view`, `.unview`, `.wl`, `.unwl`, `.target`, `.untarget`, `.team`, `.kick`, `.hop`, `.rj`, `.reload`, `.help`). Each command is gated by its own toggle option, and game-specific bridges are detected rather than assumed: `.kick` requires `vape.Modules.KickExploit`, `.team` requires a matching `Teams` child plus `ReplicatedStorage.Remotes.RequestTeamChange`. Keep it game-agnostic — anything that needs a game's own runtime table belongs in that game's folder.
 
 universal never calls `vape:Remove` — it is the provider. Game bases do.
 
@@ -431,6 +433,8 @@ followed by `cloneref(game:GetService(...))` service locals, `gameCamera`, `lplr
 - `TwoSlider`'s `props.Function` is never invoked from `SetValue`.
 - `entitylib.Events.EntityRemoving` is never fired (use `EntityRemoved`).
 - `drawing.lua` returns the string `'1'` when unsupported — callers must check the return value.
+- Download URLs are inconsistent: `src/loader.lua`, `src/main.lua`, `src/guis/new/init.lua`, `getvapeasset.lua` and every game base use `raw.githubusercontent.com/7GrandDadPGN/VapeCompiled/...`, while `NewMainScript.lua` (the fork entry point) and the CI destination are `Night5449791/VapeCompiled`. A commit sha written by one is not guaranteed to resolve against the other — pick one origin for all files before relying on reinject/teleport reload.
+- Inside a module's option callbacks, never assume a `module` local exists — only the module variable declared at the top of the file (or `vape.Modules.X`) resolves. This pattern caused two `attempt to index nil` crashes in `prison life/World/KickExploit.lua`.
 - `prediction.SolveTrajectory` returns an aim point, and `nil` on no solution.
 - `bedwars/6872274481 - game/base.lua:33-36` currently kicks the player — BedWars is retired.
 
