@@ -1,0 +1,61 @@
+local HitSound
+local Value
+local Volume
+local PitchShift
+local old, sounds = nil, {}
+
+HitSound = vape.Legit:CreateModule({
+	Name = 'HitSound',
+	Function = function(callback)
+		if callback then
+			local played
+			TracerHook:Add('HitSound', function(...)
+				local part = debug.getstack(4, 17)
+				if typeof(part) == 'Instance' then
+					for _, v in entitylib.List do
+						if part:IsDescendantOf(v.Character) and entitylib.isVulnerable(v, true) then
+							if #sounds > 0 and not played then
+								local sound = Instance.new('Sound')
+								sound.SoundId = sounds[math.random(1, #sounds)]
+								sound.PlayOnRemove = true
+								sound.PlaybackSpeed = PitchShift.Enabled and 1 + ((0.5 - math.random()) / 10) or 1
+								sound.Volume = Volume.Value
+								sound.Parent = workspace
+								sound:Destroy()
+
+								played = task.defer(function()
+									played = nil
+								end)
+							end
+
+							break
+						end
+					end
+				end
+			end)
+		else
+			TracerHook:Remove('HitSound')
+		end
+	end,
+	Tooltip = 'Custom hit sound'
+})
+Value = HitSound:CreateTextList({
+	Name = 'Sounds',
+	Placeholder = 'sound id (roblox or file path)',
+	Function = function(list)
+		table.clear(sounds)
+		for index, sound in list or {} do
+			sounds[index] = sound:find('rbxasset') and sound or isfile(sound) and getcustomasset(sound) or nil
+		end
+	end
+})
+Volume = HitSound:CreateSlider({
+	Name = 'Volume',
+	Min = 0,
+	Max = 2,
+	Default = 1,
+	Decimal = 10
+})
+PitchShift = HitSound:CreateToggle({
+	Name = 'Pitch Shift'
+})

@@ -1,0 +1,53 @@
+local AutoTaze
+local Range
+local VelocityCheck
+local cooldown = 0
+
+AutoTaze = vape.Categories.Blatant:CreateModule({
+	Name = 'AutoTaze',
+	Function = function(callback)
+		if callback then
+			repeat
+				local backpack = lplr:FindFirstChildWhichIsA('Backpack')
+				local taser = backpack and backpack:FindFirstChild('Taser')
+
+				if taser and (taser:GetAttribute('CurrentAmmo') or 1) > 0 and cooldown < os.clock() and (arrestCooldown - os.clock()) < 3 then
+					if not VelocityCheck.Enabled or entitylib.isAlive and entitylib.character.RootPart.AssemblyLinearVelocity.Magnitude < 40 then
+						local entities = entitylib.AllPosition({
+							Range = Range.Value,
+							AttackCheck = false,
+							Wallcheck = true,
+							Part = 'Head',
+							Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
+							Players = true
+						})
+
+						for _, entity in entities do
+							if not (entity.Character:GetAttribute('Tased') or entity.Character:GetAttribute('Arrested')) then
+								cooldown = os.clock() + 2
+								entitylib.character.Humanoid:EquipTool(taser)
+								break
+							end
+						end
+					end
+				end
+
+				task.wait(0.05)
+			until not AutoTaze.Enabled
+		end
+	end,
+	Tooltip = 'Automatically taze people around you. (only works with SilentAim AutoFire with Position Mode enabled)'
+})
+Range = AutoTaze:CreateSlider({
+	Name = 'Range',
+	Min = 1,
+	Max = 52,
+	Default = 52,
+	Suffix = function(val)
+		return val == 1 and 'stud' or 'studs'
+	end
+})
+VelocityCheck = AutoTaze:CreateToggle({
+	Name = 'Velocity Check',
+	Default = true
+})
