@@ -5,12 +5,14 @@ local Range
 local HitChance
 local HeadshotChance
 local Wallbang
+local IgnoreArrest
 local CircleColor
 local CircleTransparency
 local CircleFilled
 local CircleObject
 local rand = Random.new()
 local old
+local oldplasma
 local ProjectileRaycast = RaycastParams.new()
 ProjectileRaycast.RespectCanCollide = true
 
@@ -36,7 +38,8 @@ local function getTarget(origin, limit, attackcheck)
 		Part = targetPart,
 		Origin = origin.Position,
 		Players = Target.Players.Enabled,
-		NPCs = Target.NPCs.Enabled
+		NPCs = Target.NPCs.Enabled,
+		Arrest = IgnoreArrest.Enabled
 	})
 
 	if entity then
@@ -113,6 +116,24 @@ local function Hook(...)
 	return old(...)
 end
 
+local function HookPlasma(...)
+	local item = ...
+
+	if item.Local then
+		shootTimer = os.clock() + 0.1
+		local entity, targetPart, origin = getTarget(item.Tip.CFrame, item.Config.Range)
+
+		if entity then
+			targetinfo.Targets[entity] = tick() + 1
+			item.TipDirection = CFrame.lookAt(origin.Position, targetPart.Position).LookVector
+			aimTimer = os.clock() + 0.3
+			aimVec = targetPart.Position
+		end
+	end
+
+	return oldplasma(...)
+end
+
 SilentAim = vape.Categories.Combat:CreateModule({
 	Name = 'SilentAim',
 	Function = function(callback)
@@ -129,6 +150,10 @@ SilentAim = vape.Categories.Combat:CreateModule({
 				return Hook(...)
 			end)
 
+			oldplasma = hookfunction(jb.PlasmaController.ShootOther, function(...)
+				return HookPlasma(...)
+			end)
+
 			repeat
 				if CircleObject then
 					CircleObject.Position = getMousePosition()
@@ -140,6 +165,11 @@ SilentAim = vape.Categories.Combat:CreateModule({
 			if old then
 				restorefunction(jb.GunController.ShootOther)
 				old = nil
+			end
+
+			if oldplasma then
+				restorefunction(jb.PlasmaController.ShootOther)
+				oldplasma = nil
 			end
 		end
 	end,
@@ -194,6 +224,10 @@ Wallbang = SilentAim:CreateToggle({
 		end
 	end,
 	Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed or if the shoot position can be moved past walls (eg hugging walls))'
+})
+IgnoreArrest = SilentAim:CreateToggle({
+	Name = 'Ignore arrested',
+	Tooltip = 'Prevent SilentAim from targeting people that have already been arrested.'
 })
 SilentAim:CreateToggle({
 	Name = 'Range Circle',

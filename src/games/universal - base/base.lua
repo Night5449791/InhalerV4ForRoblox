@@ -14,7 +14,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/VapeCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -52,9 +52,6 @@ local assetService = cloneref(game:GetService('AssetService'))
 local coreGui = cloneref(game:GetService('CoreGui'))
 local stats = cloneref(game:GetService('Stats'))
 
-local isnetworkowner = identifyexecutor and table.find({'AWP', 'Nihon'}, ({identifyexecutor()})[1]) and isnetworkowner or function()
-	return true
-end
 local gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 local lplr = playersService.LocalPlayer
 
@@ -738,12 +735,12 @@ run(function()
 	function whitelist:update(first)
 		local suc = pcall(function()
 			local _, subbed = pcall(function()
-				return game:HttpGet('https://github.com/7GrandDadPGN/whitelists')
+				return game:HttpGet('https://github.com/Night5449791/whitelists')
 			end)
 			local commit = subbed:find('currentOid')
 			commit = commit and subbed:sub(commit + 13, commit + 52) or nil
 			commit = commit and #commit == 40 and commit or 'main'
-			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/whitelists/'..commit..'/PlayerWhitelist.json', true)
+			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/Night5449791/whitelists/'..commit..'/PlayerWhitelist.json', true)
 		end)
 		if not suc or not hash or not whitelist.get then return true end
 		whitelist.loaded = true

@@ -9,7 +9,7 @@ local isfile = isfile or function(file)
 end
 local function downloadFile(path, func)
 	if not isfile(path) then
-		local suc, res = pcall(function() return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true) end)
+		local suc, res = pcall(function() return game:HttpGet('https://raw.githubusercontent.com/Night5449791/VapeCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true) end)
 		if not suc or res == '404: Not Found' then error(res) end
 		if path:find('.lua') then res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res end
 		writefile(path, res)
@@ -404,6 +404,10 @@ run(function()
 						if pmag > entitysettings.RangePosition then continue end
 					end
 
+					if entitysettings.Arrest then
+						if entity.Character:GetAttribute('HasHandcuffs') then continue end
+					end
+
 					table.insert(sortingTable, {
 						Entity = entity,
 						Magnitude = entity.Target and -1 or mag
@@ -438,6 +442,10 @@ run(function()
 				local mag = (entity[entitysettings.Part].Position - localPosition).Magnitude
 				if mag > entitysettings.Range then continue end
 				if entitylib.isVulnerable(entity, entitysettings.AttackCheck) then
+					if entitysettings.Arrest then
+						if entity.Character:GetAttribute('HasHandcuffs') then continue end
+					end
+
 					table.insert(sortingTable, {
 						Entity = entity,
 						Magnitude = entity.Target and -1 or mag
@@ -473,6 +481,10 @@ run(function()
 				local mag = (entity[entitysettings.Part].Position - localPosition).Magnitude
 				if mag > entitysettings.Range then continue end
 				if entitylib.isVulnerable(entity, entitysettings.AttackCheck) then
+					if entitysettings.Arrest then
+						if entity.Character:GetAttribute('HasHandcuffs') then continue end
+					end
+
 					table.insert(sortingTable, {
 						Entity = entity,
 						Magnitude = entity.Target and -1 or mag
@@ -629,6 +641,7 @@ run(function()
 	jb = {
 		AlexChassis = require(replicatedStorage.Module.AlexChassis),
 		Audio = require(replicatedStorage.Std.Audio),
+		Boat = require(replicatedStorage.Game.Boat.Boat),
 		BulletEmitter = require(replicatedStorage.Game.ItemSystem.BulletEmitter),
 		CircleAction = require(replicatedStorage.Module.UI).CircleAction,
 		FallingController = require(replicatedStorage.Game.Falling),
@@ -639,6 +652,7 @@ run(function()
 		ItemSystemController = require(replicatedStorage.Game.ItemSystem.ItemSystem),
 		LightningUtils = require(replicatedStorage.Game.LightningUtils),
 		PlayerUtils = require(replicatedStorage.Game.PlayerUtils),
+		PlasmaController = require(replicatedStorage.Game.Item.PlasmaGun),
 		TeamChooseController = require(replicatedStorage.TeamSelect.TeamChooseUI),
 		VehicleController = require(replicatedStorage.Vehicle.VehicleUtils),
 		VehicleSystem = require(replicatedStorage.Game.VehicleSystem)

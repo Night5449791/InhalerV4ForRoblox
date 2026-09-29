@@ -18,10 +18,10 @@ SessionInfo = vape:CreateOverlay({
 	Position = UDim2.fromOffset(12, 14),
 	Function = function(callback)
 		if callback then
-			local teleportedServers
+			local teleported
 			SessionInfo:Clean(playersService.LocalPlayer.OnTeleport:Connect(function()
-				if not teleportedServers then
-					teleportedServers = true
+				if not teleported then
+					teleported = true
 					queue_on_teleport("shared.vapesessioninfo = '"..httpService:JSONEncode(vape.Libraries.sessioninfo.Objects).."'")
 				end
 			end))
@@ -50,6 +50,7 @@ SessionInfo = vape:CreateOverlay({
 						repeat
 							local oldkey = key
 							key, val = next(stuff, key)
+
 							if val == false then
 								table.remove(stuff, key)
 								key = oldkey
@@ -64,6 +65,7 @@ SessionInfo = vape:CreateOverlay({
 					if not Title.Enabled then
 						table.remove(stuff, 1)
 					end
+
 					infolabel.Text = table.concat(stuff, '\n')
 					infolabel.FontFace = FontOption.Value
 					infolabel.TextSize = TextSize.Value
