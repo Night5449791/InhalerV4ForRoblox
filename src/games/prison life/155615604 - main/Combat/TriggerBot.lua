@@ -22,13 +22,13 @@ local function getTriggerBotTarget()
 				posY = location.Y
 			end
 
-			local hitPos
 			local rayPos = gameCamera:ViewportPointToRay(posX, posY)
 			local ray = workspace:Raycast(rayPos.Origin, rayPos.Direction * 1500, rayParams)
-			local vEntity
+			if not ray then return end
 
+			local vEntity
 			for _, entity in entitylib.List do
-				if entity.Targetable and entity.Character and (Targets.Players.Enabled and entity.Player or Targets.NPCs.Enabled and entity.NPC) and entitylib.isVulnerable(entity, true) and ray.Instance:IsDescendantOf(entity.Character) then
+				if entity.Targetable and entity.Character and (Targets.Players.Enabled and entity.Player or Targets.NPCs.Enabled and entity.NPC) and ray.Instance:IsDescendantOf(entity.Character) and entitylib.isVulnerable(entity, true) then
 					vEntity = entity
 					break
 				end
@@ -36,7 +36,7 @@ local function getTriggerBotTarget()
 
 			if vEntity then
 				local origin = entitylib.character.Head.Position
-				local hitCheck = workspace:Raycast(origin, (ray.Position - origin), rayCheck)
+				local hitCheck = workspace:Raycast(origin, (ray.Position - origin), rayParams)
 
 				if hitCheck and hitCheck.Instance:IsDescendantOf(vEntity.Character) and (ray.Position - origin).Magnitude <= data.Range then
 					return vEntity

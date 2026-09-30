@@ -56,6 +56,9 @@ BulletTracers = vape.Legit:CreateModule({
 
 			if DrawingToggle.Enabled then
 				BulletTracers:Clean(runService.RenderStepped:Connect(function()
+					local clock = os.clock()
+					local lifetime = Lifetime.Value
+
 					for obj, data in drawingobjs do
 						local from, vis = gameCamera:WorldToViewportPoint(data[1])
 						local to, vis2 = gameCamera:WorldToViewportPoint(data[2])
@@ -64,7 +67,7 @@ BulletTracers = vape.Legit:CreateModule({
 							obj.From = Vector2.new(from.X, from.Y)
 							obj.To = Vector2.new(to.X, to.Y)
 							if Fade.Enabled then
-								obj.Transparency = Color.Opacity * (1 - math.clamp((os.clock() - data[3]) / Lifetime.Value, 0, 1))
+								obj.Transparency = Color.Opacity * (1 - math.clamp((clock - data[3]) / lifetime, 0, 1))
 							end
 						else
 							obj.Visible = false

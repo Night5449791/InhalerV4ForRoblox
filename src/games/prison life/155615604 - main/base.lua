@@ -42,6 +42,7 @@ local aimTimer, shootTimer, aimVec = os.clock(), os.clock()
 local arrestCooldown = os.clock()
 local tempTargets = {}
 local gamepasses = {}
+local flatMask = Vector3.new(1, 0, 1)
 
 local function checkPoint(pos, params)
 	for _, part in workspace:GetPartBoundsInRadius(pos, 0, params) do
@@ -108,6 +109,7 @@ run(function()
 	overlapParams.FilterType = Enum.RaycastFilterType.Exclude
 	OriginScanner.Ray = rayParams
 
+	local normals = Enum.NormalId:GetEnumItems()
 	local positions = {
 		Vector3.new(0, 1, 0),
 		Vector3.new(1, 0, 0),
@@ -153,12 +155,13 @@ run(function()
 		end
 
 		local scanPositions = {origin}
-		local diff = CFrame.lookAt(origin * Vector3.new(1, 0, 1), target * Vector3.new(1, 0, 1)).LookVector
-		for _, normal in Enum.NormalId:GetEnumItems() do
+		local diff = CFrame.lookAt(origin * flatMask, target * flatMask).LookVector
+		local rootPosition = entity.RootPart.Position
+		for _, normal in normals do
 			local offset = Vector3.fromNormalId(normal)
 
-			if (offset * Vector3.new(1, 0, 1)):Dot(-diff) > -0.5 then
-				local pos = entity.RootPart.Position + offset * 7.4
+			if (offset * flatMask):Dot(-diff) > -0.5 then
+				local pos = rootPosition + offset * 7.4
 
 				if checkPoint(pos, overlapParams) then
 					table.insert(hitboxPositions, pos)
@@ -167,7 +170,7 @@ run(function()
 		end
 
 		for _, offset in positions do
-			if (offset * Vector3.new(1, 0, 1)):Dot(diff) > -0.5 then
+			if (offset * flatMask):Dot(diff) > -0.5 then
 				local pos = origin + offset * 6
 
 				if checkPoint(pos, overlapParams) then
@@ -278,17 +281,19 @@ run(function()
 		if entitylib.isAlive then
 			local mouseLocation, sortingTable = entitysettings.MouseOrigin or getMousePosition(), {}
 			local localPosition = entitysettings.Origin or entitylib.character.HumanoidRootPart.Position
+			local partName = entitysettings.Part
 			for _, entity in entitylib.List do
 				if not entitysettings.Players and entity.Player then continue end
 				if not entitysettings.NPCs and entity.NPC then continue end
 				if not entity.Targetable then continue end
-				local position, vis = gameCamera.WorldToViewportPoint(gameCamera, entity[entitysettings.Part].Position)
+				local part = entity[partName]
+				local position, vis = gameCamera.WorldToViewportPoint(gameCamera, part.Position)
 				if not vis then continue end
 				local mag = (mouseLocation - Vector2.new(position.x, position.y)).Magnitude
 				if mag > entitysettings.Range then continue end
 				if entitylib.isVulnerable(entity, entitysettings.AttackCheck) then
 					if entitysettings.RangePosition then
-						local pmag = (entity[entitysettings.Part].Position - localPosition).Magnitude
+						local pmag = (part.Position - localPosition).Magnitude
 						if pmag > entitysettings.RangePosition then continue end
 					end
 
@@ -305,7 +310,8 @@ run(function()
 
 			for _, v in sortingTable do
 				if entitysettings.Wallcheck then
-					if entitylib.Wallcheck(entitysettings.Origin, v.Entity[entitysettings.Part].Position, entitysettings.Wallbang, v.Entity[entitysettings.Part], v.Entity) then continue end
+					local part = v.Entity[partName]
+					if entitylib.Wallcheck(entitysettings.Origin, part.Position, entitysettings.Wallbang, part, v.Entity) then continue end
 				end
 				table.clear(entitysettings)
 				table.clear(sortingTable)
@@ -319,11 +325,12 @@ run(function()
 	entitylib.EntityPosition = function(entitysettings)
 		if entitylib.isAlive then
 			local localPosition, sortingTable = entitysettings.Origin or entitylib.character.HumanoidRootPart.Position, {}
+			local partName = entitysettings.Part
 			for _, entity in entitylib.List do
 				if not entitysettings.Players and entity.Player then continue end
 				if not entitysettings.NPCs and entity.NPC then continue end
 				if not entity.Targetable then continue end
-				local mag = (entity[entitysettings.Part].Position - localPosition).Magnitude
+				local mag = (entity[partName].Position - localPosition).Magnitude
 				if mag > entitysettings.Range then continue end
 				if entitylib.isVulnerable(entity, entitysettings.AttackCheck) then
 					table.insert(sortingTable, {
@@ -339,7 +346,8 @@ run(function()
 
 			for _, v in sortingTable do
 				if entitysettings.Wallcheck then
-					if entitylib.Wallcheck(localPosition, v.Entity[entitysettings.Part].Position, entitysettings.Wallbang, v.Entity[entitysettings.Part], v.Entity) then continue end
+					local part = v.Entity[partName]
+					if entitylib.Wallcheck(localPosition, part.Position, entitysettings.Wallbang, part, v.Entity) then continue end
 				end
 				table.clear(entitysettings)
 				table.clear(sortingTable)
@@ -354,11 +362,12 @@ run(function()
 		local returned = {}
 		if entitylib.isAlive then
 			local localPosition, sortingTable = entitysettings.Origin or entitylib.character.HumanoidRootPart.Position, {}
+			local partName = entitysettings.Part
 			for _, entity in entitylib.List do
 				if not entitysettings.Players and entity.Player then continue end
 				if not entitysettings.NPCs and entity.NPC then continue end
 				if not (entity.Targetable or entitysettings.SkipTeam and entitylib.targetCheck(entity, true)) then continue end
-				local mag = (entity[entitysettings.Part].Position - localPosition).Magnitude
+				local mag = (entity[partName].Position - localPosition).Magnitude
 				if mag > entitysettings.Range then continue end
 				if entitylib.isVulnerable(entity, entitysettings.AttackCheck, entitysettings.SkipTeam) then
 					table.insert(sortingTable, {
@@ -374,7 +383,8 @@ run(function()
 
 			for _, v in sortingTable do
 				if entitysettings.Wallcheck then
-					if entitylib.Wallcheck(localPosition, v.Entity[entitysettings.Part].Position, entitysettings.Wallbang, v.Entity[entitysettings.Part], v.Entity) then continue end
+					local part = v.Entity[partName]
+					if entitylib.Wallcheck(localPosition, part.Position, entitysettings.Wallbang, part, v.Entity) then continue end
 				end
 				table.insert(returned, v.Entity)
 				if #returned >= (entitysettings.Limit or math.huge) then break end

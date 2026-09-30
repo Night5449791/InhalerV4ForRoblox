@@ -2,6 +2,7 @@ local VehicleFly
 local Mode
 local Speed
 local welds = {}
+local hoverVelocity = Vector3.new(0, 2.25, 0)
 local up, down = 0, 0
 
 VehicleFly = vape.Categories.Blatant:CreateModule({
@@ -61,9 +62,13 @@ VehicleFly = vape.Categories.Blatant:CreateModule({
 						end
 
 						if inCar then
-							root.AssemblyLinearVelocity = Vector3.new(0, 2.25, 0)
-							root.CFrame = CFrame.lookAlong(root.Position, gameCamera.CFrame.LookVector) + (entitylib.character.Humanoid.MoveDirection + Vector3.new(0, up + down, 0)) * Speed.Value * dt
-							gameCamera.CameraSubject = entitylib.character.Humanoid
+							local humanoid = entitylib.character.Humanoid
+							root.AssemblyLinearVelocity = hoverVelocity
+							root.CFrame = CFrame.lookAlong(root.Position, gameCamera.CFrame.LookVector) + (humanoid.MoveDirection + Vector3.new(0, up + down, 0)) * Speed.Value * dt
+
+							if gameCamera.CameraSubject ~= humanoid then
+								gameCamera.CameraSubject = humanoid
+							end
 						end
 					elseif old then
 						for _, weld in welds do

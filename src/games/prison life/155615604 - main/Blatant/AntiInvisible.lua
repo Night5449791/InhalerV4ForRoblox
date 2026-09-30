@@ -1,6 +1,6 @@
 local AntiInvisible
 local threads = {}
-local whitelist = {
+local allowedAnims = {
 	-- default roblox animations
 	['http://www.roblox.com/asset/?id=125750702'] = true,
 	['http://www.roblox.com/asset/?id=128777973'] = true,
@@ -46,7 +46,7 @@ local whitelist = {
 }
 
 local function AnimationAdded(anim, plr)
-	if not whitelist[anim.Animation.AnimationId] and plr then
+	if not allowedAnims[anim.Animation.AnimationId] and plr then
 		if threads[anim] then
 			task.cancel(threads[anim])
 		end
@@ -78,7 +78,7 @@ local function EntityAdded(ent)
 end
 
 for _, v in replicatedStorage:QueryDescendants('Animation') do
-	whitelist[v.AnimationId] = true
+	allowedAnims[v.AnimationId] = true
 end
 
 AntiInvisible = vape.Categories.Blatant:CreateModule({

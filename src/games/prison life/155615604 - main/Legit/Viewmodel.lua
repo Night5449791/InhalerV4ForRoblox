@@ -79,19 +79,25 @@ Viewmodel = vape.Legit:CreateModule({
 
 			Viewmodel:Clean(runService.RenderStepped:Connect(function(dt)
 				if handle then
-					moveSpring.Target = entitylib.isAlive and entitylib.character.RootPart.AssemblyLinearVelocity * 0.005 or Vector3.zero
+					local camCF = gameCamera.CFrame
+					local clock = os.clock()
+					local root = entitylib.isAlive and entitylib.character.RootPart
+					moveSpring.Target = root and root.AssemblyLinearVelocity * 0.005 or Vector3.zero
 
 					if Sway.Enabled then
+						local swayTime = tick()
+
 						if moveSpring.Target.Magnitude > 0.1 then
-							moveSpring.Target += (gameCamera.CFrame * CFrame.new(math.sin(tick() * 10) * 0.06, 0, 0)).Position - gameCamera.CFrame.Position
+							moveSpring.Target += (camCF * CFrame.new(math.sin(swayTime * 10) * 0.06, 0, 0)).Position - camCF.Position
 						else
-							moveSpring.Target += (gameCamera.CFrame * CFrame.new(0, math.sin(tick()) * 0.04, 0)).Position - gameCamera.CFrame.Position
+							moveSpring.Target += (camCF * CFrame.new(0, math.sin(swayTime) * 0.04, 0)).Position - camCF.Position
 						end
 					end
 
-					local cf = (gameCamera.CFrame * CFrame.new(Horizontal.Value, Vertical.Value, -Depth.Value)) + moveSpring:Update(dt)
-					aimSpring.Target = aimTimer > os.clock() and CFrame.lookAt(cf.Position, aimVec).LookVector or gameCamera.CFrame.LookVector
-					handle.CFrame = CFrame.lookAlong(cf.Position, aimSpring:Update(dt)) * (CFrame.Angles(math.rad(math.max(shootTimer - os.clock(), 0) * 10), 0, 0) * CFrame.new(0, 0, math.max(shootTimer - os.clock(), 0)))
+					local cf = (camCF * CFrame.new(Horizontal.Value, Vertical.Value, -Depth.Value)) + moveSpring:Update(dt)
+					local recoil = math.max(shootTimer - clock, 0)
+					aimSpring.Target = aimTimer > clock and CFrame.lookAt(cf.Position, aimVec).LookVector or camCF.LookVector
+					handle.CFrame = CFrame.lookAlong(cf.Position, aimSpring:Update(dt)) * (CFrame.Angles(math.rad(recoil * 10), 0, 0) * CFrame.new(0, 0, recoil))
 					handle.AssemblyLinearVelocity = Vector3.zero
 				end
 			end))

@@ -45,15 +45,12 @@ Killaura = vape.Categories.Blatant:CreateModule({
 
 					if #entities > 0 then
 						local selfpos = entitylib.character.RootPart.Position
-						local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+						local localfacing = entitylib.character.RootPart.CFrame.LookVector * flatMask
+						local maxAngle = math.rad(AngleSlider.Value) / 2
 
 						for _, entity in entities do
-							local delta = (entity.RootPart.Position - selfpos)
-							local angle = math.acos(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit))
-							if angle > (math.rad(AngleSlider.Value) / 2) then continue end
-							if lplr.Team == teams.Guards and entity.Player.Team == teams.Inmates and not entity.Character:GetAttribute('Hostile') then
-								continue
-							end
+							local delta = (entity.RootPart.Position - selfpos) * flatMask
+							if math.acos(localfacing:Dot(delta.Unit)) > maxAngle then continue end
 
 							targetinfo.Targets[entity] = tick() + 1
 							table.insert(attacked, {
@@ -80,7 +77,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 				end
 
 				if Face.Enabled and attacked[1] then
-					local vec = attacked[1].Entity.RootPart.Position * Vector3.new(1, 0, 1)
+					local vec = attacked[1].Entity.RootPart.Position * flatMask
 					entitylib.character.RootPart.CFrame = CFrame.lookAt(entitylib.character.RootPart.Position, Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z))
 				end
 

@@ -48,33 +48,34 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 				positions[entity] = nil
 			end))
 
-			local lastDelta = 0
 			repeat
+				local clock = os.clock()
+
 				for _, entity in entitylib.List do
 					if entity.Health > 0 and entity.Player and not Cheats.Flagged[entity.Player.UserId] then
-						local playerPos = entity.RootPart.Position
+						local root = entity.RootPart
+						local humanoid = entity.Humanoid
+						local playerPos = root.Position
 
 						if not checkPoint(entity.Head.Position, overlap) then
 							Cheats:Flag(entity.Player, 'phase/noclip', 20)
 						end
 
-						if not whiteliststates[entity.Humanoid:GetState()] then
-							Cheats:Flag(entity.Player, 'invalid state '..entity.Humanoid:GetState().Name, 1)
+						local state = humanoid:GetState()
+						if not whiteliststates[state] then
+							Cheats:Flag(entity.Player, 'invalid state '..state.Name, 1)
 						end
 
-						local velo = entity.RootPart.AssemblyLinearVelocity
-						if not entity.Humanoid.SeatPart then
-							if (velo * Vector3.new(1, 0, 1)).Magnitude > 26 then
-								if #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
-									Cheats:Flag(entity.Player, 'speed', 20)
-								end
+						local velo = root.AssemblyLinearVelocity
+						if not humanoid.SeatPart then
+							if (velo * flatMask).Magnitude > 26 and #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
+								Cheats:Flag(entity.Player, 'speed', 20)
 							end
 
-							if positions[entity] then
-								if Teleport.Enabled and ((playerPos - positions[entity][1]) * Vector3.new(1, 0, 1)).Magnitude > 50 and #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
-									local canFlag = entity.Player.Team ~= teams.Inmates or (os.clock() - entity.SpawnTime) > 0.1
-
-									if canFlag then
+							local last = positions[entity]
+							if last then
+								if Teleport.Enabled and ((playerPos - last[1]) * flatMask).Magnitude > 50 and #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
+									if entity.Player.Team ~= teams.Inmates or (clock - entity.SpawnTime) > 0.1 then
 										Cheats:Flag(entity.Player, 'teleport', 1)
 									end
 								end
@@ -84,16 +85,16 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 								Cheats:Flag(entity.Player, 'highjump', 20)
 							end
 
-							if not positions[entity] or (os.clock() - positions[entity][2]) > 0.2 then
-								positions[entity] = {playerPos, os.clock()}
+							if not last or (clock - last[2]) > 0.2 then
+								positions[entity] = {playerPos, clock}
 							end
 						else
-							positions[entity] = {playerPos, os.clock()}
+							positions[entity] = {playerPos, clock}
 						end
 					end
 				end
 
-				lastDelta = task.wait(0.05)
+				task.wait(0.05)
 			until not CheatDetector.Enabled
 		else
 			table.clear(positions)

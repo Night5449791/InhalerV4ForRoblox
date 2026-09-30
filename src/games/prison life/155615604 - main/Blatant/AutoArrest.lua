@@ -11,7 +11,8 @@ AutoArrest = vape.Categories.Blatant:CreateModule({
 	Function = function(callback)
 		if callback then
 			repeat
-				local check = arrestCooldown < os.clock()
+				local clock = os.clock()
+				local check = arrestCooldown < clock
 				if HandCheck.Enabled then
 					local tool = entitylib.isAlive and lplr.Character:FindFirstChildWhichIsA('Tool')
 					check = check and tool and tool.Name == 'Handcuffs'
@@ -48,10 +49,10 @@ AutoArrest = vape.Categories.Blatant:CreateModule({
 				end
 
 				if cdholder then
-					cdholder.Visible = arrestCooldown > os.clock()
+					cdholder.Visible = arrestCooldown > clock
 
 					if cdholder.Visible then
-						local diff = (arrestCooldown - os.clock())
+						local diff = arrestCooldown - clock
 						cdframe.Size = UDim2.new(math.clamp(diff / 7, 0, 1), -2, 1, -2)
 						cdlabel.Text = (math.round(diff * 10) / 10)..'s'
 					end
