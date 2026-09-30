@@ -1,6 +1,15 @@
 local ChatCommand
 
 local options = {}
+local teamAliases = {
+	g = 'Guards',
+	guards = 'Guards',
+	i = 'Inmates',
+	inmates = 'Inmates',
+	c = 'Criminals',
+	criminals = 'Criminals'
+}
+local teamsService = cloneref(game:GetService('Teams'))
 local viewConnection, viewEntity
 local followModule, followOldMove, followPlayer, followConnection
 
@@ -186,6 +195,72 @@ local function startFollow(player)
 	end)
 end
 
+-- Team switching
+
+local function clickTeamButton(teamName)
+	local gui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+	if not gui then return false end
+
+	local lowered = teamName:lower()
+	for _, holder in gui:GetChildren() do
+		local button = holder:FindFirstChild('Button')
+		if button and button.AutoButtonColor then
+			local text = (holder.Name..' '..button.Text):lower()
+			for _, label in holder:GetDescendants() do
+				if label:IsA('TextLabel') or label:IsA('TextButton') then
+					text = text..' '..label.Text:lower()
+				end
+			end
+
+			if text:find(lowered, 1, true) then
+				firesignal(button.MouseButton1Click)
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+local function findTeam(name)
+	name = trim(name)
+	if not name or name == '' then return end
+
+	local team = teamsService:FindFirstChild(teamAliases[name:lower()] or name)
+	if team then
+		return team
+	end
+
+	local lowered = name:lower()
+	for _, child in teamsService:GetChildren() do
+		if child.Name:lower():sub(1, #lowered) == lowered then
+			return child
+		end
+	end
+end
+
+local function handleTeam(args)
+	if not options.ChangeTeam.Enabled then return end
+
+	local targetTeam = findTeam(args and args:match('^%S+$'))
+	if not targetTeam then return end
+
+	ChatCommand:Clean(task.spawn(function()
+		local remotes = replicatedStorage:FindFirstChild('Remotes')
+		local requestTeamChange = remotes and remotes:FindFirstChild('RequestTeamChange')
+		local neutral = teamsService:FindFirstChild('Neutral')
+
+		if lplr.Team ~= neutral and neutral and requestTeamChange then
+			requestTeamChange:InvokeServer(neutral, 1)
+			task.wait(1.5)
+		end
+
+		if not clickTeamButton(targetTeam.Name) and requestTeamChange then
+			requestTeamChange:InvokeServer(targetTeam, 1)
+		end
+	end))
+end
+
 -- Reload / servers
 
 local function handleReload()
@@ -266,6 +341,146 @@ local function handleTargets(args, remove)
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
+-- KickExploit bridge
+
+local function kickModule()
+	if vape and vape.Modules and vape.Modules.KickExploit then
+		return vape.Modules.KickExploit
+	end
+
+	if vape and vape.Categories and vape.Categories.World then
+		local worldModule = vape.Categories.World.Modules and vape.Categories.World.Modules.KickExploit
+		if worldModule then
+			return worldModule
+		end
+	end
+
+	return nil
+end
+
+local function setKickTarget(name, enabled)
+	local module = kickModule()
+	if not module then return end
+
+	local targetList = (module.Options and module.Options['Targets']) or module.List or module.Targets
+	setListValue(targetList, name, enabled)
+end
+
+local function setKickMode(mode)
+	local module = kickModule()
+	if not module then return end
+
+	local modeOption = (module.Options and module.Options['Mode']) or module.Mode
+	if modeOption and modeOption.SetValue then
+		modeOption:SetValue(mode)
+	end
+end
+
+local kickTeam
+local kickTeamMembers = {}
+
+local function addKickTeamMember(plr)
+	if not kickTeam or not plr or plr.Team ~= kickTeam then return end
+	if table.find(kickTeamMembers, plr.Name) then return end
+
+	table.insert(kickTeamMembers, plr.Name)
+	setKickTarget(plr.Name, true)
+	setListValue(vape.Categories.Targets, plr.Name, true)
+end
+
+local function stopKickTeam()
+	kickTeam = nil
+
+	for _, name in kickTeamMembers do
+		setKickTarget(name, false)
+		setListValue(vape.Categories.Targets, name, false)
+	end
+
+	table.clear(kickTeamMembers)
+end
+
+local function startKick(mode, text)
+	local module = kickModule()
+	if not module then return end
+
+	setKickMode(mode)
+	if not module.Enabled then
+		module:Toggle()
+	end
+
+	if module.Enabled then
+		notif('KickExploit', text, 5)
+	else
+		notif('KickExploit', 'KickExploit failed to enable.', 5, 'warning')
+	end
+end
+
+local function stopKick()
+	stopKickTeam()
+
+	local module = kickModule()
+	if module and module.Enabled then
+		module:Toggle()
+	end
+
+	notif('KickExploit', 'Kick disabled.', 5)
+end
+
+local function handleKick(args)
+	if not options.Kick.Enabled then return end
+
+	if not kickModule() then
+		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
+		return
+	end
+
+	local name = trim((args or ''):match('^target%s+(.+)$') or args)
+	if not name or name == '' then return end
+
+	local lowered = name:lower()
+	if lowered == 'all' then
+		stopKickTeam()
+		startKick('All', 'Flinging all players.')
+		return
+	elseif lowered == 'none' or lowered == 'off' or lowered == 'stop' then
+		stopKick()
+		return
+	end
+
+	local player = findPlayer(name, true)
+	if not player then
+		notif('KickExploit', 'No player found.', 5, 'warning')
+		return
+	end
+
+	setKickTarget(player.Name, true)
+	setListValue(vape.Categories.Targets, player.Name, true)
+	startKick('Individual', 'Flinging '..player.Name..'.')
+end
+
+local function handleKickTeam(args)
+	if not options.Kick.Enabled then return end
+
+	if not kickModule() then
+		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
+		return
+	end
+
+	local team = findTeam(args and args:match('^%S+$'))
+	if not team then
+		notif('KickExploit', 'No team found. (c/i/g)', 5, 'warning')
+		return
+	end
+
+	stopKickTeam()
+	kickTeam = team
+	for _, plr in team:GetPlayers() do
+		addKickTeamMember(plr)
+	end
+
+	startKick('Individual', 'Flinging '..team.Name..'.')
+end
+
 -- Movement / camera commands
 
 local function handleTP(args)
@@ -316,8 +531,10 @@ local toggles = {
 	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
+	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
-	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'}
+	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g>'}
 }
 
 local function handleView(args)
@@ -376,6 +593,12 @@ local function onChatted(message)
 		handleTargets(args, false)
 	elseif command == 'untarget' or command == 'unblacklist' then
 		handleTargets(args, true)
+	elseif command == 'kick' then
+		handleKick(args)
+	elseif command == 'kickteam' then
+		handleKickTeam(args)
+	elseif command == 'team' then
+		handleTeam(args)
 	elseif command == 'hop' or command == 'serverhop' then
 		handleHop()
 	elseif command == 'rj' or command == 'rejoin' then
@@ -397,6 +620,12 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 				restoreCamera()
 			end
 		end))
+		ChatCommand:Clean(entitylib.Events.EntityAdded:Connect(function(entity)
+			if entity.Player then
+				addKickTeamMember(entity.Player)
+			end
+		end))
+		ChatCommand:Clean(stopKickTeam)
 		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
 	end,
 	Tooltip = 'Chat commands, every command is a toggleable option\n.help lists the enabled commands'
