@@ -1,26 +1,27 @@
 local AutoToxic
-local Toggles, Lists, Cloned, Presets = {}, {}, {}, {}
+local Presets = {}
+local cloned = {}
+local random = Random.new()
 
-local function sendMessage(name, obj, default)
-	local message = default
-	if #Lists[name].ListEnabled > 0 then
-		if #Cloned[name] <= 0 then
-			Cloned[name] = table.clone(Lists[name].ListEnabled)
-		end
+local lines = {
+	'skill issue | kicked <obj>',
+}
 
-		local entry = Random.new():NextInteger(1, #Cloned[name])
-		message = Cloned[name][entry]
-		table.remove(Cloned[name], entry)
+local function sendMessage(obj)
+	if not next(cloned) then
+		cloned = table.clone(lines)
 	end
 
-	if not message then return end
+	local message = table.remove(cloned, random:NextInteger(1, #cloned)):gsub('<obj>', obj or '')
 
-	message = message and message:gsub('<obj>', obj or '') or ''
 	if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+		local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
+
 		if textChatService:CanUserChatAsync(lplr.UserId) then
-			textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+			channel:SendAsync(message)
+			channel:SendPresetAsync(Presets['So close'])
 		else
-			textChatService.ChatInputBarConfiguration.TargetTextChannel:SendPresetAsync(Presets[message] or Presets['So close'])
+			channel:SendPresetAsync(Presets['So close'])
 		end
 	else
 		replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
@@ -31,32 +32,11 @@ AutoToxic = vape.Categories.Utility:CreateModule({
 	Name = 'AutoToxic',
 	Function = function(callback)
 		if callback then
-			AutoToxic:Clean(vapeEvents.CheaterKicked.Event:Connect(function(plr)
-				sendMessage('Kicked', plr, 'skill issue | Kicked <obj>')
-			end))
+			AutoToxic:Clean(vapeEvents.CheaterKicked.Event:Connect(sendMessage))
 		end
 	end,
 	Tooltip = 'Says a message after a cheater gets kicked with CheatDetector enabled.'
 })
-for _, v in {'Kicked'} do
-	Cloned[v] = {}
-	Toggles[v] = AutoToxic:CreateToggle({
-		Name = v..' ',
-		Function = function(callback)
-			if Lists[v] then
-				Lists[v].Object.Visible = callback
-			end
-		end,
-		Default = true
-	})
-	Lists[v] = AutoToxic:CreateTextList({
-		Name = v,
-		Darker = true,
-		Function = function()
-			table.clear(Cloned[v])
-		end
-	})
-end
 
 pcall(function()
 	for _, group in textChatService:GetPresetsAsync().categoryGroups do
