@@ -344,20 +344,35 @@ end
 -- KickExploit bridge
 
 local function kickModule()
-	return vape.Modules.KickExploit
+	if vape and vape.Modules and vape.Modules.KickExploit then
+		return vape.Modules.KickExploit
+	end
+
+	if vape and vape.Categories and vape.Categories.World then
+		local worldModule = vape.Categories.World.Modules and vape.Categories.World.Modules.KickExploit
+		if worldModule then
+			return worldModule
+		end
+	end
+
+	return nil
 end
 
 local function setKickTarget(name, enabled)
 	local module = kickModule()
-	if module then
-		setListValue(module.Options['Targets'], name, enabled)
-	end
+	if not module then return end
+
+	local targetList = (module.Options and module.Options['Targets']) or module.List or module.Targets
+	setListValue(targetList, name, enabled)
 end
 
 local function setKickMode(mode)
 	local module = kickModule()
-	if module and module.Options['Mode'] then
-		module.Options['Mode']:SetValue(mode)
+	if not module then return end
+
+	local modeOption = (module.Options and module.Options['Mode']) or module.Mode
+	if modeOption and modeOption.SetValue then
+		modeOption:SetValue(mode)
 	end
 end
 
