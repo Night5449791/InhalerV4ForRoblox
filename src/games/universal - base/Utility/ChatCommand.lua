@@ -18,8 +18,8 @@ end
 
 local function getLocalHumanoid()
 	local character = lplr.Character
-	return character and character:FindFirstChildOfClass('Humanoid')
-		or (entitylib.character and entitylib.character.Humanoid)
+	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
+	return humanoid or (entitylib.character and entitylib.character.Humanoid)
 end
 
 -- Lists
@@ -70,17 +70,20 @@ local function findEntity(prefix, includeDead)
 	local partial
 
 	for _, entity in entitylib.List do
-		if entity.Humanoid and (includeDead or entity.Humanoid.Health > 0) then
-			local player = entity.Player
-			if player then
-				if player.Name:lower() == lowered then
-					return entity
-				end
+		local humanoid = entity.Humanoid
+		if not humanoid or (not includeDead and humanoid.Health <= 0) then continue end
 
-				if not partial and (player.Name:lower():sub(1, length) == lowered or player.DisplayName:lower():sub(1, length) == lowered) then
-					partial = entity
-				end
-			end
+		local player = entity.Player
+		if not player then continue end
+
+		local name = player.Name:lower()
+		local display = player.DisplayName:lower()
+		if name == lowered or display == lowered then
+			return entity
+		end
+
+		if not partial and (name:sub(1, length) == lowered or display:sub(1, length) == lowered) then
+			partial = entity
 		end
 	end
 
@@ -88,9 +91,6 @@ local function findEntity(prefix, includeDead)
 end
 
 local function findPlayer(prefix, allowLeft)
-	prefix = trim(prefix)
-	if not prefix or prefix == '' then return end
-
 	local entity = findEntity(prefix, true)
 	if entity then
 		return entity.Player
@@ -98,16 +98,21 @@ local function findPlayer(prefix, allowLeft)
 
 	if not allowLeft then return end
 
+	prefix = trim(prefix)
+	if not prefix or prefix == '' then return end
+
 	local lowered = prefix:lower()
 	local length = #lowered
 	local partial
 
 	for _, plr in playersService:GetPlayers() do
-		if plr.Name:lower() == lowered or plr.DisplayName:lower() == lowered then
+		local name = plr.Name:lower()
+		local display = plr.DisplayName:lower()
+		if name == lowered or display == lowered then
 			return plr
 		end
 
-		if not partial and (plr.Name:lower():sub(1, length) == lowered or plr.DisplayName:lower():sub(1, length) == lowered) then
+		if not partial and (name:sub(1, length) == lowered or display:sub(1, length) == lowered) then
 			partial = plr
 		end
 	end
@@ -347,41 +352,55 @@ local function handleHelp()
 	notif('ChatCommand', #enabled > 0 and table.concat(enabled, '\n') or 'No commands enabled.', 8)
 end
 
+local commands = {
+	help = handleHelp,
+	tp = handleTP,
+	follow = handleFollow,
+	unfollow = handleUnfollow,
+	view = handleView,
+	unview = restoreCamera,
+	wl = function(args)
+		handleWhitelist(args, false)
+	end,
+	whitelist = function(args)
+		handleWhitelist(args, false)
+	end,
+	unwl = function(args)
+		handleWhitelist(args, true)
+	end,
+	unwhitelist = function(args)
+		handleWhitelist(args, true)
+	end,
+	target = function(args)
+		handleTargets(args, false)
+	end,
+	blacklist = function(args)
+		handleTargets(args, false)
+	end,
+	untarget = function(args)
+		handleTargets(args, true)
+	end,
+	unblacklist = function(args)
+		handleTargets(args, true)
+	end,
+	hop = handleHop,
+	serverhop = handleHop,
+	rj = handleRejoin,
+	rejoin = handleRejoin,
+	reload = handleReload
+}
+
 local function onChatted(message)
 	message = trim(message)
 	if message:sub(1, 1) ~= '.' then return end
 
 	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
 	command = command and command:lower()
-	args = args ~= '' and args or nil
 	if not command then return end
 
-	if command == 'help' then
-		handleHelp()
-	elseif command == 'tp' then
-		handleTP(args)
-	elseif command == 'follow' then
-		handleFollow(args)
-	elseif command == 'unfollow' then
-		handleUnfollow()
-	elseif command == 'view' then
-		handleView(args)
-	elseif command == 'unview' then
-		restoreCamera()
-	elseif command == 'wl' or command == 'whitelist' then
-		handleWhitelist(args, false)
-	elseif command == 'unwl' or command == 'unwhitelist' then
-		handleWhitelist(args, true)
-	elseif command == 'target' or command == 'blacklist' then
-		handleTargets(args, false)
-	elseif command == 'untarget' or command == 'unblacklist' then
-		handleTargets(args, true)
-	elseif command == 'hop' or command == 'serverhop' then
-		handleHop()
-	elseif command == 'rj' or command == 'rejoin' then
-		handleRejoin()
-	elseif command == 'reload' then
-		handleReload()
+	local handler = commands[command]
+	if handler then
+		handler(args ~= '' and args or nil)
 	end
 end
 
