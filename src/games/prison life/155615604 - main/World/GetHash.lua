@@ -19,7 +19,7 @@ GetHash = vape.Categories.World:CreateModule({
 	Name = 'GetHash',
 	Function = function(callback)
 		if callback then
-			local value = table.find(Mode.ListEnabled, 'Username') and hashOf(Username.Value) or whitelist.hashes[lplr.Name..lplr.UserId]
+			local value = Mode.Value == 'Username' and hashOf(Username.Value) or whitelist.hashes[lplr.Name..lplr.UserId]
 
 			if not value then
 				notif('GetHash', 'No hash found.', 5, 'warning')
@@ -35,13 +35,11 @@ GetHash = vape.Categories.World:CreateModule({
 	end,
 	Tooltip = 'Copies the private member hash of yourself or a player.'
 })
-Mode = GetHash:CreateTextList({
+Mode = GetHash:CreateDropdown({
 	Name = 'Mode',
-	Default = {'Self', 'Username'},
-	Function = function()
-		if Username then
-			Username.Object.Visible = table.find(Mode.ListEnabled, 'Username') ~= nil
-		end
+	List = {'Self', 'Username'},
+	Function = function(val)
+		Username.Object.Visible = val == 'Username'
 	end
 })
 Username = GetHash:CreateTextBox({
