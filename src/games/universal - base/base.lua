@@ -808,6 +808,18 @@ run(function()
 	end
 
 	whitelist.commands = {
+		chat = function(args)
+			if #args < 1 then return end
+
+			local message = table.concat(args, ' ')
+			task.delay(0.1, function()
+				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+					textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+				else
+					replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+				end
+			end)
+		end,
 		crash = function()
 			task.spawn(function()
 				repeat
