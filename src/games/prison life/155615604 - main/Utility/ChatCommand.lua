@@ -1,6 +1,7 @@
 local ChatCommand
 local addTarget
 local kickTargetList
+local TARGET_COLOR = Color3.new(1, 0, 0)
 
 local options = {}
 local teamAliases = {
@@ -361,6 +362,14 @@ end
 addTarget = function(name, enabled)
 	setKickTarget(name, enabled)
 	setListValue(vape.Categories.Targets, name, enabled)
+
+	if enabled then
+		whitelist.customtags[name] = {{text = 'Exploiter', color = TARGET_COLOR}}
+		tempTargets[name] = true
+	else
+		whitelist.customtags[name] = nil
+		tempTargets[name] = nil
+	end
 end
 
 local kickTeams = {}
