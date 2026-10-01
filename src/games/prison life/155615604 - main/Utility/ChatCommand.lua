@@ -1,4 +1,6 @@
 local ChatCommand
+local addTarget
+local kickTargetList
 
 local options = {}
 local teamAliases = {
@@ -271,10 +273,9 @@ end
 local function handleRejoin()
 	if not options.Rejoin.Enabled then return end
 
-	if playersService.NumPlayers > 1 then
-		teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
-	else
-		teleportService:Teleport(game.PlaceId)
+	local rejoin = vape.Modules.Rejoin
+	if rejoin and not rejoin.Enabled then
+		rejoin:Toggle()
 	end
 end
 
@@ -294,7 +295,7 @@ local function handleWhitelist(args, remove)
 end
 
 local function clearAllTargets()
-	local count = clearListValues(vape.Categories.Targets)
+	local count = clearListValues(vape.Categories.Targets) + clearListValues(kickTargetList())
 	notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
 end
 
@@ -315,7 +316,7 @@ local function handleTargets(args, remove)
 		return
 	end
 
-	setListValue(vape.Categories.Targets, player.Name, not remove)
+	addTarget(player.Name, not remove)
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
@@ -336,12 +337,15 @@ local function kickModule()
 	return nil
 end
 
-local function setKickTarget(name, enabled)
+kickTargetList = function()
 	local module = kickModule()
 	if not module then return end
 
-	local targetList = (module.Options and module.Options['Targets']) or module.List or module.Targets
-	setListValue(targetList, name, enabled)
+	return (module.Options and module.Options['Targets']) or module.List or module.Targets
+end
+
+local function setKickTarget(name, enabled)
+	setListValue(kickTargetList(), name, enabled)
 end
 
 local function setKickMode(mode)
@@ -354,7 +358,7 @@ local function setKickMode(mode)
 	end
 end
 
-local function addTarget(name, enabled)
+addTarget = function(name, enabled)
 	setKickTarget(name, enabled)
 	setListValue(vape.Categories.Targets, name, enabled)
 end

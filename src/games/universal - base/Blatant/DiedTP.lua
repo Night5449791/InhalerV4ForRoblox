@@ -1,56 +1,40 @@
 local DiedTP
-local MovementMode
 local lastDeath
 
 local function trackDeath(entity)
-	entity.Humanoid.Died:Connect(function()
+	DiedTP:Clean(entity.Humanoid.Died:Connect(function()
 		local root = entity.RootPart
 		if root then
 			lastDeath = root.CFrame
 		end
-	end)
+	end))
+end
+
+local function returnToDeath(entity)
+	if not lastDeath then return end
+
+	local root = entity.RootPart
+	if not root then return end
+
+	root.CFrame = lastDeath
+	lastDeath = nil
 end
 
 DiedTP = vape.Categories.Blatant:CreateModule({
 	Name = 'DiedTP',
 	Function = function(callback)
 		if callback then
-			if not entitylib.isAlive then
-				notif('DiedTP', 'Character missing.', 5, 'warning')
-				DiedTP:Toggle()
-				return
-			end
+			DiedTP:Clean(entitylib.Events.LocalAdded:Connect(function(entity)
+				trackDeath(entity)
+				task.defer(returnToDeath, entity)
+			end))
 
-			if not lastDeath then
-				notif('DiedTP', 'No death position recorded.', 5, 'warning')
-				DiedTP:Toggle()
-				return
+			if entitylib.isAlive then
+				trackDeath(entitylib.character)
 			end
-
-			local root = entitylib.character.RootPart
-			if entitylib.character.Humanoid.SeatPart then
-				entitylib.character.Humanoid.Sit = false
-				task.wait(0.1)
-			end
-
-			if MovementMode.Value == 'Motor' then
-				motorMove(root, lastDeath)
-			else
-				root.CFrame = lastDeath
-			end
-
-			DiedTP:Toggle()
+		else
+			lastDeath = nil
 		end
 	end,
-	Tooltip = 'Teleports you to where you last died.'
+	Tooltip = 'Teleports you back to where you died after respawning.'
 })
-MovementMode = DiedTP:CreateDropdown({
-	Name = 'Movement',
-	List = {'CFrame', 'Motor'}
-})
-
-if entitylib.isAlive then
-	trackDeath(entitylib.character)
-end
-
-vape:Clean(entitylib.Events.LocalAdded:Connect(trackDeath))

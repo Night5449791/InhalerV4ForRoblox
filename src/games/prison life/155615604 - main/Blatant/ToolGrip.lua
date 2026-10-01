@@ -4,14 +4,29 @@ local SpecialGrips = {
 	['Remington 870'] = Vector3.new(1, 2, 1.5),
 	['AK-47'] = Vector3.new(1, 2, 1.5)
 }
+local originalGrips = setmetatable({}, {
+	__mode = 'k'
+})
 
 local function ApplyGrip(tool)
-	if tool:IsA('Tool') then
-		local grip = SpecialGrips[tool.Name] or DefaultGrip
-		if tool.GripPos ~= grip then
-			tool.GripPos = grip
-		end
+	if not tool:IsA('Tool') then return end
+
+	local grip = SpecialGrips[tool.Name] or DefaultGrip
+	if tool.GripPos == grip then return end
+
+	if originalGrips[tool] == nil then
+		originalGrips[tool] = tool.GripPos
 	end
+
+	tool.GripPos = grip
+end
+
+local function RestoreGrips()
+	for tool, grip in originalGrips do
+		tool.GripPos = grip
+	end
+
+	table.clear(originalGrips)
 end
 
 local function EntityAdded()
@@ -34,6 +49,8 @@ ToolGrip = vape.Categories.Blatant:CreateModule({
 			if entitylib.isAlive then
 				task.spawn(EntityAdded)
 			end
+		else
+			RestoreGrips()
 		end
 	end,
 	Tooltip = 'applies tool grip pos'

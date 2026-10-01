@@ -42,6 +42,10 @@ local function clearListValues(list)
 	return count
 end
 
+local function addTarget(name, enabled)
+	setListValue(vape.Categories.Targets, name, enabled)
+end
+
 -- Camera
 
 local function clearViewConnection()
@@ -223,10 +227,9 @@ end
 local function handleRejoin()
 	if not options.Rejoin.Enabled then return end
 
-	if playersService.NumPlayers > 1 then
-		teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
-	else
-		teleportService:Teleport(game.PlaceId)
+	local rejoin = vape.Modules.Rejoin
+	if rejoin and not rejoin.Enabled then
+		rejoin:Toggle()
 	end
 end
 
@@ -267,7 +270,7 @@ local function handleTargets(args, remove)
 		return
 	end
 
-	setListValue(vape.Categories.Targets, player.Name, not remove)
+	addTarget(player.Name, not remove)
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
