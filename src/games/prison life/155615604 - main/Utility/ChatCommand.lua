@@ -16,7 +16,7 @@ local teamAliases = {
 	criminals = 'Criminals'
 }
 local teamsService = cloneref(game:GetService('Teams'))
-local viewPlayer, viewEntity
+local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 
 local function trim(text)
@@ -61,7 +61,6 @@ end
 
 local function clearViewConnection()
 	viewPlayer = nil
-	viewEntity = nil
 end
 
 local function restoreCamera()
@@ -485,6 +484,33 @@ local function handleKickTeam(args)
 	startKick('Individual', 'Flinging '..table.concat(names, ', ')..'.')
 end
 
+local function handleKickMethod(args)
+	if not options.Kick.Enabled then return end
+
+	local module = kickModule()
+	if not module then
+		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
+		return
+	end
+
+	local method = trim(args)
+	if not method or method == '' then return end
+
+	local option = module.Options and module.Options['Kick Mode']
+	if not option or not option.SetValue then return end
+
+	local lowered = method:lower()
+	if lowered == 'normal' then
+		option:SetValue('Normal')
+		notif('KickExploit', 'Kick method: Normal', 5)
+	elseif lowered == 'headfling' or lowered == 'head' then
+		option:SetValue('Headfling')
+		notif('KickExploit', 'Kick method: Headfling', 5)
+	else
+		notif('KickExploit', 'Invalid method. (normal/headfling)', 5, 'warning')
+	end
+end
+
 -- Movement / camera commands
 
 local function handleTP(args)
@@ -538,7 +564,7 @@ local toggles = {
 	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>'}
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/headfling>'}
 }
 
 local function handleView(args)
@@ -553,7 +579,6 @@ local function handleView(args)
 
 	clearViewConnection()
 	viewPlayer = player
-	viewEntity = entity
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
@@ -602,6 +627,7 @@ local commands = {
 	end,
 	kick = handleKick,
 	kickteam = handleKickTeam,
+	kickmethod = handleKickMethod,
 	team = handleTeam,
 	hop = handleHop,
 	serverhop = handleHop,
@@ -644,7 +670,6 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 			if not entity.Player then return end
 
 			if entity.Player == viewPlayer then
-				viewEntity = entity
 				gameCamera.CameraSubject = entity.Humanoid
 			end
 

@@ -1,7 +1,7 @@
 local ChatCommand
 
 local options = {}
-local viewPlayer, viewEntity
+local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 
 local function trim(text)
@@ -50,7 +50,6 @@ end
 
 local function clearViewConnection()
 	viewPlayer = nil
-	viewEntity = nil
 end
 
 local function restoreCamera()
@@ -339,7 +338,6 @@ local function handleView(args)
 
 	clearViewConnection()
 	viewPlayer = player
-	viewEntity = entity
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
@@ -425,7 +423,6 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 		end))
 		ChatCommand:Clean(entitylib.Events.EntityAdded:Connect(function(entity)
 			if entity.Player == viewPlayer then
-				viewEntity = entity
 				gameCamera.CameraSubject = entity.Humanoid
 			end
 		end))
