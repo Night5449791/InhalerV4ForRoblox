@@ -17,3 +17,10 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 	end,
 	Tooltip = 'Automatically join a team when joining the server'
 })
+
+AutoOnDied = KickExploit:CreateToggle({
+	Name = 'OnDied',
+	Tooltip = 'Automatically pick team on death'
+})
+
+-- firesignal(game:GetService("Players").LocalPlayer.PlayerGui.Home.hud.Topbar.MenuFrame.SwitchTeams.MouseButton1Click) switching neutral imma take note on
