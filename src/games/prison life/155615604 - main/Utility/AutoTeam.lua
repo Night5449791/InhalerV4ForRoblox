@@ -65,7 +65,7 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 
 AutoOnDied = AutoTeam:CreateToggle({
 	Name = 'OnDied',
-	Default = true,
+	Default = false,
 	Tooltip = 'Automatically pick team on death'
 })
 
