@@ -546,6 +546,49 @@ local function handleUnfollow()
 	notif('ChatCommand', 'Stopped following.', 5)
 end
 
+local danceTrack
+
+local function stopDance()
+	if danceTrack then
+		pcall(function()
+			danceTrack:Stop()
+			danceTrack:Destroy()
+		end)
+		danceTrack = nil
+	end
+end
+
+local function handleDance()
+	if not options.Dance.Enabled then return end
+
+	stopDance()
+
+	local humanoid = getLocalHumanoid()
+	if not humanoid or not humanoid.Parent then
+		notif('ChatCommand', 'No character found.', 5, 'warning')
+		return
+	end
+
+	local r15 = humanoid.RigType == Enum.HumanoidRigType.R15
+	local dances = r15
+		and {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
+		or {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'}
+
+	local animation = Instance.new('Animation')
+	animation.AnimationId = 'rbxassetid://'..dances[math.random(1, #dances)]
+	danceTrack = humanoid:LoadAnimation(animation)
+	danceTrack.Looped = true
+	danceTrack:Play()
+	notif('ChatCommand', 'Dancing.', 5)
+end
+
+local function handleStopDance()
+	if not options.Dance.Enabled then return end
+
+	stopDance()
+	notif('ChatCommand', 'Stopped dancing.', 5)
+end
+
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
@@ -564,7 +607,12 @@ local toggles = {
 	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/headfling>'}
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/headfling>'},
+	{Name = 'Dance', Tooltip = '.dance\n.dundance', Function = function(enabled)
+		if not enabled then
+			stopDance()
+		end
+	end}
 }
 
 local function handleView(args)
@@ -599,6 +647,9 @@ local commands = {
 	tp = handleTP,
 	follow = handleFollow,
 	unfollow = handleUnfollow,
+	dance = handleDance,
+	dundance = handleStopDance,
+	nodance = handleStopDance,
 	view = handleView,
 	unview = restoreCamera,
 	wl = function(args)
@@ -657,6 +708,7 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 
 		ChatCommand:Clean(restoreCamera)
 		ChatCommand:Clean(stopFollow)
+		ChatCommand:Clean(stopDance)
 		ChatCommand:Clean(playersService.PlayerRemoving:Connect(function(plr)
 			if plr == viewPlayer then
 				restoreCamera()
