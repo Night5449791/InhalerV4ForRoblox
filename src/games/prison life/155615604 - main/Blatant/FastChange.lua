@@ -5,22 +5,36 @@ FastChange = vape.Categories.Blatant:CreateModule({
 	Name = 'FastChange',
 	Function = function(callback)
 		if callback then
-			local home = lplr.PlayerGui:FindFirstChild('Home', true)
-			local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
-			if switch then
-				firesignal(switch.MouseButton1Click)
-			end
+			local picked = false
 
-			task.wait(0.75)
+			if lplr.Team == teams.Neutral then
+				local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+				if teamGui then
+					for _, holder in teamGui:GetChildren() do
+						if holder.Name == ChooseTeam.Value and holder.Button.AutoButtonColor then
+							firesignal(holder.Button.MouseButton1Click)
+							picked = true
+							break
+						end
+					end
+				end
+			else
+				local home = lplr.PlayerGui:FindFirstChild('Home', true)
+				local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
+				if switch then
+					firesignal(switch.MouseButton1Click)
+				end
 
-			local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
-			local picked
-			if teamGui then
-				for _, holder in teamGui:GetChildren() do
-					if holder.Name == ChooseTeam.Value and holder.Button.AutoButtonColor then
-						pickTeam(holder.Button)
-						picked = true
-						break
+				task.wait(0.75)
+
+				local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+				if teamGui then
+					for _, holder in teamGui:GetChildren() do
+						if holder.Name == ChooseTeam.Value and holder.Button.AutoButtonColor then
+							firesignal(holder.Button.MouseButton1Click)
+							picked = true
+							break
+						end
 					end
 				end
 			end
