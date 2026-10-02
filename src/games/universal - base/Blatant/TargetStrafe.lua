@@ -3,6 +3,8 @@ local Targets
 local SearchRange
 local StrafeRange
 local YFactor
+local Targeting
+local TargetUsername
 local rayCheck = RaycastParams.new()
 rayCheck.RespectCanCollide = true
 local module, old
@@ -29,6 +31,19 @@ TargetStrafe = vape.Categories.Blatant:CreateModule({
 					Players = Targets.Players.Enabled,
 					NPCs = Targets.NPCs.Enabled
 				})
+
+				if Targeting.Enabled then
+					local name = (TargetUsername.Value or ''):lower()
+					if name ~= '' then
+						ent = nil
+						for _, e in entitylib.List do
+							if e.Player and (e.Player.Name:lower() == name or e.Player.DisplayName:lower() == name) then
+								ent = e
+								break
+							end
+						end
+					end
+				end
 
 				if ent then
 					local root, targetPos = entitylib.character.RootPart, ent.RootPart.Position
@@ -90,6 +105,21 @@ TargetStrafe = vape.Categories.Blatant:CreateModule({
 Targets = TargetStrafe:CreateTargets({
 	Players = true,
 	Walls = true
+})
+Targeting = TargetStrafe:CreateToggle({
+	Name = 'Targeting',
+	Default = false,
+	Function = function(enabled)
+		TargetUsername.Object.Visible = enabled
+	end,
+	Tooltip = 'Force TargetStrafe to lock onto the player set in Target Username instead of the nearest one.'
+})
+TargetUsername = TargetStrafe:CreateTextBox({
+	Name = 'Target Username',
+	Placeholder = 'Roblox username',
+	Player = true,
+	Visible = false,
+	Tooltip = 'The player TargetStrafe will lock onto while Targeting is enabled.'
 })
 SearchRange = TargetStrafe:CreateSlider({
 	Name = 'Search Range',
