@@ -68,5 +68,3 @@ AutoOnDied = AutoTeam:CreateToggle({
 	Default = false,
 	Tooltip = 'Automatically pick team on death'
 })
-
--- firesignal(game:GetService("Players").LocalPlayer.PlayerGui.Home.hud.Topbar.MenuFrame.SwitchTeams.MouseButton1Click) switching neutral imma take note on
