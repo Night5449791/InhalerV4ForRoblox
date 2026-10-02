@@ -14,7 +14,7 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 				firesignal(switch.MouseButton1Click)
 			end
 
-			task.wait(1)
+			task.wait(0.75)
 
 			local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
 			if teamGui then

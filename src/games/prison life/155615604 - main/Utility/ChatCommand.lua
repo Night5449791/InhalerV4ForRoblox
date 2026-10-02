@@ -264,7 +264,7 @@ local function handleHop()
 	if not options.ServerHop.Enabled then return end
 
 	local serverHop = vape.Modules.ServerHop
-	if serverHop and not serverHop.Enabled then
+	if serverHop then
 		serverHop:Toggle()
 	end
 end
