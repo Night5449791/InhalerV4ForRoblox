@@ -2,6 +2,21 @@
 	Prediction Library
 	Source: https://devforum.roblox.com/t/predict-projectile-ballistics-including-gravity-and-motion/1842434
 	New Solver: https://devforum.roblox.com/t/trajectory-prediction/3350931
+
+	Returns `module` exposing projectile ballistics solvers (gravity + target
+	motion). Its locals are inlined into the universal chunk via the --Libraries
+	marker, so other modules reference `prediction` directly.
+
+	Usage:
+	  prediction.SolveTrajectory(
+	    origin,          -- Vector3, muzzle/world position of the shot
+	    projectileSpeed, -- number, muzzle speed
+	    gravity,         -- number, world gravity
+	    targetPos,       -- Vector3, current target position
+	    targetVelocity,  -- Vector3, current target velocity
+	    playerGravity, playerHeight, playerJump, params
+	  )
+	    -> predicted intercept Vector3, or nil if no solution
 ]]
 local module = {}
 local eps = 1e-9

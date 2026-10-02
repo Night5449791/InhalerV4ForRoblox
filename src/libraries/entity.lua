@@ -1,3 +1,17 @@
+-- Entity library: player/NPC tracking.
+-- Returns `entitylib`, a table maintaining a live entity list with the local
+-- character and EntityAdded/EntityRemoved/etc. events. Loaded by the universal
+-- module and reused by nearly every game module.
+--
+-- Usage (its locals are inlined into the universal chunk via the --Libraries
+-- marker, so other modules simply reference `entitylib` directly):
+--   entitylib.isAlive                         -> bool, is the local player alive
+--   entitylib.character                       -> the local entity table
+--   entitylib.List                            -> array of all tracked entities
+--   for _, v in entitylib.List do ... end
+--   entitylib.Events.EntityAdded:Connect(function(entity) ... end)
+--   entitylib.Events.EntityRemoved:Connect(function(entity) ... end)
+
 local entitylib = {
 	isAlive = false,
 	character = {},

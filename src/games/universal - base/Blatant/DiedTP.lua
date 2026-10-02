@@ -15,6 +15,7 @@ local function applyDeathCFrame(char)
 	root.CFrame = deathCFrame + Vector3.new(0, 2, 0)
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
+	deathCFrame = nil
 end
 
 local function watchCharacter(char)
@@ -41,6 +42,13 @@ DiedTP = vape.Categories.Blatant:CreateModule({
 		if callback then
 			DiedTP:Clean(entitylib.Events.LocalAdded:Connect(function(char)
 				watchCharacter(char)
+			end))
+			DiedTP:Clean(entitylib.Events.LocalRemoved:Connect(function(entity)
+				if deathCFrame then return end
+				local root = getRoot(entity.Character)
+				if root then
+					deathCFrame = root.CFrame
+				end
 			end))
 
 			if entitylib.isAlive then

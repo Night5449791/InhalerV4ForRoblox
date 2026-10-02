@@ -47,7 +47,7 @@ To test a single module, edit under `src/games/<game>/...`, then either run the 
 
 Three layers under `src/`, all loaded at runtime as independent chunks (no `require` anywhere except on game-owned ModuleScripts):
 
-### `src/libraries/` — 5 standalone chunks, each `return <table>`
+### `src/libraries/` — 6 standalone chunks, each `return <table>`
 
 Loaded via `loadstring(downloadFile('newvape/libraries/<name>.lua'), ...)()`.
 
@@ -58,6 +58,7 @@ Loaded via `loadstring(downloadFile('newvape/libraries/<name>.lua'), ...)()`.
 | `prediction.lua` | projectile ballistics (`SolveTrajectory`) | universal |
 | `drawing.lua` | host id / `'1'` — Actor comm-channel Drawing bridge | frontlines, redliner |
 | `vm.lua` | Fiu Luau bytecode VM | jailbreak |
+| `json.lua` | `{write, read, encode, decode}` — minimal JSON file I/O (prefers executor `jsonEncode/jsonDecode`, falls back to `HttpService`; uses `writefile/readfile/isfile/isfolder/makefolder`) | on demand |
 
 ### `src/guis/new/` — the single GUI
 

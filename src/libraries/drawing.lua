@@ -1,3 +1,12 @@
+-- Drawing library: host id / Drawing bridge for Actor comm-channel.
+-- When a comm channel is unavailable it returns the string '1'. Otherwise it
+-- establishes a host/actor channel over the executor's Drawing API and returns
+-- the host id so the main thread and Actor can exchange data.
+--
+-- Usage (loaded as its own chunk; pass `true` for the actor side):
+--   local id = loadstring(downloadFile('newvape/libraries/drawing.lua'))(isactor)
+--   id  -> host id string (or '1' when no comm channel is available)
+
 if not get_comm_channel or not create_comm_channel then
 	return '1'
 end

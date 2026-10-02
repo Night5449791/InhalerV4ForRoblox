@@ -1,3 +1,17 @@
+-- Hash library (HashLib)
+-- Returns the table `sha` exposing MD5 / SHA1 / SHA2 / SHA3 / SHAKE digests and HMAC.
+--
+-- Usage (loaded as its own chunk; the returned table is the global `sha`):
+--   local hash = loadstring(downloadFile('newvape/libraries/hash.lua'))()
+--   hash.md5('hello')                 -> hex digest string
+--   hash.sha1('hello')
+--   hash.sha256('hello')
+--   hash.sha512('hello')
+--   hash.sha3_256('hello')
+--   hash.hmac(hash.sha256, key, message)
+--   hash.hex_to_bin(hex) / hash.bin_to_base64(bin)
+--
+-- Docs: https://devforum.roblox.com/t/open-source-hashlib/416732/1
 -- HashLib by Egor Skriptunoff, boatbomber, and howmanysmall, I'm not trusting exploits to have a built in crypt library.
 
 --[=[------------------------------------------------------------------------------------------------------------------------
