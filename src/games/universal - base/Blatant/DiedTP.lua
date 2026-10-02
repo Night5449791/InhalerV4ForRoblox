@@ -1,40 +1,52 @@
 local DiedTP
-local lastDeath
+local deathCFrame
 
-local function trackDeath(entity)
-	DiedTP:Clean(entity.Humanoid.Died:Connect(function()
-		local root = entity.RootPart
-		if root then
-			lastDeath = root.CFrame
-		end
-	end))
+local function getRoot(char)
+	if not char then return end
+	return char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
 end
 
-local function returnToDeath(entity)
-	if not lastDeath then return end
+local function applyDeathCFrame(char)
+	if not char or not deathCFrame then return end
 
-	local root = entity.RootPart
+	local root = getRoot(char)
 	if not root then return end
 
-	root.CFrame = lastDeath
-	lastDeath = nil
+	root.CFrame = deathCFrame + Vector3.new(0, 2, 0)
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
+end
+
+local function watchCharacter(char)
+	if not char then return end
+
+	local humanoid = char:FindFirstChildOfClass('Humanoid')
+	if not humanoid then return end
+
+	humanoid.Died:Connect(function()
+		local root = getRoot(char)
+		if root then
+			deathCFrame = root.CFrame
+		end
+	end)
+
+	if deathCFrame then
+		task.defer(applyDeathCFrame, char)
+	end
 end
 
 DiedTP = vape.Categories.Blatant:CreateModule({
 	Name = 'DiedTP',
 	Function = function(callback)
 		if callback then
-			DiedTP:Clean(entitylib.Events.LocalAdded:Connect(function(entity)
-				trackDeath(entity)
-				task.defer(returnToDeath, entity)
+			DiedTP:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+				watchCharacter(char)
 			end))
 
 			if entitylib.isAlive then
-				trackDeath(entitylib.character)
+				watchCharacter(entitylib.character)
 			end
-		else
-			lastDeath = nil
 		end
 	end,
-	Tooltip = 'Teleports you back to where you died after respawning.'
+	Tooltip = 'Teleports you back to your last death position when you respawn.'
 })

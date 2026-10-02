@@ -1,4 +1,24 @@
 local AutoTeam
+local AutoOnDied
+
+local function openTeamMenu()
+	local home = lplr.PlayerGui:FindFirstChild('Home', true)
+	local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
+	if switch then
+		firesignal(switch.MouseButton1Click)
+	end
+end
+
+local function joinFirstTeam()
+	local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+	if not teamGui then return end
+	for _, holder in teamGui:GetChildren() do
+		if holder.Button.AutoButtonColor then
+			firesignal(holder.Button.MouseButton1Click)
+			return
+		end
+	end
+end
 
 AutoTeam = vape.Categories.Utility:CreateModule({
 	Name = 'AutoTeam',
@@ -8,23 +28,9 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 		local function onDeath()
 			if not AutoOnDied.Enabled then return end
 
-			local home = lplr.PlayerGui:FindFirstChild('Home', true)
-			local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
-			if switch then
-				firesignal(switch.MouseButton1Click)
-			end
-
+			openTeamMenu()
 			task.wait(0.75)
-
-			local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
-			if teamGui then
-				for _, holder in teamGui:GetChildren() do
-					if holder.Button.AutoButtonColor then
-						firesignal(holder.Button.MouseButton1Click)
-						break
-					end
-				end
-			end
+			joinFirstTeam()
 		end
 
 		local function connectDeath(entity)
@@ -39,15 +45,7 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 		end
 
 		if callback then
-			local gui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
-			if gui then
-				for _, holder in gui:GetChildren() do
-					if holder.Button.AutoButtonColor then
-						firesignal(holder.Button.MouseButton1Click)
-						break
-					end
-				end
-			end
+			joinFirstTeam()
 
 			AutoTeam:Clean(entitylib.Events.LocalAdded:Connect(connectDeath))
 			if entitylib.isAlive then
