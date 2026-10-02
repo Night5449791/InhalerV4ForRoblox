@@ -1,35 +1,38 @@
 local FastChange
-local reqteam = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes"):FindFirstChild("RequestTeamChange")
 local ChooseTeam
 
 FastChange = vape.Categories.Blatant:CreateModule({
-    Name = 'FastChange',
-    Function = function(callback)
-        if callback then 
-            if ChooseTeam.Value == 'Guards' then
-                if lplr.Team == 'Neutral' then
-                    reqteam:InvokeServer(game:GetService("Teams"):FindFirstChild("Guards"), 1)
-                else
-                    task.wait(1)
-                    reqteam:InvokeServer(game:GetService("Teams"):FindFirstChild("Neutral"), 1)
-                    task.wait(1)
-                    reqteam:InvokeServer(game:GetService("Teams"):FindFirstChild("Guards"), 1)
-                end                
-            elseif ChooseTeam.Value == 'Inmates' then
-                if lplr.Team == 'Neutral' then
-                    notif('FastChange', 'wait 2s for fadeGui', 2, 'warn')
-                    reqteam:InvokeServer(game:GetService("Teams"):FindFirstChild("Inmates"), 1)
-                else
-                    task.wait(1)
-                    reqteam:InvokeServer(game:GetService("Teams"):FindFirstChild("Neutral"), 1)
-                    task.wait(1)
-                    reqteam:InvokeServer(game:GetService("Teams"):FindFirstChild("Inmates"), 1)
-                end   
-            end
-            FastChange:Toggle()
-        end
-    end,
-    Tooltip = 'not-Automatically switch team'
+	Name = 'FastChange',
+	Function = function(callback)
+		if callback then
+			local home = lplr.PlayerGui:FindFirstChild('Home', true)
+			local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
+			if switch then
+				firesignal(switch.MouseButton1Click)
+			end
+
+			task.wait(0.75)
+
+			local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+			local picked
+			if teamGui then
+				for _, holder in teamGui:GetChildren() do
+					if holder.Name == ChooseTeam.Value and holder.Button.AutoButtonColor then
+						pickTeam(holder.Button)
+						picked = true
+						break
+					end
+				end
+			end
+
+			if not picked then
+				notif('FastChange', 'Could not switch to '..ChooseTeam.Value..'.', 2, 'warning')
+			end
+
+			FastChange:Toggle()
+		end
+	end,
+	Tooltip = 'Fast team switch via the team menu'
 })
 
 ChooseTeam = FastChange:CreateDropdown({
