@@ -1,6 +1,9 @@
 local DiedTP
-local deathCFrame
+local lastDeath
 local connections = {}
+local characterConnection
+local enabled = false
+local generation = 0
 
 local function disconnectConnections()
 	for _, conn in ipairs(connections) do
@@ -10,6 +13,10 @@ local function disconnectConnections()
 	end
 
 	table.clear(connections)
+	if characterConnection then
+		characterConnection:Disconnect()
+		characterConnection = nil
+	end
 end
 
 local function getRoot(char)
@@ -17,25 +24,13 @@ local function getRoot(char)
 	return char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
 end
 
-local function captureDeathCFrame(char)
+local function captureDeathPosition(char)
 	if not char then return end
 
 	local root = getRoot(char)
 	if root then
-		deathCFrame = root.CFrame
+		lastDeath = root.CFrame
 	end
-end
-
-local function applyDeathCFrame(char)
-	if not char or not deathCFrame then return end
-
-	local root = getRoot(char)
-	if not root then return end
-
-	root.CFrame = deathCFrame + Vector3.new(0, 2, 0)
-	root.AssemblyLinearVelocity = Vector3.zero
-	root.AssemblyAngularVelocity = Vector3.zero
-	deathCFrame = nil
 end
 
 local function watchCharacter(char)
@@ -44,46 +39,67 @@ local function watchCharacter(char)
 	local humanoid = char:FindFirstChildOfClass('Humanoid')
 	if not humanoid then return end
 
-	local diedConnection = humanoid.Died:Connect(function()
-		captureDeathCFrame(char)
+	if characterConnection then
+		characterConnection:Disconnect()
+	end
+	characterConnection = humanoid.Died:Connect(function()
+		captureDeathPosition(char)
 	end)
-	connections[#connections + 1] = diedConnection
+	DiedTP:Clean(characterConnection)
+end
 
-	if deathCFrame then
-		task.defer(applyDeathCFrame, char)
+local function returnToLastDeath(char, currentGeneration)
+	if not enabled or currentGeneration ~= generation or not char or not lastDeath then return end
+
+	local root = getRoot(char)
+	if not root then return end
+
+	local humanoid = char:FindFirstChildOfClass('Humanoid')
+	if humanoid and humanoid.SeatPart then
+		humanoid.Sit = false
+		task.wait(0.1)
+	end
+
+	if enabled and currentGeneration == generation and root.Parent then
+		root.CFrame = lastDeath
 	end
 end
 
 DiedTP = vape.Categories.Blatant:CreateModule({
 	Name = 'DiedTP',
 	Function = function(callback)
+		enabled = callback
+		generation = generation + 1
+		local currentGeneration = generation
+
 		if not callback then
 			disconnectConnections()
-			deathCFrame = nil
 			return
 		end
 
 		disconnectConnections()
 
-		local addedConnection = entitylib.Events.LocalAdded:Connect(function(char)
+		local addedConnection = entitylib.Events.LocalAdded:Connect(function(entity)
+			if not enabled or currentGeneration ~= generation then return end
+			local char = entity and entity.Character
 			watchCharacter(char)
+			task.defer(returnToLastDeath, char, currentGeneration)
 		end)
 		connections[#connections + 1] = addedConnection
+		DiedTP:Clean(addedConnection)
 
 		local removedConnection = entitylib.Events.LocalRemoved:Connect(function(entity)
-			if not entity or not entity.Character then return end
-			if deathCFrame then return end
-
-			local root = getRoot(entity.Character)
-			if root then
-				deathCFrame = root.CFrame
+			if not enabled or currentGeneration ~= generation then return end
+			if entity and entity.Character and not lastDeath then
+				captureDeathPosition(entity.Character)
 			end
 		end)
 		connections[#connections + 1] = removedConnection
+		DiedTP:Clean(removedConnection)
 
 		if entitylib.isAlive and entitylib.character then
-			watchCharacter(entitylib.character)
+			watchCharacter(entitylib.character.Character)
 		end
 	end,
-	Tooltip = 'Teleports you back to your last death position when you respawn.'
+	Tooltip = 'Returns you to your last death position when you respawn.'
 })
