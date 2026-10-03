@@ -192,9 +192,21 @@ run(function()
 	end
 
 	function OriginScanner:UpdateIgnore()
-		local ignoreList = VehicleWallbang.Enabled and {lplr.Character, workspace.CarContainer} or {lplr.Character}
+		-- a nil character here would leave a hole at index 1 and drop the whole
+		-- array, leaving nothing ignored so every wallbang scan gets blocked
+		local ignoreList = {}
+		if lplr.Character then
+			table.insert(ignoreList, lplr.Character)
+		end
+
+		if VehicleWallbang.Enabled then
+			table.insert(ignoreList, workspace.CarContainer)
+		end
+
 		for _, entity in entitylib.List do
-			table.insert(ignoreList, entity.Character)
+			if entity.Character then
+				table.insert(ignoreList, entity.Character)
+			end
 		end
 
 		rayParams.FilterDescendantsInstances = ignoreList
