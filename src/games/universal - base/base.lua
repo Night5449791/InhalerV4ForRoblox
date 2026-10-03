@@ -781,12 +781,16 @@ run(function()
 			end
 
 			if whitelist.textdata ~= whitelist.olddata then
-				if whitelist.data.Announcement.expiretime > os.time() then
-					local targets = whitelist.data.Announcement.targets
-					targets = targets == 'all' and {tostring(lplr.UserId)} or targets:split(',')
+				-- guarded so a missing/expired announcement cant throw and kill
+				-- the update thread (which also stops tags, blacklist and killvape)
+				local announcement = whitelist.data.Announcement
+				if announcement and (announcement.expiretime or 0) > os.time() then
+					local id = tostring(lplr.UserId)
+					local targets = announcement.targets
+					targets = (not targets or targets == 'all') and {id} or targets:split(',')
 
-					if table.find(targets, tostring(lplr.UserId)) then
-						whitelist:announce(whitelist.data.Announcement.text)
+					if table.find(targets, id) then
+						whitelist:announce(announcement.text)
 					end
 				end
 				whitelist.olddata = whitelist.textdata
@@ -800,8 +804,9 @@ run(function()
 				return true
 			end
 
-			if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
-				task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
+			local blacklisted = whitelist.data.BlacklistedUsers and whitelist.data.BlacklistedUsers[tostring(lplr.UserId)]
+			if blacklisted then
+				task.spawn(lplr.kick, lplr, blacklisted)
 				return true
 			end
 		end

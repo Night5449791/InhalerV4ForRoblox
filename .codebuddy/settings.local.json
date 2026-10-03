@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "changelog-generator@codebuddy-plugins-official": true,
+    "github@codebuddy-plugins-official": true
+  }
+}
