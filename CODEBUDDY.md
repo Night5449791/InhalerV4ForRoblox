@@ -1,6 +1,6 @@
 # CODEBUDDY.md This file provides guidance to CodeBuddy when working with code in this repository.
 
-> Repo: `Night5449791/VapeV4ForRoblox` — a fork of Vape V4, a Roblox combat/utility script GUI.
+> Repo: `Night5449791/InhalerV4ForRoblox` — a fork of Vape V4, a Roblox combat/utility script GUI.
 > Runtime target is **Luau inside a Roblox exploit executor** (not standard Lua, not Node).
 > `src/` is the human-maintainable source tree; an external bundler flattens it into `Night5449791/VapeCompiled`, which the runtime downloads at injection time.
 
@@ -22,7 +22,7 @@ Copy files from `src/` into the executor's workspace so they mirror runtime path
 
 ```lua
 shared.VapeDeveloper = true
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/VapeV4ForRoblox/main/NewMainScript.lua", true))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/InhalerV4ForRoblox/main/NewMainScript.lua", true))()
 ```
 
 `shared.VapeDeveloper = true` (set before load) skips fetching the remote commit sha, skips wiping cached files, and makes the loader read `newvape/loader.lua` from disk instead of downloading — so edits take effect on re-execute. Related globals: `shared.VapeIndependent` (don't auto-inject; `vape.Init` is exported so you call `finishLoading` yourself), `shared.VapeCustomProfile` (profile name), `shared.vapereload` (auto-reload after teleport).
