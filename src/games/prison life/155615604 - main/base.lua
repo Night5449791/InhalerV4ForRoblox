@@ -21,6 +21,7 @@ local textChatService = cloneref(game:GetService('TextChatService'))
 local tweenService = cloneref(game:GetService('TweenService'))
 local runService = cloneref(game:GetService('RunService'))
 local guiService = cloneref(game:GetService('GuiService'))
+local teleportService = cloneref(game:GetService('TeleportService'))
 local teams = cloneref(game:GetService('Teams'))
 local coreGui = cloneref(game:GetService('CoreGui'))
 
