@@ -30,5 +30,5 @@ KillNotifications = vape.Categories.Render:CreateModule({
 
 AdvancedCheck = KillNotifications:CreateToggle({
 	Name = 'AdvancedCheck',
-	Default = true
+	Default = false
 })
