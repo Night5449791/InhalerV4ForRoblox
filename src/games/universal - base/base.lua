@@ -912,11 +912,6 @@ run(function()
 			else
 				vape:Uninject()
 			end
-		end,
-		void = function()
-			if entitylib.isAlive then
-				entitylib.character.RootPart.CFrame += Vector3.new(0, -1000, 0)
-			end
 		end
 	}
 
