@@ -503,11 +503,11 @@ local function handleKickMethod(args)
 	if lowered == 'normal' then
 		option:SetValue('Normal')
 		notif('KickExploit', 'Kick method: Normal', 5)
-	elseif lowered == 'headfling' or lowered == 'head' then
-		option:SetValue('Headfling')
-		notif('KickExploit', 'Kick method: Headfling', 5)
+	elseif lowered == 'killfling' or lowered == 'kill' or lowered == 'headfling' or lowered == 'head' then
+		option:SetValue('Killfling')
+		notif('KickExploit', 'Kick method: Killfling', 5)
 	else
-		notif('KickExploit', 'Invalid method. (normal/headfling)', 5, 'warning')
+		notif('KickExploit', 'Invalid method. (normal/killfling)', 5, 'warning')
 	end
 end
 
@@ -657,7 +657,7 @@ local toggles = {
 	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/headfling>'},
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
 	{Name = 'Dance', Tooltip = '.dance\n.dundance', Function = function(enabled)
 		if not enabled then
 			stopDance()
