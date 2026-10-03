@@ -31,7 +31,7 @@ FastChange = vape.Categories.Blatant:CreateModule({
 			picked = switchTeam(ChooseTeam.Value)
 		else
 			openTeamMenu()
-			task.wait(0.75)
+			task.wait(0.8)
 			picked = switchTeam(ChooseTeam.Value)
 		end
 
