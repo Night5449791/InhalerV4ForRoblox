@@ -123,7 +123,6 @@ run(function()
 					entitylib.character.RootPart.Position,
 					args[2],
 					ray and ray.Position + ray.Normal * 0.01 or nil,
-					ray and (ray.Material or (ray.Instance and ray.Instance.Material)),
 					targetPart,
 					entity
 				)
