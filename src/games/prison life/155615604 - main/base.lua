@@ -24,6 +24,10 @@ local guiService = cloneref(game:GetService('GuiService'))
 local teams = cloneref(game:GetService('Teams'))
 local coreGui = cloneref(game:GetService('CoreGui'))
 
+local isnetworkowner = identifyexecutor and table.find({'AWP', 'Nihon'}, ({identifyexecutor()})[1]) and isnetworkowner or function()
+	return true
+end
+
 local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
