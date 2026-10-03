@@ -37,6 +37,67 @@ local pl = {}
 local Spring = {}
 local TracerHook = {Hooks = {}}
 local VehicleWallbang = {Enabled = false}
+
+-- Wall penetration model: max depth (studs) a standard 9mm-class bullet can pass
+-- through per surface material. 0 = impassable (shield/water), math.huge = open air/ground.
+local MATERIAL_PENETRATION = {
+	[Enum.Material.Air] = math.huge,
+	[Enum.Material.Grass] = math.huge,
+	[Enum.Material.LeafyGrass] = math.huge,
+	[Enum.Material.Sand] = math.huge,
+	[Enum.Material.Snow] = math.huge,
+	[Enum.Material.Water] = 0,
+	[Enum.Material.ForceField] = 0,
+	[Enum.Material.Glass] = 12,
+	[Enum.Material.Wood] = 6,
+	[Enum.Material.WoodPlanks] = 6,
+	[Enum.Material.Plastic] = 5,
+	[Enum.Material.SmoothPlastic] = 5,
+	[Enum.Material.Neon] = 4,
+	[Enum.Material.Brick] = 3,
+	[Enum.Material.Cobblestone] = 2.5,
+	[Enum.Material.Concrete] = 2,
+	[Enum.Material.Sandstone] = 2,
+	[Enum.Material.Sediment] = 2,
+	[Enum.Material.Limestone] = 2,
+	[Enum.Material.Slate] = 2,
+	[Enum.Material.Rock] = 1.5,
+	[Enum.Material.Basalt] = 1.5,
+	[Enum.Material.Granite] = 1.5,
+	[Enum.Material.Marble] = 1.5,
+	[Enum.Material.Metal] = 1.5,
+	[Enum.Material.DiamondPlate] = 1.5,
+	[Enum.Material.CorrodedMetal] = 1.5,
+	[Enum.Material.Pavement] = 1.5,
+	[Enum.Material.Asphalt] = 1.5,
+	[Enum.Material.Ice] = 1.5,
+	[Enum.Material.CrackedLava] = 1.5,
+}
+local DEFAULT_PENETRATION = 3
+
+-- Per-weapon bullet penetration multiplier relative to a standard round.
+local WEAPON_PENETRATION = {
+	M700 = 8,
+	['AK-47'] = 2,
+	M4A1 = 2,
+	FAL = 2,
+	MP5 = 1.5,
+	Revolver = 1.5,
+	['Remington 870'] = 1.2,
+	M9 = 1,
+}
+
+local function getBulletPenetration()
+	local mult = 1
+	local ok, tool = pcall(function()
+		return pl.Shoot and debug.getupvalue(pl.Shoot, 1)
+	end)
+	local weapon = ok and tool and tool.Name
+	if weapon and WEAPON_PENETRATION[weapon] then
+		mult = WEAPON_PENETRATION[weapon]
+	end
+	return mult
+end
 local oldshoot, oldequip
 local aimTimer, shootTimer, aimVec = os.clock(), os.clock()
 local arrestCooldown = os.clock()
@@ -139,16 +200,31 @@ run(function()
 		Vector3.new(0, -1, 0)
 	}
 
-	function OriginScanner:Scan(origin, target, extra, part, entity)
+	function OriginScanner:Scan(origin, target, extra, material, part, entity)
 		if self.Cache[part] then
 			return table.unpack(self.Cache[part])
 		end
 
 		local hitboxPositions = {}
 		if checkPoint(target, overlapParams) then
-			if extra and (origin - extra).Magnitude < 7.5 then
-				self.Cache[part] = {extra}
-				return extra
+			if extra and material then
+				local distanceToWall = (origin - extra).Magnitude
+				local maxPen = (MATERIAL_PENETRATION[material] or DEFAULT_PENETRATION) * getBulletPenetration()
+				local thickness = 0.1
+
+				if distanceToWall > 0.001 then
+					local dir = (origin - extra).Unit
+					local thicknessRay = workspace:Raycast(extra + dir * 0.1, dir * distanceToWall, rayParams)
+					thickness = thicknessRay and (thicknessRay.Distance + 0.1) or 0.1
+				end
+
+				-- Only wallbang when the wall is penetrable for this material/bullet,
+				-- the measured thickness is within that budget, and the wall is close
+				-- enough for the bullet to still connect.
+				if maxPen > 0 and thickness <= maxPen and distanceToWall <= maxPen then
+					self.Cache[part] = {extra}
+					return extra
+				end
 			end
 
 			table.insert(hitboxPositions, target)
@@ -415,7 +491,9 @@ run(function()
 	entitylib.Wallcheck = function(origin, position, checkPosition, part, entity)
 		local ray = workspace.Raycast(workspace, position, (origin - position), OriginScanner.Ray)
 		if ray or workspace.Raycast(workspace, origin, (position - origin), OriginScanner.Ray) then
-			return not checkPosition or not OriginScanner:Scan(checkPosition, position, ray and ray.Position + ray.Normal * 0.01 or nil, part, entity)
+			local wallRay = ray or workspace:Raycast(workspace, origin, (position - origin), OriginScanner.Ray)
+			local material = wallRay and (wallRay.Material or (wallRay.Instance and wallRay.Instance.Material))
+			return not checkPosition or not OriginScanner:Scan(checkPosition, position, wallRay and wallRay.Position + wallRay.Normal * 0.01 or nil, material, part, entity)
 		end
 
 		return false
