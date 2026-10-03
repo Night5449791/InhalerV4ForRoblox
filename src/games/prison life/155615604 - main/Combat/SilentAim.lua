@@ -119,7 +119,14 @@ run(function()
 			end
 
 			if OriginScanner.Cache[targetPart] or ray or workspace:Raycast(origin, (args[2] - origin), OriginScanner.Ray) then
-				local newOrigin, hit = OriginScanner:Scan(entitylib.character.RootPart.Position, args[2], ray and ray.Position + ray.Normal * 0.01 or nil, targetPart, entity)
+				local newOrigin, hit = OriginScanner:Scan(
+					entitylib.character.RootPart.Position,
+					args[2],
+					ray and ray.Position + ray.Normal * 0.01 or nil,
+					ray and (ray.Material or (ray.Instance and ray.Instance.Material)),
+					targetPart,
+					entity
+				)
 
 				if newOrigin then
 					for index, value in debug.getstack(3) do
