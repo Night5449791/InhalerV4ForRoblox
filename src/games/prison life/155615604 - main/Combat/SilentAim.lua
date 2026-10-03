@@ -129,23 +129,9 @@ run(function()
 				)
 
 				if newOrigin then
-					-- the shoot function isnt always 3 frames up, a leftover hook from an
-					-- earlier load adds a frame and makes a fixed level silently miss
-					local level = 3
-					for i = 3, 6 do
-						local success, func = pcall(function()
-							return debug.info(i, 'f')
-						end)
-						if not success or not func then break end
-						if func == pl.Shoot then
-							level = i
-							break
-						end
-					end
-
-					for index, value in debug.getstack(level) do
+					for index, value in debug.getstack(3) do
 						if value == origin then
-							debug.setstack(level, index, newOrigin)
+							debug.setstack(3, index, newOrigin)
 						end
 					end
 
