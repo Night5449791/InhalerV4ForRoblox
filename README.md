@@ -12,6 +12,7 @@
 </h2>
 
 ## Contacts
+[My Discord](https://discord.com/users/1448308188439904309)
 [7GrandDad's Community Discord](https://discord.gg/VZEQJxMSnG)
 <br/>
 [7GrandDad's YouTube](https://youtube.com/c/7GrandDadVape)
@@ -20,7 +21,7 @@
 1. Download the specific scripting utility of your choice.
 2. Execute the provided loadstring below.
 ```luau
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/VapeV4ForRoblox/main/NewMainScript.lua", true))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/InhalerV4ForRoblox/main/NewMainScript.lua", true))()
 ```
 3. If it still loads original vape v4 try this loadstring instead.
 ```luau
@@ -28,7 +29,7 @@ delfile("newvape/main.lua")
 delfolder('newvape/libraries')
 delfolder('newvape/games')
 delfolder('newvape/guis')
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/VapeV4ForRoblox/main/NewMainScript.lua", true))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/InhalerV4ForRoblox/main/NewMainScript.lua", true))()
 ```
 
 ## Possible Issues
@@ -39,12 +40,12 @@ Half of the time its usually the scripting utility at fault, please make sure th
 ### User Issues
 If its not the supposed utility at fault, please try some troubleshooting steps.
 1. Deleting the newvape folder (WITH THE GAME CLOSED).
-2. Making sure you have connection to [the main loadstring.](https://raw.githubusercontent.com/Night5449791/VapeV4ForRoblox/refs/heads/main/loadstring)
+2. Making sure you have connection to [the main loadstring.](https://raw.githubusercontent.com/Night5449791/InhalerV4ForRoblox/refs/heads/main/loadstring)
 3. Ensuring no external script is conflicting with vape.
 4. Report the issue by using 
 
 ## Developers & Credits
-[Nighthere123](https://github.com/Night5449791) - Fork owner prolly lololololololol
+[Nighthere123](https://github.com/Night5449791) - discord nightdiamond700 - Fork owner prolly lololololololol
 <br/>
 [7GrandDad](https://github.com/7GrandDadPGN) - Original Lead maintainer of the project - vaperoblox on Discord
 <br/>
