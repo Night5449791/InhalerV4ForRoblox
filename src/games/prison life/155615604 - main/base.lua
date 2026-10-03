@@ -53,7 +53,6 @@ local MATERIAL_PENETRATION = {
 	[Enum.Material.WoodPlanks] = 6,
 	[Enum.Material.Plastic] = 5,
 	[Enum.Material.SmoothPlastic] = 5,
-	[Enum.Material.RedPlastic] = 5,
 	[Enum.Material.Neon] = 4,
 	[Enum.Material.Brick] = 3,
 	[Enum.Material.Cobblestone] = 2.5,
