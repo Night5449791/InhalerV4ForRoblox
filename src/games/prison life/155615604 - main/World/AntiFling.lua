@@ -24,7 +24,7 @@ local function Modify(part)
 			local prox = Instance.new('ProximityPrompt')
 			prox.ActionText = 'Enter'
 			prox.Enabled = not part.Occupant
-			prox.MaxActivationDistance = 8
+			prox.MaxActivationDistance = 10
 			prox.RequiresLineOfSight = false
 			prox.Parent = part
 
