@@ -22,6 +22,14 @@
 ```luau
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/VapeV4ForRoblox/main/NewMainScript.lua", true))()
 ```
+3. If it still loads original vape v4 try this loadstring instead.
+```luau
+delfile("newvape/main.lua")
+delfolder('newvape/libraries')
+delfolder('newvape/games')
+delfolder('newvape/guis')
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/VapeV4ForRoblox/main/NewMainScript.lua", true))()
+```
 
 ## Possible Issues
 Half of the time its usually the scripting utility at fault, please make sure the utility meets certain quality standards such as.
