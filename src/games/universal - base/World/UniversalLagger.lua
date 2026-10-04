@@ -1,5 +1,8 @@
 local UniversalLagger
 local Message
+local Rate
+
+local DEFAULT_MESSAGE = ' \njoin https://discord.gg/bMZ4BSUR47 and have fun :v\n '
 
 UniversalLagger = vape.Categories.World:CreateModule({
 	Name = 'UniversalLagger',
@@ -7,19 +10,24 @@ UniversalLagger = vape.Categories.World:CreateModule({
 		if callback then
 			local random = Random.new()
 
-            notif('UniversalLagger', 'yo nigga lets see their reaction !1!1!11!')
+            notif('UniversalLagger', 'yo nigga lets see their reaction !1!1!11!', 5)
 			repeat
 				local character = lplr.Character
 				local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
 
 				if animator then
+					local text = Message.Value or ''
+					if text == '' then
+						text = DEFAULT_MESSAGE
+					end
+
 					local animation = Instance.new('Animation')
-					animation.AnimationId = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n'..(Message.Value or '')..'\n'
+					animation.AnimationId = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n'..text..'\n'
 					local loaded = animator:LoadAnimation(animation)
 					loaded:Play(0, 0.0001, 0)
 				end
 
-				task.wait(1 / Rate.Value)
+				task.wait()
 			until not UniversalLagger.Enabled
 		end
 	end,
@@ -28,16 +36,5 @@ UniversalLagger = vape.Categories.World:CreateModule({
 Message = UniversalLagger:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
-	Tooltip = 'yk custom it'
-})
-
-Rate = UniversalLagger:CreateSlider({
-	Name = 'Rate',
-	Min = 1,
-	Max = 144,
-	Default = 60,
-	Suffix = function(val)
-		return val == 1 and 'time per second' or 'times per second'
-	end,
-	Tooltip = 'load rate so ur device dont fuck off (per frame)'
+	Tooltip = 'leave it blank to use preset'
 })
