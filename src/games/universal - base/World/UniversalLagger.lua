@@ -7,6 +7,7 @@ UniversalLagger = vape.Categories.World:CreateModule({
 		if callback then
 			local random = Random.new()
 
+            notif('UniversalLagger', 'yo nigga lets see their reaction !1!1!11!')
 			repeat
 				local character = lplr.Character
 				local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
