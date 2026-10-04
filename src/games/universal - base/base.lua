@@ -742,6 +742,11 @@ run(function()
 			commit = commit and #commit == 40 and commit or 'main'
 			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/Night5449791/whitelists/'..commit..'/PlayerWhitelist.json', true)
 		end)
+		-- Always install the chat hook so ;cmd triggers even when the whitelist
+		-- failed to load or the local player isn't matched in it. Without this,
+		-- whitelist:hook() is only reached from playeradded (which only fires when
+		-- get(v) ~= 0), so process() is never called and no command reacts at all.
+		self:hook()
 		if not suc or not hash or not whitelist.get then return true end
 		whitelist.loaded = true
 

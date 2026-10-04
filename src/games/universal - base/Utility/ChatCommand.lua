@@ -358,48 +358,6 @@ local function getTargetStrafe()
 	return blatant and blatant.Modules and blatant.Modules.TargetStrafe
 end
 
-local function handleTargetStrafe(args)
-	if not options.TargetStrafe.Enabled then return end
-
-	local module = getTargetStrafe()
-	if not module then
-		notif('ChatCommand', 'TargetStrafe is not available in this game.', 5, 'warning')
-		return
-	end
-
-	args = trim(args)
-	local lowered = args and args:lower()
-	if not args or lowered == 'off' or lowered == 'stop' or lowered == 'none' then
-		local targeting = module.Options and module.Options['Targeting']
-		if targeting and targeting.Enabled then
-			targeting:Toggle()
-		end
-
-		notif('ChatCommand', 'TargetStrafe targeting disabled.', 5)
-		return
-	end
-
-	local targeting = module.Options and module.Options['Targeting']
-	local username = module.Options and module.Options['Target Username']
-	if not targeting or not username then
-		notif('ChatCommand', 'TargetStrafe targeting options are missing.', 5, 'warning')
-		return
-	end
-
-	if not module.Enabled then
-		module:Toggle()
-	end
-	if not targeting.Enabled then
-		targeting:Toggle()
-	end
-	username:SetValue(args)
-	notif('ChatCommand', 'TargetStrafe locked onto '..args..'.', 5)
-end
-
-local function handleStopTargetStrafe()
-	handleTargetStrafe('off')
-end
-
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
@@ -452,6 +410,15 @@ local function handleHelp()
 	notif('ChatCommand', #enabled > 0 and table.concat(enabled, '\n') or 'No commands enabled.', 8)
 end
 
+local function handleDebugNetworkOwner()
+	local ShowNetworkOwner = vape.Modules.ShowNetworkOwner
+	if ShowNetworkOwner and ShowNetworkOwner.Enabled then
+		ShowNetworkOwner.Enabled = false
+	else
+		ShowNetworkOwner.Enabled = true
+	end
+end
+
 local commands = {
 	help = handleHelp,
 	tp = handleTP,
@@ -491,9 +458,8 @@ local commands = {
 	rj = handleRejoin,
 	rejoin = handleRejoin,
 	reload = handleReload,
-	tstrafe = handleTargetStrafe,
-	targetstrafe = handleTargetStrafe,
-	untstrafe = handleStopTargetStrafe
+	debugnet = handleDebugNetworkOwner,
+	debugnetworkowner = handleDebugNetworkOwner,
 }
 
 local function onChatted(message)
