@@ -26,16 +26,6 @@ run(function()
 		return inputService.GetMouseLocation(inputService)
 	end
 
-	local backpack
-	-- cached, both scanners below can run every AutoFire tick
-	local function getBackpack()
-		if not backpack or backpack.Parent ~= lplr then
-			backpack = lplr:FindFirstChildWhichIsA('Backpack')
-		end
-
-		return backpack
-	end
-
 	-- 0 while the tool is reloading or carries no range attribute
 	local function getToolRange(tool)
 		if (tool:GetAttribute('Local_ReloadSession') or 0) > 0 then
@@ -51,9 +41,9 @@ run(function()
 			return tool
 		end
 
-		local container = getBackpack()
-		if container then
-			for _, tool in container:GetChildren() do
+		local backpack = lplr:FindFirstChildWhichIsA('Backpack')
+		if backpack then
+			for _, tool in backpack:GetChildren() do
 				if tool:IsA('Tool') and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and tool.Name ~= 'Taser' and getToolRange(tool) > range then
 					return tool
 				end
@@ -68,9 +58,9 @@ run(function()
 			mag = getToolRange(tool)
 		end
 
-		local container = getBackpack()
-		if container then
-			for _, tool in container:GetChildren() do
+		local backpack = lplr:FindFirstChildWhichIsA('Backpack')
+		if backpack then
+			for _, tool in backpack:GetChildren() do
 				if tool:IsA('Tool') and tool.Name ~= 'Taser' then
 					local dist = getToolRange(tool)
 					if dist > mag then
@@ -83,25 +73,13 @@ run(function()
 		return mag
 	end
 
-	local entityMode
-	local entityFunc
-	-- caches the lookup so the 'Entity'..Mode.Value concat isnt rebuilt per shot
-	local function getEntity(settings)
-		if entityMode ~= Mode.Value then
-			entityMode = Mode.Value
-			entityFunc = entitylib['Entity'..entityMode]
-		end
-
-		return entityFunc(settings)
-	end
-
 	local function getTarget(origin, limit, attackcheck)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then
 			return
 		end
 
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
-		local entity = getEntity({
+		local entity = entitylib['Entity'..Mode.Value]({
 			Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
 			RangePosition = limit,
 			AttackCheck = attackcheck,
@@ -180,7 +158,7 @@ run(function()
 
 				local fireDelay = os.clock()
 				repeat
-					if CircleObject and CircleObject.Visible then
+					if CircleObject then
 						CircleObject.Position = getMousePosition()
 					end
 
@@ -193,7 +171,7 @@ run(function()
 							local limit = AutoFireSwitch.Enabled and getMaxRange() or gundata.Range or 1000
 							local taser = gundata.Behavior == 'Taser'
 							local headPosition = entitylib.character.Head.Position
-							local entity = getEntity({
+							local entity = entitylib['Entity'..Mode.Value]({
 								Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
 								RangePosition = limit,
 								AttackCheck = not taser,
