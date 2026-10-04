@@ -19,14 +19,25 @@ UniversalLagger = vape.Categories.World:CreateModule({
 					loaded:Play(0, 0.0001, 0)
 				end
 
-				task.wait()
+				task.wait(1 / Rate.Value)
 			until not UniversalLagger.Enabled
 		end
 	end,
-	Tooltip = 'Spams malformed animation ids through your characters animator.'
+	Tooltip = 'lags ur server, thx v3rm'
 })
 Message = UniversalLagger:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
 	Tooltip = 'yk custom it'
+})
+
+Rate = UniversalLagger:CreateSlider({
+	Name = 'Rate',
+	Min = 1,
+	Max = 144,
+	Default = 60,
+	Suffix = function(val)
+		return val == 1 and 'time per second' or 'times per second'
+	end,
+	Tooltip = 'load rate so ur device dont fuck off (per frame)'
 })
