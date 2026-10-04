@@ -36,5 +36,9 @@ UniversalLagger = vape.Categories.World:CreateModule({
 Message = UniversalLagger:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
-	Tooltip = 'leave it blank to use preset'
+	Tooltip = 'leave it blank to use preset',
+	Function = function()
+        UniversalLagger:Toggle()
+		UniversalLagger:Toggle()
+    end,
 })
