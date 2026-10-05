@@ -54,13 +54,13 @@ UniversalLagger = vape.Categories.World:CreateModule({
 	Tooltip = 'Spams broken animations to lag the server'
 })
 
-Message = UniversalLagger:CreateTextBox({
+Message = UniversalBroadcast:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
 	Tooltip = 'leave it blank to use preset'
 })
 
-Delay = UniversalLagger:CreateSlider({
+Delay = UniversalBroadcast:CreateSlider({
 	Name = 'Delay',
 	Min = 0.05,
 	Max = 1,
