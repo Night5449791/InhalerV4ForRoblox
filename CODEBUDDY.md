@@ -319,6 +319,7 @@ Two `run(function() … end)` blocks: (1) `:330+` overrides `entitylib.getUpdate
 - `entitylib.Events.EntityRemoving` is never fired — use `EntityRemoved`.
 - `drawing.lua` returns the string `'1'` when unsupported; `prediction.SolveTrajectory` returns an aim point, `nil` on no solution.
 - `bedwars/6872274481 - game/base.lua:33-36` kicks the player on load — BedWars is retired.
+- MAKE CHATCOMMAND APPLY BOTH CHATCOMMAND UNLESS ITS A GAME SPECIFIC COMMAND
 
 ---
 

@@ -341,18 +341,6 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
-local function handleHelp()
-	local enabled = {}
-	for _, toggle in toggles do
-		if options[toggle.Name].Enabled then
-			table.insert(enabled, toggle.Tooltip:gsub('\n', ' / '))
-		end
-	end
-
-	table.sort(enabled)
-	notif('ChatCommand', #enabled > 0 and table.concat(enabled, '\n') or 'No commands enabled.', 8)
-end
-
 local function handleDebugNetworkOwner()
 	local ShowNetworkOwner = vape.Modules.ShowNetworkOwner
 	if ShowNetworkOwner and ShowNetworkOwner.Enabled then
@@ -363,7 +351,6 @@ local function handleDebugNetworkOwner()
 end
 
 local commands = {
-	help = handleHelp,
 	tp = handleTP,
 	follow = handleFollow,
 	unfollow = handleUnfollow,
@@ -439,7 +426,7 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 		end))
 		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
 	end,
-	Tooltip = 'Chat commands, every command is a toggleable option\n.help lists the enabled commands'
+	Tooltip = 'Chat commands, every command is a toggleable option'
 })
 
 for _, toggle in toggles do

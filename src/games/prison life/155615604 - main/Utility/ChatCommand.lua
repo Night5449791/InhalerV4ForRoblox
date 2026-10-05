@@ -75,63 +75,54 @@ end
 
 -- Player lookup
 
-local function findEntity(prefix, includeDead)
-	prefix = trim(prefix)
-	if not prefix or prefix == '' then return end
-
-	local lowered = prefix:lower()
-	local length = #lowered
+-- exact match wins, otherwise the first prefix match
+local function matchPlayer(players, text)
+	local lowered = text:lower()
 	local partial
 
-	for _, entity in entitylib.List do
-		local humanoid = entity.Humanoid
-		if not humanoid or (not includeDead and humanoid.Health <= 0) then continue end
+	for _, plr in players do
+		local name = plr.Name:lower()
+		local display = plr.DisplayName:lower()
 
-		local player = entity.Player
-		if not player then continue end
-
-		local name = player.Name:lower()
-		local display = player.DisplayName:lower()
 		if name == lowered or display == lowered then
-			return entity
+			return plr
 		end
 
-		if not partial and (name:sub(1, length) == lowered or display:sub(1, length) == lowered) then
-			partial = entity
+		if not partial and (name:sub(1, #lowered) == lowered or display:sub(1, #lowered) == lowered) then
+			partial = plr
 		end
 	end
 
 	return partial
 end
 
+local function findEntity(prefix, includeDead)
+	prefix = trim(prefix)
+	if not prefix or prefix == '' then return end
+
+	local players, entities = {}, {}
+	for _, entity in entitylib.List do
+		if entity.Player and (includeDead or entity.Humanoid.Health > 0) then
+			table.insert(players, entity.Player)
+			entities[entity.Player] = entity
+		end
+	end
+
+	local plr = matchPlayer(players, prefix)
+	return plr and entities[plr] or nil
+end
+
+-- spawned players first, then everyone still in the server when allowLeft is set
 local function findPlayer(prefix, allowLeft)
 	local entity = findEntity(prefix, true)
 	if entity then
 		return entity.Player
 	end
 
-	if not allowLeft then return end
-
 	prefix = trim(prefix)
-	if not prefix or prefix == '' then return end
+	if not allowLeft or not prefix or prefix == '' then return end
 
-	local lowered = prefix:lower()
-	local length = #lowered
-	local partial
-
-	for _, plr in playersService:GetPlayers() do
-		local name = plr.Name:lower()
-		local display = plr.DisplayName:lower()
-		if name == lowered or display == lowered then
-			return plr
-		end
-
-		if not partial and (name:sub(1, length) == lowered or display:sub(1, length) == lowered) then
-			partial = plr
-		end
-	end
-
-	return partial
+	return matchPlayer(playersService:GetPlayers(), prefix)
 end
 
 -- Follow
@@ -321,18 +312,11 @@ end
 
 -- CheaterDetector bridge
 
-local function cheaterModule()
-	local module = vape.Modules and vape.Modules.CheaterDetector
-	if module and module.AddCheater then
-		return module
-	end
-end
-
 local function handleCheater(args, remove)
 	if not options.Cheater.Enabled then return end
 
-	local module = cheaterModule()
-	if not module then
+	local module = vape.Modules and vape.Modules.CheaterDetector
+	if not (module and module.AddCheater) then
 		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
 		return
 	end
@@ -344,21 +328,10 @@ local function handleCheater(args, remove)
 	end
 end
 
--- KickExploit bridge
+-- KickExploit bridge (vape.Modules is a flat list of every module by name)
 
 local function kickModule()
-	if vape and vape.Modules and vape.Modules.KickExploit then
-		return vape.Modules.KickExploit
-	end
-
-	if vape and vape.Categories and vape.Categories.World then
-		local worldModule = vape.Categories.World.Modules and vape.Categories.World.Modules.KickExploit
-		if worldModule then
-			return worldModule
-		end
-	end
-
-	return nil
+	return vape.Modules and vape.Modules.KickExploit
 end
 
 kickTargetList = function()
@@ -395,6 +368,13 @@ addTarget = function(name, enabled)
 	end
 end
 
+local kickMethods = {
+	normal = 'Normal',
+	kill = 'Killfling',
+	killfling = 'Killfling',
+	head = 'Killfling',
+	headfling = 'Killfling'
+}
 local kickTeams = {}
 local kickTeamMembers = {}
 
@@ -524,16 +504,14 @@ local function handleKickMethod(args)
 	local option = module.Options and module.Options['Kick Mode']
 	if not option or not option.SetValue then return end
 
-	local lowered = method:lower()
-	if lowered == 'normal' then
-		option:SetValue('Normal')
-		notif('KickExploit', 'Kick method: Normal', 5)
-	elseif lowered == 'killfling' or lowered == 'kill' or lowered == 'headfling' or lowered == 'head' then
-		option:SetValue('Killfling')
-		notif('KickExploit', 'Kick method: Killfling', 5)
-	else
+	local mode = kickMethods[method:lower()]
+	if not mode then
 		notif('KickExploit', 'Invalid method. (normal/killfling)', 5, 'warning')
+		return
 	end
+
+	option:SetValue(mode)
+	notif('KickExploit', 'Kick method: '..mode, 5)
 end
 
 -- Movement / camera commands
@@ -608,20 +586,7 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
-local function handleHelp()
-	local enabled = {}
-	for _, toggle in toggles do
-		if options[toggle.Name].Enabled then
-			table.insert(enabled, toggle.Tooltip:gsub('\n', ' / '))
-		end
-	end
-
-	table.sort(enabled)
-	notif('ChatCommand', #enabled > 0 and table.concat(enabled, '\n') or 'No commands enabled.', 8)
-end
-
 local commands = {
-	help = handleHelp,
 	tp = handleTP,
 	follow = handleFollow,
 	unfollow = handleUnfollow,
@@ -630,25 +595,13 @@ local commands = {
 	wl = function(args)
 		handleWhitelist(args, false)
 	end,
-	whitelist = function(args)
-		handleWhitelist(args, false)
-	end,
 	unwl = function(args)
-		handleWhitelist(args, true)
-	end,
-	unwhitelist = function(args)
 		handleWhitelist(args, true)
 	end,
 	target = function(args)
 		handleTargets(args, false)
 	end,
-	blacklist = function(args)
-		handleTargets(args, false)
-	end,
 	untarget = function(args)
-		handleTargets(args, true)
-	end,
-	unblacklist = function(args)
 		handleTargets(args, true)
 	end,
 	addskid = function(args)
@@ -662,11 +615,21 @@ local commands = {
 	kickmethod = handleKickMethod,
 	team = handleTeam,
 	hop = handleHop,
-	serverhop = handleHop,
 	rj = handleRejoin,
-	rejoin = handleRejoin,
 	reload = handleReload
 }
+
+-- long forms point at the same handler as the short ones
+for alias, name in {
+	whitelist = 'wl',
+	unwhitelist = 'unwl',
+	blacklist = 'target',
+	unblacklist = 'untarget',
+	serverhop = 'hop',
+	rejoin = 'rj'
+} do
+	commands[alias] = commands[name]
+end
 
 local function onChatted(message)
 	message = trim(message)
@@ -710,7 +673,7 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 		ChatCommand:Clean(stopKickTeam)
 		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
 	end,
-	Tooltip = 'Chat commands, every command is a toggleable option\n.help lists the enabled commands'
+	Tooltip = 'Chat commands, every command is a toggleable option'
 })
 
 for _, toggle in toggles do
