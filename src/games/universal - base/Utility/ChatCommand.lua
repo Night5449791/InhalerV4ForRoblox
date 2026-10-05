@@ -272,23 +272,6 @@ local function handleTargets(args, remove)
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
--- Copy user whitelist hash
-
-local function handleCopyUser(args)
-	if not options.CopyUser.Enabled then return end
-
-	local player = findPlayer(args)
-	if not player then
-		notif('ChatCommand', 'No player found.', 5, 'warning')
-		return
-	end
-
-	-- matches whitelist:get() / GetHash -> sha512(Name..UserId..'SelfReport')
-	local h = hash.sha512(player.Name..player.UserId..'SelfReport')
-	pcall(setclipboard, h)
-	notif('ChatCommand', 'Copied hash for '..player.DisplayName..'\n'..h, 10)
-end
-
 -- Movement / camera commands
 
 local function handleTP(args)
@@ -324,14 +307,6 @@ local function handleUnfollow()
 	notif('ChatCommand', 'Stopped following.', 5)
 end
 
-local function getTargetStrafe()
-	local module = vape.Modules and vape.Modules.TargetStrafe
-	if module then return module end
-
-	local blatant = vape.Categories and vape.Categories.Blatant
-	return blatant and blatant.Modules and blatant.Modules.TargetStrafe
-end
-
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
@@ -348,9 +323,7 @@ local toggles = {
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
-	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'CopyUser', Tooltip = '.copyuser <plr>'},
-	{Name = 'TargetStrafe', Tooltip = '.tstrafe <username>\n.tstrafe off / .untstrafe'}
+	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'}
 }
 
 local function handleView(args)
@@ -420,7 +393,6 @@ local commands = {
 	unblacklist = function(args)
 		handleTargets(args, true)
 	end,
-	copyuser = handleCopyUser,
 	hop = handleHop,
 	serverhop = handleHop,
 	rj = handleRejoin,
