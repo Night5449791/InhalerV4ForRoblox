@@ -7,29 +7,28 @@ UniversalLagger = vape.Categories.World:CreateModule({
 	Name = 'UniversalLagger',
 	Function = function(callback)
 		if callback then
+			local random = Random.new()
+
             notif('UniversalLagger', 'yo nigga lets see their reaction !1!1!11!', 5)
+			repeat
+				local character = lplr.Character
+				local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
 
-			local character = lplr.Character
-			local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
+				if animator then
+					local text = Message.Value or ''
+					if text == '' then
+						text = DEFAULT_MESSAGE
+					end
 
-			if animator then
-				local random = Random.new()
-				local text = Message.Value or ''
-				if text == '' then
-					text = DEFAULT_MESSAGE
-				end
-
-				-- build ONE broken anim, then spam it instead of making a new one each frame
-				local animation = Instance.new('Animation')
-				-- yk a broken anim can make roblox fucking warn every clients
-				animation.AnimationId = 'http=5077706747\1'..random:NextInteger(1, 1000000)..'\n \n'..text..'\n \n'
-
-				repeat
+					-- both the preset and custom messages get the same padding
+					local animation = Instance.new('Animation')
+					animation.AnimationId = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n \n'..text..'\n \n'
 					local loaded = animator:LoadAnimation(animation)
 					loaded:Play(0, 0.0001, 0)
-					task.wait()
-				until not UniversalLagger.Enabled
-			end
+				end
+
+				task.wait()
+			until not UniversalLagger.Enabled
 		end
 	end,
 	Tooltip = 'lags ur server, thx v3rm'
@@ -37,9 +36,5 @@ UniversalLagger = vape.Categories.World:CreateModule({
 Message = UniversalLagger:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
-	Tooltip = 'leave it blank to use preset',
-	Function = function()
-        UniversalLagger:Toggle()
-		UniversalLagger:Toggle()
-    end,
+	Tooltip = 'leave it blank to use preset'
 })
