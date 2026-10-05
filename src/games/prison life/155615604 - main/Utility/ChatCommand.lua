@@ -319,6 +319,31 @@ local function handleTargets(args, remove)
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
+-- CheaterDetector bridge
+
+local function cheaterModule()
+	local module = vape.Modules and vape.Modules.CheaterDetector
+	if module and module.AddCheater then
+		return module
+	end
+end
+
+local function handleCheater(args, remove)
+	if not options.Cheater.Enabled then return end
+
+	local module = cheaterModule()
+	if not module then
+		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
+		return
+	end
+
+	if remove then
+		module:RemoveCheater(args)
+	else
+		module:AddCheater(args)
+	end
+end
+
 -- Copy user whitelist hash
 
 local function handleCopyUser(args)
@@ -632,6 +657,7 @@ local toggles = {
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'CopyUser', Tooltip = '.copyuser <plr>'},
+	{Name = 'Cheater', Tooltip = '.addskid <plr>\n.removeskid <plr>'},
 	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
 	{Name = 'TargetStrafe', Tooltip = '.tstrafe <username>\n.tstrafe off / .untstrafe'}
 }
@@ -695,6 +721,18 @@ local commands = {
 		handleTargets(args, true)
 	end,
 	copyuser = handleCopyUser,
+	addcheater = function(args)
+		handleCheater(args, false)
+	end,
+	removecheater = function(args)
+		handleCheater(args, true)
+	end,
+	addskid = function(args)
+		handleCheater(args, false)
+	end,
+	removeskid = function(args)
+		handleCheater(args, true)
+	end,
 	kick = handleKick,
 	kickteam = handleKickTeam,
 	kickmethod = handleKickMethod,

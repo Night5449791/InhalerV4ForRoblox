@@ -1,78 +1,114 @@
--- we all code for shits lol
+-- cheaters are stored locally in newvape/profile/cheaters-<GameId>.json
+-- the list starts empty and is user managed
 
 local CheaterDetector
-local Users
+local cheaterOptions = {}
+local filePath = 'newvape/profile/cheaters-'..tostring(game.GameId)..'.json'
+local Cheaters = {Names = {}, Users = {}}
+local canSave = json ~= nil
 
-local cUsernames = {
-	['WyRaff'] = 'speedhack,teleporting', -- vc server common
-	['PraiseDracc'] = 'known exploiter', -- since he is commonly in vc server
-	['jerry_plsnoban7'] = 'known exploiter (kerax)', -- cringe
-	['jerry_plsnoban6'] = 'known exploiter (kerax)',
-	['jerry_plsnoban5'] = 'known exploiter (kerax)',
-	['rudeeis_ab'] = 'phase/noclip ahhh hack', -- saint member, dont they even use the same thing
-	['JOJI12416'] = 'known exploiter (kerax owner)', -- kerax if u wonder
-	['DawnPulseVoid'] = 'known exploiter',
-	['BestCode_BaconThx']= 'known exploiter (kerax)',   -- join .gg/prisonlife if u got flagged by this dude, we wanna laugh at u
-	['RazhulanDeveloper'] = 'known exploiter (kerax)', -- join .gg/prisonlife if u got flagged by this dude, we wanna laugh at u
-	['SaintSkirr'] = 'known exploiter (vape)', -- not a big deal, why kerax just why
-	['centipedeinmyheads'] = 'known exploiter (kerax)', -- NOT another saint member lol, kerax user
-	-- skids list
-	["veggeta38372737"] = "kerax user, abuser", -- most kerax users are skids abusing so, yeah
-	['jbskjbg'] = 'invalid state Platform Stand exp',
-	['1267_isevil'] = 'failed fling attempt',
-	['1987_isevil'] = 'failed fling attempt',
-	['HeyiamTheCooolest'] = 'skid exploiter',
-	['Chill_baconr00'] = 'highjump', --  using vape v4 from Night5449791 and cant beat me XD
-	['gcfhjfjf4'] = 'highjump, aimbot',
-	['dannielll51'] = 'headsit exploit', -- inspired, vape antiheadsit soon.
-	['Bonjour394'] = 'skid exploiter', -- hes js a jerk
-	['princeofegypt'] = 'gets kicked for fling attempt', -- imagine gets kicked for script that kicks
-	['bilinmez4095'] = 'invalid state Platform Stand',
-	['djdjdd54321'] = 'phase/noclip into walls',
-	['cnmjm222'] = 'invisible',
-	['oyeuser67'] = 'speedhack',
-	['BetterCallMe788'] = 'fling',
-	['Avacad0731'] = 'phase/noclip',
-	['C0nquerons'] = 'Platform Stand exploit',
-	['goobyzoobytv'] = 'phase/noclip',
-	['Joni_8824'] = 'phase/noclip',
-	['jaycomputing'] = 'skid using selenium larps and got kicked',
-	['tooodarl9'] = 'skid exploiter',
-	['Henr45555455'] = 'invalid state Platform Stand',
-	['Marssimo_14'] = 'invalid state Platform Stand',
-	['boy_cantot2'] = 'invalid state Platform Stand',
-	['killerdoy372bro'] = 'invalid animation',
-	['trervoTDJ'] = 'aimbotting',
-	['Pedro9Henrique2000'] = 'phase/noclip',
-	["faizan1111789"] = "speed",
-	['juanpro231ew'] = "invalid state Swimming",
-	["voidwalker5346"] = "invalid animation (car kick)",
-	["mchser3"] = "invalid state Swimming",
-	["ang5454"] = "highjump",
-	['rackasauras'] = 'speed',
-	["dobys149"] = "phase/noclip",
-	["SyntaxK3v"] = "speed",
-	["Thacosmick_2"] = "invalid state Swimming",
-	["Unicornpoop1239508"] = "speed",
-	["kind_jack001"] = "invalid animation (invis)",
-	["lilyazz0000"] = "invalid state PlatformStanding (fly)",
-	["nobby_rules2"] = "speed",
-	["duimaxxing"] = "phase/noclip",
-	['sauodwuansd212'] = 'fling/kickall'
-}
-
-local function playerAdded(plr)
-	local reason = cUsernames[plr.Name]
-	if Users then
-		reason = table.find(Users.ListEnabled, tostring(plr.UserId)) or reason
-	end
-
-	if reason then
-		notif('CheaterDetector', 'Cheater Detected ('..reason..'): '..plr.Name, 60, 'alert')
-		whitelist.customtags[plr.Name] = {{text = 'Exploiter', color = Color3.new(1, 0, 0)}}
-		tempTargets[plr.Name] = true
+-- vape.Notifications only exists once the gui is loaded, this file runs before that
+local function notify(text, duration, type)
+	if vape.Notifications then
+		notif('CheaterDetector', text, duration, type)
 	end
 end
+
+local function saveCheaters()
+	if not canSave then
+		notify('Failed to save, json library is unavailable.', 15, 'warning')
+	elseif not pcall(json.write, filePath, Cheaters) then
+		notify('Failed to write '..filePath, 15, 'warning')
+	end
+end
+
+local function loadCheaters()
+	local data = canSave and json.read(filePath)
+	if not data then
+		return saveCheaters() -- creates the file on first run
+	end
+
+	Cheaters.Names = type(data.Names) == 'table' and data.Names or {}
+	Cheaters.Users = type(data.Users) == 'table' and data.Users or {}
+end
+
+-- a reason of nil removes the tag instead
+local function tagCheater(plr, reason, alert)
+	whitelist.customtags[plr.Name] = reason and {{text = 'Exploiter', color = Color3.new(1, 0, 0)}} or nil
+	tempTargets[plr.Name] = reason and true or nil
+
+	if reason and alert and cheaterOptions.Notifications.Enabled then
+		notify('Cheater Detected ('..reason..'): '..plr.DisplayName, 60, 'alert')
+	end
+end
+
+local function getCheaterReason(plr)
+	local user = Cheaters.Users[tostring(plr.UserId)]
+	if user then
+		return user.Reason or 'known cheater'
+	end
+
+	return Cheaters.Names[plr.Name:lower()] or Cheaters.Names[plr.DisplayName:lower()]
+end
+
+local function findCheaterPlayer(text)
+	text = text and text:lower()
+	if not text or text == '' then return end
+
+	local partial
+	for _, plr in playersService:GetPlayers() do
+		if plr.Name:lower() == text or plr.DisplayName:lower() == text then return plr end
+
+		if not partial and (plr.Name:lower():sub(1, #text) == text or plr.DisplayName:lower():sub(1, #text) == text) then
+			partial = plr
+		end
+	end
+
+	return partial
+end
+
+-- remove = true drops the player, otherwise they get added with the given reason
+local function editCheater(text, reason, remove)
+	text = text and text:match('^%s*(.-)%s*$')
+	if not text or text == '' then return notify('No player given.', 8, 'warning') end
+
+	-- a removal has no reason, that is what untags the player
+	if remove then
+		reason = nil
+	else
+		reason = (reason and reason:match('^%s*(.-)%s*$')) or 'manually added'
+	end
+
+	local plr = findCheaterPlayer(text)
+
+	if plr then
+		Cheaters.Users[tostring(plr.UserId)] = not remove and {
+			Name = plr.Name,
+			DisplayName = plr.DisplayName,
+			Reason = reason,
+			Time = os.time()
+		} or nil
+		Cheaters.Names[plr.Name:lower()] = nil
+		Cheaters.Names[plr.DisplayName:lower()] = nil
+		tagCheater(plr, reason)
+	else
+		Cheaters.Names[text:lower()] = not remove and reason or nil
+	end
+
+	saveCheaters()
+	notify((plr and plr.DisplayName or text)..(remove and ' removed from the cheater list.' or ' added to the cheater list. ('..reason..')'), 10)
+end
+
+local function playerAdded(plr)
+	if plr == lplr then return end
+
+	local reason = getCheaterReason(plr)
+	if reason then
+		tagCheater(plr, reason, true)
+	end
+end
+
+loadCheaters()
 
 CheaterDetector = vape.Categories.Utility:CreateModule({
 	Name = 'CheaterDetector',
@@ -84,5 +120,49 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 			end
 		end
 	end,
-	Tooltip = 'Detects people with history of cheating',
+	Tooltip = 'Detects people with history of cheating\nCheaters are stored in '..filePath
+})
+
+function CheaterDetector:AddCheater(text, reason)
+	editCheater(text, reason)
+end
+
+function CheaterDetector:RemoveCheater(text)
+	editCheater(text, nil, true)
+end
+
+cheaterOptions.Notifications = CheaterDetector:CreateToggle({
+	Name = 'Notifications',
+	Default = true,
+	Tooltip = 'Notifies you when a known cheater joins'
+})
+
+local addBox
+addBox = CheaterDetector:CreateTextBox({
+	Name = 'Add cheater',
+	Placeholder = 'DisplayName',
+	Player = true,
+	Tooltip = 'Adds a player to the local cheater list',
+	Function = function(enter)
+		if not enter then return end
+
+		local text = addBox.Value
+		addBox:SetValue('')
+		editCheater(text)
+	end
+})
+
+CheaterDetector:CreateButton({
+	Name = 'Clear cheater list',
+	Tooltip = 'Removes every locally stored cheater',
+	Function = function()
+		for _, plr in playersService:GetPlayers() do
+			tagCheater(plr)
+		end
+
+		table.clear(Cheaters.Names)
+		table.clear(Cheaters.Users)
+		saveCheaters()
+		notify('Cleared the cheater list.', 10)
+	end
 })
