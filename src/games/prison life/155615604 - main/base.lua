@@ -29,7 +29,6 @@ local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
 local entitylib = vape.Libraries.entity
-local json = vape.Libraries.json
 local whitelist = vape.Libraries.whitelist
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo

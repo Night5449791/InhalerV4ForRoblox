@@ -344,23 +344,6 @@ local function handleCheater(args, remove)
 	end
 end
 
--- Copy user whitelist hash
-
-local function handleCopyUser(args)
-	if not options.CopyUser.Enabled then return end
-
-	local player = findPlayer(args)
-	if not player then
-		notif('ChatCommand', 'No player found.', 5, 'warning')
-		return
-	end
-
-	-- matches whitelist:get() / GetHash -> sha512(Name..UserId..'SelfReport')
-	local h = hash.sha512(player.Name..player.UserId..'SelfReport')
-	pcall(setclipboard, h)
-	notif('ChatCommand', 'Copied hash for '..player.DisplayName..'\n'..h, 10)
-end
-
 -- KickExploit bridge
 
 local function kickModule()
@@ -588,56 +571,6 @@ local function handleUnfollow()
 	notif('ChatCommand', 'Stopped following.', 5)
 end
 
-local function getTargetStrafe()
-	local module = vape.Modules and vape.Modules.TargetStrafe
-	if module then return module end
-
-	local blatant = vape.Categories and vape.Categories.Blatant
-	return blatant and blatant.Modules and blatant.Modules.TargetStrafe
-end
-
-local function handleTargetStrafe(args)
-	if not options.TargetStrafe.Enabled then return end
-
-	local module = getTargetStrafe()
-	if not module then
-		notif('ChatCommand', 'TargetStrafe is not available in this game.', 5, 'warning')
-		return
-	end
-
-	args = trim(args)
-	local lowered = args and args:lower()
-	if not args or lowered == 'off' or lowered == 'stop' or lowered == 'none' then
-		local targeting = module.Options and module.Options['Targeting']
-		if targeting and targeting.Enabled then
-			targeting:Toggle()
-		end
-
-		notif('ChatCommand', 'TargetStrafe targeting disabled.', 5)
-		return
-	end
-
-	local targeting = module.Options and module.Options['Targeting']
-	local username = module.Options and module.Options['Target Username']
-	if not targeting or not username then
-		notif('ChatCommand', 'TargetStrafe targeting options are missing.', 5, 'warning')
-		return
-	end
-
-	if not module.Enabled then
-		module:Toggle()
-	end
-	if not targeting.Enabled then
-		targeting:Toggle()
-	end
-	username:SetValue(args)
-	notif('ChatCommand', 'TargetStrafe locked onto '..args..'.', 5)
-end
-
-local function handleStopTargetStrafe()
-	handleTargetStrafe('off')
-end
-
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
@@ -656,10 +589,8 @@ local toggles = {
 	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'CopyUser', Tooltip = '.copyuser <plr>'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr>\n.removeskid <plr>'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
-	{Name = 'TargetStrafe', Tooltip = '.tstrafe <username>\n.tstrafe off / .untstrafe'}
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'}
 }
 
 local function handleView(args)
@@ -720,7 +651,6 @@ local commands = {
 	unblacklist = function(args)
 		handleTargets(args, true)
 	end,
-	copyuser = handleCopyUser,
 	addcheater = function(args)
 		handleCheater(args, false)
 	end,
@@ -741,10 +671,7 @@ local commands = {
 	serverhop = handleHop,
 	rj = handleRejoin,
 	rejoin = handleRejoin,
-	reload = handleReload,
-	tstrafe = handleTargetStrafe,
-	targetstrafe = handleTargetStrafe,
-	untstrafe = handleStopTargetStrafe
+	reload = handleReload
 }
 
 local function onChatted(message)

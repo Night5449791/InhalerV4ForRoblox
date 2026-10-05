@@ -1,4 +1,4 @@
-local UniversalLagger
+local UniversalBroadcast
 local Message
 local Delay
 
@@ -6,7 +6,7 @@ local DEFAULT_MESSAGE = 'join https://discord.gg/bMZ4BSUR47 and have fun :v'
 local animation
 
 UniversalLagger = vape.Categories.World:CreateModule({
-	Name = 'UniversalLagger',
+	Name = 'UniversalBroadcast',
 	Function = function(callback)
 		if callback then
 			local random = Random.new()

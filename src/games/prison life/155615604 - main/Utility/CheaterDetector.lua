@@ -3,9 +3,10 @@
 
 local CheaterDetector
 local cheaterOptions = {}
-local filePath = 'newvape/profile/cheaters-'..tostring(game.GameId)..'.json'
+local folderPath = 'newvape/profile/'
+local filePath = folderPath..'cheaters-'..tostring(game.GameId)..'.json'
 local Cheaters = {Names = {}, Users = {}}
-local canSave = json ~= nil
+local httpService = cloneref(game:GetService('HttpService'))
 
 -- vape.Notifications only exists once the gui is loaded, this file runs before that
 local function notify(text, duration, type)
@@ -15,17 +16,30 @@ local function notify(text, duration, type)
 end
 
 local function saveCheaters()
-	if not canSave then
-		notify('Failed to save, json library is unavailable.', 15, 'warning')
-	elseif not pcall(json.write, filePath, Cheaters) then
+	if not isfolder(folderPath) then
+		pcall(makefolder, folderPath)
+	end
+
+	local encoded, content = pcall(function()
+		return httpService:JSONEncode(Cheaters)
+	end)
+
+	if not encoded or not pcall(writefile, filePath, content) then
 		notify('Failed to write '..filePath, 15, 'warning')
 	end
 end
 
 local function loadCheaters()
-	local data = canSave and json.read(filePath)
-	if not data then
+	if not isfile(filePath) then
 		return saveCheaters() -- creates the file on first run
+	end
+
+	local decoded, data = pcall(function()
+		return httpService:JSONDecode(readfile(filePath))
+	end)
+
+	if not decoded or type(data) ~= 'table' then
+		return saveCheaters()
 	end
 
 	Cheaters.Names = type(data.Names) == 'table' and data.Names or {}
