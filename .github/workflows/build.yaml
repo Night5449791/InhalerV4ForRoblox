@@ -16,23 +16,23 @@ jobs:
     - name: Clone destination files
       uses: actions/checkout@v6
       with:
-        repository: Night5449791/VapeCompiled
+        repository: Night5449791/InhalerBundler
         token: ${{ secrets.ACTIONS_GITHUB_TOKEN }}
-        path: "./VapeCompiled"
+        path: "./InhalerBundler"
 
     - name: Clone bundler
       uses: actions/checkout@v6
       with:
-        repository: Night5449791/VapeBundler
-        path: "./VapeBundler"
+        repository: Night5449791/InhalerBundler
+        path: "./InhalerBundler"
 
     - name: Copy bundler configuration
       run: |-
-        mv ./.github/workflows/workflowConfig.json ./VapeBundler/config.json
+        mv ./.github/workflows/workflowConfig.json ./InhalerBundler/config.json
 
     - name: Install node packages
       run: |-
-        cd ./VapeBundler
+        cd ./InhalerBundler
         npm i
 
     - name: Set up Node.js
@@ -40,7 +40,7 @@ jobs:
 
     - name: Run Bundler
       run: |-
-        node ./VapeBundler/index.js prod
+        node ./InhalerBundler/index.js prod
 
     - name: Setup git commit
       run: |-
@@ -49,7 +49,7 @@ jobs:
 
     - name: Push commit
       run: |-
-        cd ./VapeCompiled
+        cd ./InhalerCompiled
         git add .
-        git commit -m "Updated Inhaler"
+        git commit -m "Updated Inhaler to Prod"
         git push origin
