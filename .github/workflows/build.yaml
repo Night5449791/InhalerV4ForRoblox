@@ -16,9 +16,9 @@ jobs:
     - name: Clone destination files
       uses: actions/checkout@v6
       with:
-        repository: Night5449791/InhalerBundler
+        repository: Night5449791/InhalerCompiled
         token: ${{ secrets.ACTIONS_GITHUB_TOKEN }}
-        path: "./InhalerBundler"
+        path: "./InhalerCompiled"
 
     - name: Clone bundler
       uses: actions/checkout@v6
