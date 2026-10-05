@@ -2,7 +2,7 @@ local UniversalBroadcast
 local Message
 local Delay
 
-local DEFAULT_MESSAGE = 'join https://discord.gg/bMZ4BSUR47 and have fun :v'
+local DEFAULT_MESSAGE = 'join https://discord.gg/bMZ4BSUR47 get better exploits or have fun :v'
 local animation
 
 UniversalLagger = vape.Categories.World:CreateModule({
