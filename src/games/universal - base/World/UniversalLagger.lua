@@ -1,40 +1,71 @@
 local UniversalLagger
 local Message
+local Delay
 
 local DEFAULT_MESSAGE = 'join https://discord.gg/bMZ4BSUR47 and have fun :v'
+local animation
 
 UniversalLagger = vape.Categories.World:CreateModule({
 	Name = 'UniversalLagger',
 	Function = function(callback)
 		if callback then
 			local random = Random.new()
+			local animator, track
 
-            notif('UniversalLagger', 'yo nigga lets see their reaction !1!1!11!', 5)
-			repeat
+			notif('UniversalLagger', 'watch them cry nigga its fun :v', 5)
+
+			while UniversalLagger.Enabled and vape.Loaded ~= nil do
 				local character = lplr.Character
-				local animator = character and character:FindFirstChildWhichIsA('Animator', true) or nil
 
-				if animator then
-					local text = Message.Value or ''
-					if text == '' then
-						text = DEFAULT_MESSAGE
-					end
-
-					-- both the preset and custom messages get the same padding
-					local animation = Instance.new('Animation')
-					animation.AnimationId = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n \n'..text..'\n \n'
-					local loaded = animator:LoadAnimation(animation)
-					loaded:Play(0, 0.0001, 0)
+				-- only search for the animator again after a respawn
+				if character and (not animator or not animator:IsDescendantOf(character)) then
+					animator = character:FindFirstChildWhichIsA('Animator', true)
+					track = nil
 				end
 
-				task.wait()
-			until not UniversalLagger.Enabled
+				if animator then
+					-- the animation is reused and the previous track is destroyed,
+					-- otherwise they pile up every frame and drop the local fps
+					animation = animation or Instance.new('Animation')
+					animation.AnimationId = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n \n'..(Message.Value ~= '' and Message.Value or DEFAULT_MESSAGE)..'\n \n'
+
+					local old = track
+					track = animator:LoadAnimation(animation)
+					track:Play(0, 0.0001, 0)
+
+					if old then
+						old:Destroy()
+					end
+				end
+
+				task.wait(Delay.Value)
+			end
+
+			if track then
+				track:Destroy()
+			end
+
+			if animation then
+				animation:Destroy()
+				animation = nil
+			end
 		end
 	end,
-	Tooltip = 'lags ur server, thx v3rm'
+	Tooltip = 'Spams broken animations to lag the server'
 })
+
 Message = UniversalLagger:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
 	Tooltip = 'leave it blank to use preset'
+})
+
+Delay = UniversalLagger:CreateSlider({
+	Name = 'Delay',
+	Min = 0.05,
+	Max = 1,
+	Default = 0.2,
+	Decimal = 100,
+	Suffix = 's',
+	Tooltip = 'Time between each animation, lower = more lag but also more local fps loss'
 })
