@@ -1,4 +1,5 @@
 local AntiInvisible
+local AntiLag
 local threads = {}
 local allowedAnims = {
 	-- default roblox animations
@@ -45,22 +46,45 @@ local allowedAnims = {
 	['rbxassetid://131326339350805'] = true
 }
 
+-- UniversalBroadcast / UniversalLagger feed the animator things like
+-- 'http=507770677\1<random>\n \n<message>\n \n', every client then fails to
+-- resolve it, floods the console and eats fps
+local function isValidAnimationId(id)
+	if not id or id == '' then return true end
+
+	return id:match('^rbxassetid://%d+$') ~= nil or id:match('^https?://[%w%.]*roblox%.com/asset/%?id=%d+') ~= nil
+end
+
 local function AnimationAdded(anim, plr)
-	if not allowedAnims[anim.Animation.AnimationId] and plr then
-		if threads[anim] then
-			task.cancel(threads[anim])
+	local animation = anim.Animation
+	local id = animation and animation.AnimationId
+	if allowedAnims[id] or not plr then return end
+
+	if AntiLag.Enabled and not isValidAnimationId(id) then
+		-- dropping the animation stops the client from retrying the load
+		Cheats:Flag(plr, 'console lag', 1)
+		pcall(anim.Stop, anim, 0)
+
+		if animation then
+			pcall(animation.Destroy, animation)
 		end
 
-		Cheats:Flag(plr, 'invalid animation', 1)
-		threads[anim] = task.spawn(function()
-			repeat
-				anim:AdjustWeight(0, 0)
-				task.wait()
-			until not (anim.IsPlaying and AntiInvisible.Enabled)
-
-			threads[anim] = nil
-		end)
+		return
 	end
+
+	if threads[anim] then
+		task.cancel(threads[anim])
+	end
+
+	Cheats:Flag(plr, 'invalid animation', 1)
+	threads[anim] = task.spawn(function()
+		repeat
+			anim:AdjustWeight(0, 0)
+			task.wait()
+		until not (anim.IsPlaying and AntiInvisible.Enabled)
+
+		threads[anim] = nil
+	end)
 end
 
 local function EntityAdded(ent)
@@ -97,4 +121,9 @@ AntiInvisible = vape.Categories.Blatant:CreateModule({
 		end
 	end,
 	Tooltip = 'Prevent people from using animations outside of the game\'s scope'
+})
+AntiLag = AntiInvisible:CreateToggle({
+	Name = 'AntiLag',
+	Default = true,
+	Tooltip = 'Drops malformed animations so they cannot spam your console and drop fps'
 })
