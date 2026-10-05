@@ -2,7 +2,7 @@
 
 > Repo: `Night5449791/InhalerV4ForRoblox` — a fork of Vape V4, a Roblox combat/utility script GUI.
 > Runtime target is **Luau inside a Roblox exploit executor** (not standard Lua, not Node).
-> `src/` is the human-maintainable source tree; an external bundler flattens it into `Night5449791/VapeCompiled`, which the runtime downloads at injection time.
+> `src/` is the human-maintainable source tree; an external bundler flattens it into `Night5449791/InhalerCompiled`, which the runtime downloads at injection time.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### Build
 
-There is **no local build command**. Builds happen only in CI: `.github/workflows/build.yaml` triggers on push to `main`, clones the external `Night5449791/VapeBundler` (not in this repo), copies `.github/workflows/workflowConfig.json` → `VapeBundler/config.json` (`SRC_PATH=./src`, `PROD_PATH=./VapeCompiled`), runs `node ./VapeBundler/index.js prod` (Node 24.15.0), and pushes the flattened output to `VapeCompiled`. Changing bundling behavior requires editing VapeBundler.
+There is **no local build command**. Builds happen only in CI: `.github/workflows/build.yaml` triggers on push to `main`, clones the external `Night5449791/VapeBundler` (not in this repo), copies `.github/workflows/workflowConfig.json` → `VapeBundler/config.json` (`SRC_PATH=./src`, `PROD_PATH=./InhalerCompiled`), runs `node ./VapeBundler/index.js prod` (Node 24.15.0), and pushes the flattened output to `InhalerCompiled`. Changing bundling behavior requires editing VapeBundler.
 
 ### Lint / Test
 
@@ -34,7 +34,7 @@ To test a single module, edit under `src/games/<game>/...`, then either run the 
 ## 2. Boot chain
 
 1. **`NewMainScript.lua` / `loadstring`** — one-line user entry; HTTP GETs the loader and runs it. Byte-identical to `src/loader.lua`.
-2. **`src/loader.lua`** (68 lines) — filesystem bootstrap only. Defines `isfile`/`delfile` fallbacks and `downloadFile(path, func)`, which caches from `raw.githubusercontent.com/Night5449791/VapeCompiled/<commit>/<path>`. Creates `newvape/{games,profiles,assets,libraries,guis}`. Resolves the remote commit by parsing `currentOid` off the GitHub page into `newvape/profiles/commit.txt`. Ends with `loadstring(downloadFile('newvape/main.lua'), 'main')()`.
+2. **`src/loader.lua`** (68 lines) — filesystem bootstrap only. Defines `isfile`/`delfile` fallbacks and `downloadFile(path, func)`, which caches from `raw.githubusercontent.com/Night5449791/InhalerCompiled/<commit>/<path>`. Creates `newvape/{games,profiles,assets,libraries,guis}`. Resolves the remote commit by parsing `currentOid` off the GitHub page into `newvape/profiles/commit.txt`. Ends with `loadstring(downloadFile('newvape/main.lua'), 'main')()`.
    **Cache watermark:** every downloaded `.lua` is prefixed with `--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.` `wipeFolder()` deletes cached files still carrying it (except `loader`). Preserve this when touching loader logic.
 3. **`src/main.lua`** (111 lines) — the assembler: `repeat task.wait() until game:IsLoaded()` → `shared.vape:Uninject()` if reloading → load `newvape/guis/<gui>.lua` into `shared.vape` (gui name is hardcoded `'new'` at `main.lua:87`) → load `newvape/games/universal.lua` unconditionally → load `newvape/games/<game.PlaceId>.lua` if present → `finishLoading()`.
    `finishLoading()` clears `vape.Init`, runs `vape:Load()`, spawns a 10-second `vape:Save()` loop, and hooks `OnTeleport` to `queue_on_teleport` a re-injection script (carrying `VapeDeveloper`/`VapeCustomProfile`/`vapereload`).
