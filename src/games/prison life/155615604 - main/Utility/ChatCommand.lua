@@ -589,7 +589,7 @@ local toggles = {
 	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Cheater', Tooltip = '.addskid <plr>\n.removeskid <plr>'},
+	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.removeskid <plr>'},
 	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'}
 }
 

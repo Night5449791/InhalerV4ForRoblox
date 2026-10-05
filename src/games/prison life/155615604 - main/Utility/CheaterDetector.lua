@@ -7,6 +7,10 @@ local filePath = 'newvape/cheaters.json'
 local Cheaters = {Names = {}, Users = {}}
 local httpService = cloneref(game:GetService('HttpService'))
 
+local function trimText(text)
+	return text and text:match('^%s*(.-)%s*$') or nil
+end
+
 -- vape.Notifications only exists once the gui is loaded, this file runs before that
 local function notify(text, duration, type)
 	if vape.Notifications then
@@ -85,19 +89,43 @@ local function findCheaterPlayer(text)
 	return partial
 end
 
+-- ".addskid <display name> <reason>" - display names can contain spaces, so the
+-- longest match against an online player wins and whatever follows is the reason
+local function splitCheaterText(text)
+	local words = {}
+	for word in text:gmatch('%S+') do
+		table.insert(words, word)
+	end
+
+	if #words == 0 then return end
+
+	for i = #words, 1, -1 do
+		local name = table.concat(words, ' ', 1, i)
+		local plr = findCheaterPlayer(name)
+		if plr then
+			return plr, table.concat(words, ' ', i + 1), name
+		end
+	end
+
+	-- nobody online matches, the first word is the name and the rest the reason
+	return nil, table.concat(words, ' ', 2), words[1]
+end
+
 -- remove = true drops the player, otherwise they get added with the given reason
 local function editCheater(text, reason, remove)
-	text = text and text:match('^%s*(.-)%s*$')
+	text = trimText(text)
 	if not text or text == '' then return notify('No player given.', 8, 'warning') end
 
+	local plr, rest, name = splitCheaterText(text)
+	if not name then return notify('No player given.', 8, 'warning') end
+
 	-- a removal has no reason, that is what untags the player
+	local given = trimText(reason)
 	if remove then
 		reason = nil
 	else
-		reason = (reason and reason:match('^%s*(.-)%s*$')) or 'manually added'
+		reason = (given and given ~= '' and given) or (rest and rest ~= '' and rest) or 'manually added'
 	end
-
-	local plr = findCheaterPlayer(text)
 
 	if plr then
 		Cheaters.Users[tostring(plr.UserId)] = not remove and {
@@ -110,11 +138,11 @@ local function editCheater(text, reason, remove)
 		Cheaters.Names[plr.DisplayName:lower()] = nil
 		tagCheater(plr, reason)
 	else
-		Cheaters.Names[text:lower()] = not remove and reason or nil
+		Cheaters.Names[name:lower()] = not remove and reason or nil
 	end
 
 	saveCheaters()
-	notify((plr and plr.DisplayName or text)..(remove and ' removed from the cheater list.' or ' added to the cheater list. ('..reason..')'), 10)
+	notify((plr and plr.DisplayName or name)..(remove and ' removed from the cheater list.' or ' added to the cheater list. ('..reason..')'), 10)
 end
 
 local function playerAdded(plr)
@@ -160,7 +188,7 @@ addBox = CheaterDetector:CreateTextBox({
 	Name = 'Add cheater',
 	Placeholder = 'DisplayName',
 	Player = true,
-	Tooltip = 'Adds a player to the local cheater list',
+	Tooltip = 'Adds a player to the local cheater list\n"DisplayName reason"',
 	Function = function(enter)
 		if not enter then return end
 
