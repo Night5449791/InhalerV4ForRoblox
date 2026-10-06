@@ -1,6 +1,7 @@
 local AntiInvisible
 local AntiLag
 local threads = {}
+local connections = {}
 local allowedAnims = {
 	-- default roblox animations
 	['http://www.roblox.com/asset/?id=125750702'] = true,
@@ -60,8 +61,10 @@ local function AnimationAdded(anim, plr)
 	local id = animation and animation.AnimationId
 	if allowedAnims[id] or not plr then return end
 
+	-- malformed animation ids (e.g. the UniversalBroadcast spam) cannot be
+	-- resolved by the client, flood the console and tank fps. dropping them
+	-- here stops the retry loop even when AntiInvisible itself is off.
 	if AntiLag.Enabled and not isValidAnimationId(id) then
-		-- dropping the animation stops the client from retrying the load
 		Cheats:Flag(plr, 'console lag', 1)
 		pcall(anim.Stop, anim, 0)
 
@@ -71,6 +74,9 @@ local function AnimationAdded(anim, plr)
 
 		return
 	end
+
+	-- only hide animations that are not part of the game when AntiInvisible is on
+	if not AntiInvisible.Enabled then return end
 
 	if threads[anim] then
 		task.cancel(threads[anim])
@@ -89,15 +95,39 @@ end
 
 local function EntityAdded(ent)
 	local animator = ent.Humanoid:WaitForChild('Animator', 5)
+	if not animator then return end
 
-	if animator and AntiInvisible.Enabled then
-		AntiInvisible:Clean(animator.AnimationPlayed:Connect(function(anim)
-			AnimationAdded(anim, ent.Player)
-		end))
+	table.insert(connections, animator.AnimationPlayed:Connect(function(anim)
+		AnimationAdded(anim, ent.Player)
+	end))
 
-		for _, anim in animator:GetPlayingAnimationTracks() do
-			task.spawn(AnimationAdded, anim, ent.Player)
-		end
+	for _, anim in animator:GetPlayingAnimationTracks() do
+		task.spawn(AnimationAdded, anim, ent.Player)
+	end
+end
+
+local function teardown()
+	for i = #connections, 1, -1 do
+		connections[i]:Disconnect()
+		connections[i] = nil
+	end
+
+	for _, v in threads do
+		task.cancel(v)
+	end
+
+	table.clear(threads)
+end
+
+-- (re)connect the AnimationPlayed watchers whenever either feature is on
+local function refresh()
+	teardown()
+
+	if not (AntiInvisible.Enabled or AntiLag.Enabled) then return end
+
+	table.insert(connections, entitylib.Events.EntityAdded:Connect(EntityAdded))
+	for _, v in entitylib.List do
+		task.spawn(EntityAdded, v)
 	end
 end
 
@@ -109,15 +139,14 @@ AntiInvisible = vape.Categories.Blatant:CreateModule({
 	Name = 'AntiInvisible',
 	Function = function(callback)
 		if callback then
-			AntiInvisible:Clean(entitylib.Events.EntityAdded:Connect(EntityAdded))
-			for _, v in entitylib.List do
-				task.spawn(EntityAdded, v)
-			end
+			refresh()
 		else
-			for _, v in threads do
-				task.cancel(v)
+			teardown()
+
+			-- AntiLag may still want the watchers up after AntiInvisible turns off
+			if AntiLag.Enabled then
+				refresh()
 			end
-			table.clear(threads)
 		end
 	end,
 	Tooltip = 'Prevent people from using animations outside of the game\'s scope'
@@ -125,5 +154,12 @@ AntiInvisible = vape.Categories.Blatant:CreateModule({
 AntiLag = AntiInvisible:CreateToggle({
 	Name = 'AntiLag',
 	Default = false,
-	Tooltip = 'Drops malformed animations so they cannot spam your console and drop fps'
+	Tooltip = 'Drops malformed animations so they cannot spam your console and drop fps',
+	Function = function(callback)
+		if callback then
+			refresh()
+		elseif not AntiInvisible.Enabled then
+			teardown()
+		end
+	end
 })
