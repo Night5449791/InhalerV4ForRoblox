@@ -269,6 +269,18 @@ local function handleRejoin()
 	end
 end
 
+local function handleBroadcast()
+	if not options.Broadcast.Enabled then return end
+
+	local module = vape.Modules.UniversalBroadcast
+	if module then
+		module:Toggle()
+		notif('UniversalBroadcast', 'Automatically broadcasting in console. Press F9 or chat /console to see result', 5)
+	else
+		notif('ChatCommand', 'UniversalBroadcast is not available in this game.', 5, 'warning')
+	end
+end
+
 -- Whitelist / target lists
 
 local function handleWhitelist(args, remove)
@@ -568,7 +580,8 @@ local toggles = {
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'}
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
+	{Name = 'Broadcast', Tooltip = '.broadcast'}
 }
 
 local function handleView(args)
@@ -616,7 +629,8 @@ local commands = {
 	team = handleTeam,
 	hop = handleHop,
 	rj = handleRejoin,
-	reload = handleReload
+	reload = handleReload,
+	broadcast = handleBroadcast
 }
 
 -- long forms point at the same handler as the short ones
