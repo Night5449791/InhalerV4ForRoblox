@@ -52,7 +52,7 @@ local whitelist = {
 -- broadcast spam hands the client an animation id it cannot resolve, the engine
 -- then logs one warning per attempt and the console has to render every single
 -- line, that flood is what actually kills the client
-local ANIMATION_FAILURE = 'failed to play animation'
+local ANIMATION_FAILURE = 'Failed to play animation'
 local CLEAR_INTERVAL = 0.5
 
 -- MessageOut only reports, the line is already in the log by the time it fires,
