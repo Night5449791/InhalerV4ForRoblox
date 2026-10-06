@@ -324,16 +324,19 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 	table.insert(fields, {name = 'Added By', value = lplr.Name, inline = true})
 	table.insert(fields, {name = 'Logged Date', value = os.date('%m/%d/%Y %H:%M:%S'), inline = true})
 
-	local sent, err = webhook.sendEmbed(url, {
-		title = removed and '✅ Skid Removed / Unflagged' or '🚨 Detected Skid Target',
-		description = 'User: '..user..' (@'..display..')\nID: '..id,
-		color = removed and EMBED_GREEN or EMBED_RED,
-		fields = fields
-	}, lplr.Name)
+	-- request blocks until discord answers, never do that on the calling thread
+	task.spawn(function()
+		local sent, err = webhook.sendEmbed(url, {
+			title = removed and '✅ Skid Removed / Unflagged' or '🚨 Detected Skid Target',
+			description = 'User: '..user..' (@'..display..')\nID: '..id,
+			color = removed and EMBED_GREEN or EMBED_RED,
+			fields = fields
+		}, lplr.Name)
 
-	if not sent then
-		notify('Webhook failed: '..tostring(err), 10, 'warning')
-	end
+		if not sent then
+			notify('Webhook failed: '..tostring(err), 10, 'warning')
+		end
+	end)
 end
 
 -- remove = true drops the player, otherwise they get added with the given reason

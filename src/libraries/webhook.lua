@@ -7,6 +7,9 @@
 --   webhook.validate(url)                    -> bool
 --   webhook.send(url, payload)               -> bool, err
 --   webhook.sendEmbed(url, embed, 'name')    -> bool, err
+--
+-- send and sendEmbed block until discord answers, spawn them from a task or the
+-- caller stalls for as long as the request takes
 
 local cloneref = cloneref or function(obj)
 	return obj
@@ -14,20 +17,33 @@ end
 local httpService = cloneref(game:GetService('HttpService'))
 
 -- the chunk env is not always the executor env, these live on the real global
--- table, so getgenv has to be tried before the plain globals
+-- table, so getgenv has to be tried before the plain globals.
+-- resolved once, an executor never swaps this out while running
+local requestFunction
+local requestResolved = false
+
 local function getRequestFunction()
+	if requestResolved then return requestFunction end
+	requestResolved = true
+
 	local genv = (getgenv and getgenv()) or _G
 
 	if genv then
-		if typeof(genv.request) == 'function' then return genv.request end
-		if typeof(genv.http_request) == 'function' then return genv.http_request end
-		if typeof(genv.syn) == 'table' and typeof(genv.syn.request) == 'function' then return genv.syn.request end
+		requestFunction = typeof(genv.request) == 'function' and genv.request
+			or typeof(genv.http_request) == 'function' and genv.http_request
+			or (typeof(genv.syn) == 'table' and typeof(genv.syn.request) == 'function' and genv.syn.request)
+			or nil
 	end
 
-	-- every executor names this differently, request is the common one
-	if typeof(request) == 'function' then return request end
-	if typeof(http_request) == 'function' then return http_request end
-	if typeof(syn) == 'table' and typeof(syn.request) == 'function' then return syn.request end
+	if not requestFunction then
+		-- every executor names this differently, request is the common one
+		requestFunction = typeof(request) == 'function' and request
+			or typeof(http_request) == 'function' and http_request
+			or (typeof(syn) == 'table' and typeof(syn.request) == 'function' and syn.request)
+			or nil
+	end
+
+	return requestFunction
 end
 
 local webhook = {}
