@@ -2,7 +2,7 @@ local AntiInvisible
 local AntiLag
 local threads = {}
 local logService = cloneref(game:GetService('LogService'))
-local clearTimer = 0
+local spamUntil = 0
 local clearFailed = false
 local whitelist = {
 	-- default roblox animations
@@ -52,28 +52,53 @@ local whitelist = {
 -- broadcast spam hands the client an animation id it cannot resolve, the engine
 -- then logs one warning per attempt and the console has to render every single
 -- line, that flood is what actually kills the client
-local ANIMATION_FAILURE = 'Failed to play animation'
-local CLEAR_INTERVAL = 0.5
+-- keep wiping for this long past the last hit, messages arrive between frames
+-- and whatever slips through is exactly what ends up rendered
+local SPAM_WINDOW = 1
 
--- MessageOut only reports, the line is already in the log by the time it fires,
--- so wiping the output is the only way to keep the flood from piling up
+-- anything that is not a plain asset id cannot be resolved, that is the spam
+local function isValidAnimationId(id)
+	if type(id) ~= 'string' or id == '' then return true end
+
+	return id:match('^rbxassetid://%d+$') ~= nil or id:match('^https?://[%w%.%-]*roblox%.com/asset/%?id=%d+') ~= nil
+end
+
+-- the client cannot clear the output on every executor, this is only a second
+-- line of defence, the real protection is dropping the animations below
+local function clearOutput()
+	if pcall(logService.ClearOutput, logService) then return end
+
+	if not clearFailed then
+		clearFailed = true
+		notif('AntiInvisible', 'ClearOutput is unavailable, only the animations are being blocked.', 15, 'warning')
+	end
+end
+
 local function onMessageOut(message)
 	if not (AntiLag and AntiLag.Enabled and AntiInvisible.Enabled) then return end
 	if type(message) ~= 'string' then return end
-	if not message:lower():find(ANIMATION_FAILURE, 1, true) then return end
 
-	local now = os.clock()
-	if (now - clearTimer) < CLEAR_INTERVAL then return end
-	clearTimer = now
+	-- the wording differs between engine versions, match all of them
+	local lowered = message:lower()
+	if not (lowered:find('failed to play animation', 1, true) or lowered:find('failed to load animation', 1, true) or lowered:find('unable to load animation', 1, true)) then return end
 
-	if not pcall(logService.ClearOutput, logService) and not clearFailed then
-		clearFailed = true
-		notif('AntiInvisible', 'Console clearing is unavailable, the animation warnings cannot be hidden.', 15, 'warning')
-	end
+	spamUntil = os.clock() + SPAM_WINDOW
+	clearOutput()
 end
 
 local function AnimationAdded(anim, plr)
 	if not whitelist[anim.Animation.AnimationId] and plr then
+		-- drop unresolvable ids before the engine resolves them, that resolution
+		-- is what logs the warning and floods the console
+		if AntiLag and AntiLag.Enabled and not isValidAnimationId(anim.Animation.AnimationId) then
+			local animation = anim.Animation
+			Cheats:Flag(plr, 'console lag', 1)
+			pcall(anim.Stop, anim, 0)
+			pcall(anim.Destroy, anim)
+			pcall(animation.Destroy, animation)
+			return
+		end
+
 		if threads[anim] then
 			task.cancel(threads[anim])
 		end
@@ -112,12 +137,22 @@ AntiInvisible = vape.Categories.Blatant:CreateModule({
 	Name = 'AntiInvisible',
 	Function = function(callback)
 		if callback then
+			spamUntil = 0
 			AntiInvisible:Clean(entitylib.Events.EntityAdded:Connect(EntityAdded))
 			AntiInvisible:Clean(logService.MessageOut:Connect(onMessageOut))
+			-- a burst drops far more lines than MessageOut reports one by one,
+			-- wiping every frame for as long as it lasts leaves nothing on screen
+			AntiInvisible:Clean(runService.Heartbeat:Connect(function()
+				if not (AntiLag and AntiLag.Enabled) then return end
+				if os.clock() > spamUntil then return end
+
+				clearOutput()
+			end))
 			for _, v in entitylib.List do
 				task.spawn(EntityAdded, v)
 			end
 		else
+			spamUntil = 0
 			for _, v in threads do
 				task.cancel(v)
 			end
@@ -129,5 +164,5 @@ AntiInvisible = vape.Categories.Blatant:CreateModule({
 AntiLag = AntiInvisible:CreateToggle({
 	Name = 'AntiLag',
 	Default = false,
-	Tooltip = 'Hides the animation failure warnings that broadcast spam floods the console with'
+	Tooltip = 'Drops the malformed animations that broadcast spam floods the console with'
 })
