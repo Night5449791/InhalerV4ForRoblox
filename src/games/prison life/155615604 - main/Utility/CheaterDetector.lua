@@ -431,21 +431,6 @@ webhookUrl = CheaterDetector:CreateTextBox({
 	Tooltip = 'Discord webhook url the cheater changes get posted to'
 })
 
-local addBox
-addBox = CheaterDetector:CreateTextBox({
-	Name = 'Add cheater',
-	Placeholder = 'DisplayName',
-	Player = true,
-	Tooltip = 'Adds a player to the local cheater list\n"DisplayName reason"',
-	Function = function(enter)
-		if not enter then return end
-
-		local text = addBox.Value
-		addBox:SetValue('')
-		editCheater(text)
-	end
-})
-
 CheaterDetector:CreateButton({
 	Name = 'Clear cheater list',
 	Tooltip = 'Removes every locally stored cheater',
