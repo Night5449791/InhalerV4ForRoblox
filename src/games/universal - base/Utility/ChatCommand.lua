@@ -3,6 +3,7 @@ local ChatCommand
 local options = {}
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
+local danceTrack
 
 local function trim(text)
 	return text and text:match('^%s*(.-)%s*$') or nil
@@ -250,6 +251,37 @@ local function handleBroadcast()
 	end
 end
 
+local function handleUndance()
+	if danceTrack then
+		danceTrack:Stop()
+		danceTrack:Destroy()
+		danceTrack = nil
+	end
+end
+
+local function handleDance()
+	if not options.Dance.Enabled then return end
+
+	local character = lplr.Character
+	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
+	if not humanoid then
+		notif('ChatCommand', 'You have no character.', 5, 'warning')
+		return
+	end
+
+	handleUndance()
+	local dances = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'}
+	if humanoid.RigType == Enum.HumanoidRigType.R15 then
+		dances = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
+	end
+
+	local animation = Instance.new('Animation')
+	animation.AnimationId = 'rbxassetid://'..dances[math.random(1, #dances)]
+	danceTrack = humanoid:LoadAnimation(animation)
+	danceTrack.Looped = true
+	danceTrack:Play()
+end
+
 -- Whitelist / target lists
 
 local function handleWhitelist(args, remove)
@@ -343,7 +375,8 @@ local toggles = {
 	{Name = 'ReloadVape', Tooltip = '.reload'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Broadcast', Tooltip = '.broadcast'}
+	{Name = 'Broadcast', Tooltip = '.broadcast'},
+	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
 }
 
 local function handleView(args)
@@ -406,6 +439,8 @@ local commands = {
 	rejoin = handleRejoin,
 	reload = handleReload,
 	broadcast = handleBroadcast,
+	dance = handleDance,
+	undance = handleUndance,
 	debugnet = handleDebugNetworkOwner,
 	debugnetworkowner = handleDebugNetworkOwner,
 }
@@ -431,6 +466,8 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 
 		ChatCommand:Clean(restoreCamera)
 		ChatCommand:Clean(stopFollow)
+		ChatCommand:Clean(handleUndance)
+		ChatCommand:Clean(lplr.CharacterAdded:Connect(handleUndance))
 		ChatCommand:Clean(playersService.PlayerRemoving:Connect(function(plr)
 			if plr == viewPlayer then
 				restoreCamera()
