@@ -1,8 +1,10 @@
 local AntiInvisible
 local AntiLag
 local threads = {}
-local connections = {}
-local allowedAnims = {
+local logService = cloneref(game:GetService('LogService'))
+local clearTimer = 0
+local clearFailed = false
+local whitelist = {
 	-- default roblox animations
 	['http://www.roblox.com/asset/?id=125750702'] = true,
 	['http://www.roblox.com/asset/?id=128777973'] = true,
@@ -47,106 +49,79 @@ local allowedAnims = {
 	['rbxassetid://131326339350805'] = true
 }
 
--- UniversalBroadcast / UniversalLagger feed the animator things like
--- 'http=507770677\1<random>\n \n<message>\n \n', every client then fails to
--- resolve it, floods the console and eats fps
-local function isValidAnimationId(id)
-	if not id or id == '' then return true end
+-- broadcast spam hands the client an animation id it cannot resolve, the engine
+-- then logs one warning per attempt and the console has to render every single
+-- line, that flood is what actually kills the client
+local ANIMATION_FAILURE = 'failed to play animation'
+local CLEAR_INTERVAL = 0.5
 
-	return id:match('^rbxassetid://%d+$') ~= nil or id:match('^https?://[%w%.]*roblox%.com/asset/%?id=%d+') ~= nil
+-- MessageOut only reports, the line is already in the log by the time it fires,
+-- so wiping the output is the only way to keep the flood from piling up
+local function onMessageOut(message)
+	if not (AntiLag and AntiLag.Enabled and AntiInvisible.Enabled) then return end
+	if type(message) ~= 'string' then return end
+	if not message:lower():find(ANIMATION_FAILURE, 1, true) then return end
+
+	local now = os.clock()
+	if (now - clearTimer) < CLEAR_INTERVAL then return end
+	clearTimer = now
+
+	if not pcall(logService.ClearOutput, logService) and not clearFailed then
+		clearFailed = true
+		notif('AntiInvisible', 'Console clearing is unavailable, the animation warnings cannot be hidden.', 15, 'warning')
+	end
 end
 
 local function AnimationAdded(anim, plr)
-	local animation = anim.Animation
-	local id = animation and animation.AnimationId
-	if allowedAnims[id] or not plr then return end
-
-	-- malformed animation ids (e.g. the UniversalBroadcast spam) cannot be
-	-- resolved by the client, flood the console and tank fps. dropping them
-	-- here stops the retry loop even when AntiInvisible itself is off.
-	if AntiLag.Enabled and not isValidAnimationId(id) then
-		Cheats:Flag(plr, 'console lag', 1)
-		pcall(anim.Stop, anim, 0)
-
-		if animation then
-			pcall(animation.Destroy, animation)
+	if not whitelist[anim.Animation.AnimationId] and plr then
+		if threads[anim] then
+			task.cancel(threads[anim])
 		end
 
-		return
+		Cheats:Flag(plr, 'invalid animation', 1)
+		threads[anim] = task.spawn(function()
+			repeat
+				anim:AdjustWeight(0, 0)
+				task.wait()
+			until not (anim.IsPlaying and AntiInvisible.Enabled)
+
+			threads[anim] = nil
+		end)
 	end
-
-	-- only hide animations that are not part of the game when AntiInvisible is on
-	if not AntiInvisible.Enabled then return end
-
-	if threads[anim] then
-		task.cancel(threads[anim])
-	end
-
-	Cheats:Flag(plr, 'invalid animation', 1)
-	threads[anim] = task.spawn(function()
-		repeat
-			anim:AdjustWeight(0, 0)
-			task.wait()
-		until not (anim.IsPlaying and AntiInvisible.Enabled)
-
-		threads[anim] = nil
-	end)
 end
 
 local function EntityAdded(ent)
 	local animator = ent.Humanoid:WaitForChild('Animator', 5)
-	if not animator then return end
 
-	table.insert(connections, animator.AnimationPlayed:Connect(function(anim)
-		AnimationAdded(anim, ent.Player)
-	end))
+	if animator and AntiInvisible.Enabled then
+		AntiInvisible:Clean(animator.AnimationPlayed:Connect(function(anim)
+			AnimationAdded(anim, ent.Player)
+		end))
 
-	for _, anim in animator:GetPlayingAnimationTracks() do
-		task.spawn(AnimationAdded, anim, ent.Player)
-	end
-end
-
-local function teardown()
-	for i = #connections, 1, -1 do
-		connections[i]:Disconnect()
-		connections[i] = nil
-	end
-
-	for _, v in threads do
-		task.cancel(v)
-	end
-
-	table.clear(threads)
-end
-
--- (re)connect the AnimationPlayed watchers whenever either feature is on
-local function refresh()
-	teardown()
-
-	if not (AntiInvisible.Enabled or AntiLag.Enabled) then return end
-
-	table.insert(connections, entitylib.Events.EntityAdded:Connect(EntityAdded))
-	for _, v in entitylib.List do
-		task.spawn(EntityAdded, v)
+		for _, anim in animator:GetPlayingAnimationTracks() do
+			task.spawn(AnimationAdded, anim, ent.Player)
+		end
 	end
 end
 
 for _, v in replicatedStorage:QueryDescendants('Animation') do
-	allowedAnims[v.AnimationId] = true
+	whitelist[v.AnimationId] = true
 end
 
 AntiInvisible = vape.Categories.Blatant:CreateModule({
 	Name = 'AntiInvisible',
 	Function = function(callback)
 		if callback then
-			refresh()
-		else
-			teardown()
-
-			-- AntiLag may still want the watchers up after AntiInvisible turns off
-			if AntiLag.Enabled then
-				refresh()
+			AntiInvisible:Clean(entitylib.Events.EntityAdded:Connect(EntityAdded))
+			AntiInvisible:Clean(logService.MessageOut:Connect(onMessageOut))
+			for _, v in entitylib.List do
+				task.spawn(EntityAdded, v)
 			end
+		else
+			for _, v in threads do
+				task.cancel(v)
+			end
+			table.clear(threads)
 		end
 	end,
 	Tooltip = 'Prevent people from using animations outside of the game\'s scope'
@@ -154,12 +129,5 @@ AntiInvisible = vape.Categories.Blatant:CreateModule({
 AntiLag = AntiInvisible:CreateToggle({
 	Name = 'AntiLag',
 	Default = false,
-	Tooltip = 'Drops malformed animations so they cannot spam your console and drop fps',
-	Function = function(callback)
-		if callback then
-			refresh()
-		elseif not AntiInvisible.Enabled then
-			teardown()
-		end
-	end
+	Tooltip = 'Hides the animation failure warnings that broadcast spam floods the console with'
 })

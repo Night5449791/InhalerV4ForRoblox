@@ -1,7 +1,10 @@
 -- cheaters are stored locally in newvape/cheaters.json
+-- oh notice that everytime json file content format is changed, we higher the version
 
 local CheaterDetector
-local DB_VERSION = 2
+local webhookUrl
+-- v1 stored Names/Users only, v2 added Version + Count, v3 pretty prints the file
+local DB_VERSION = 3
 local cheaterOptions = {}
 local filePath = 'newvape/cheaters.json'
 local backupPath = 'newvape/cheaters.json.bak'
@@ -9,6 +12,8 @@ local brokenPath = 'newvape/cheaters.json.broken'
 local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
 local httpService = cloneref(game:GetService('HttpService'))
 local TAG_COLOR = Color3.new(1, 0, 0)
+local EMBED_RED = 15548997   -- discord red, used when a cheater is added
+local EMBED_GREEN = 5763911  -- discord green, used when one is removed
 
 local function countCheaters(names, users)
 	local count = 0
@@ -41,6 +46,78 @@ local function notify(text, duration, type)
 	end
 end
 
+-- JSONEncode only emits compact json, this adds indentation so the file stays
+-- readable when opened. everything inside a string is copied verbatim, so the
+-- escaping JSONEncode produced is never touched
+local function beautifyJSON(json)
+	local out = {}
+	local indent = 0
+	local inString = false
+	local escaped = false
+	local length = #json
+
+	local function emit(text)
+		table.insert(out, text)
+	end
+
+	local function newline()
+		emit('\n'..string.rep('\t', indent))
+	end
+
+	local i = 1
+	while i <= length do
+		local char = json:sub(i, i)
+
+		-- inside a string nothing is structural, quotes and escapes included
+		if inString then
+			emit(char)
+
+			if escaped then
+				escaped = false
+			elseif char == '\\' then
+				escaped = true
+			elseif char == '"' then
+				inString = false
+			end
+
+			i += 1
+			continue
+		end
+
+		if char == '"' then
+			inString = true
+			emit(char)
+		elseif char == '{' or char == '[' then
+			-- keep empty containers on a single line
+			local closing = json:sub(i + 1, i + 1)
+			if closing == '}' or closing == ']' then
+				emit(char..closing)
+				i += 2
+				continue
+			end
+
+			indent += 1
+			emit(char)
+			newline()
+		elseif char == '}' or char == ']' then
+			indent -= 1
+			newline()
+			emit(char)
+		elseif char == ',' then
+			emit(',')
+			newline()
+		elseif char == ':' then
+			emit(': ')
+		else
+			emit(char)
+		end
+
+		i += 1
+	end
+
+	return table.concat(out)
+end
+
 local function saveCheaters()
 	ensureFolder()
 
@@ -55,6 +132,8 @@ local function saveCheaters()
 		return notify('Failed to encode: '..tostring(content), 15, 'warning')
 	end
 
+	content = beautifyJSON(content)
+
 	local written, err = pcall(writefile, filePath, content)
 	if not written then
 		notify('Failed to write '..filePath..' ('..tostring(err)..')', 15, 'warning')
@@ -67,7 +146,8 @@ local function saveCheaters()
 end
 
 -- an outdated database only needs the current version stamped on it, every
--- derived field (Count) is rebuilt by saveCheaters anyway
+-- derived field (Count) is rebuilt by saveCheaters anyway. the resave right
+-- after this is what actually rewrites the file in the newer format
 local function upgradeCheaters(data)
 	data.Version = DB_VERSION
 end
@@ -213,6 +293,42 @@ local function splitCheaterText(text)
 	return nil, table.concat(words, ' ', 2), words[1]
 end
 
+-- posts the change to the webhook, a failure is only a notification
+-- previous is the reason the target had before it got removed
+local function sendWebhookLog(plr, name, reason, removed, previous)
+	if not (webhook and cheaterOptions.Webhook.Enabled and webhookUrl) then return end
+
+	local url = trimText(webhookUrl.Value)
+	if not url or url == '' then return end
+
+	local user = plr and plr.Name or name
+	local display = plr and plr.DisplayName or name
+	local id = plr and tostring(plr.UserId) or 'unknown'
+	local fields = {}
+
+	if removed then
+		table.insert(fields, {name = 'Status', value = 'Removed from skidlist'})
+		table.insert(fields, {name = 'Reason Was', value = previous or 'unknown'})
+	else
+		table.insert(fields, {name = '⚠️ Reason', value = '`'..(reason or 'manually added')..'`'})
+	end
+
+	-- inline fields render side by side, that is what keeps the last row aligned
+	table.insert(fields, {name = 'Added By', value = lplr.Name, inline = true})
+	table.insert(fields, {name = 'Logged Date', value = os.date('%m/%d/%Y %H:%M:%S'), inline = true})
+
+	local sent, err = webhook.sendEmbed(url, {
+		title = removed and '✅ Skid Removed / Unflagged' or '🚨 Detected Skid Target',
+		description = 'User: '..user..' (@'..display..')\nID: '..id,
+		color = removed and EMBED_GREEN or EMBED_RED,
+		fields = fields
+	}, lplr.Name)
+
+	if not sent then
+		notify('Webhook failed: '..tostring(err), 10, 'warning')
+	end
+end
+
 -- remove = true drops the player, otherwise they get added with the given reason
 local function editCheater(text, reason, remove)
 	text = trimText(text)
@@ -220,6 +336,9 @@ local function editCheater(text, reason, remove)
 
 	-- splitCheaterText always hands a name back once text is not empty
 	local plr, rest, name = splitCheaterText(text)
+
+	-- read the old reason before the entry is dropped, the log still needs it
+	local previous = remove and (plr and getCheaterReason(plr) or Cheaters.Names[name:lower()]) or nil
 
 	-- a removal has no reason, that is what untags the player
 	if remove then
@@ -244,6 +363,7 @@ local function editCheater(text, reason, remove)
 	end
 
 	saveCheaters()
+	sendWebhookLog(plr, name, reason, remove, previous)
 	notify((plr and plr.DisplayName or name)..(remove and ' removed from the cheater list.' or ' added to the cheater list. ('..reason..')'), 10)
 end
 
@@ -283,6 +403,25 @@ cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 	Name = 'Notifications',
 	Default = true,
 	Tooltip = 'Notifies you when a known cheater joins'
+})
+
+cheaterOptions.Webhook = CheaterDetector:CreateToggle({
+	Name = 'Webhook',
+	Default = false,
+	Tooltip = 'Posts every added or removed cheater to a discord webhook',
+	Function = function(callback)
+		if webhookUrl then
+			webhookUrl.Object.Visible = callback
+		end
+	end
+})
+
+webhookUrl = CheaterDetector:CreateTextBox({
+	Name = 'Webhook URL',
+	Placeholder = 'https://discord.com/api/webhooks/...',
+	Visible = false,
+	Darker = true,
+	Tooltip = 'Discord webhook url the cheater changes get posted to'
 })
 
 local addBox

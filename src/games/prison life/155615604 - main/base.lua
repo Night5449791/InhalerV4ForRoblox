@@ -34,6 +34,12 @@ local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
 local getfontbounds = vape.Libraries.getfontbounds
 
+-- optional, a missing webhook library must never take the whole game down
+local webhookLoaded, webhook = pcall(function()
+	return loadstring(downloadFile('newvape/libraries/webhook.lua'), 'webhook')()
+end)
+webhook = webhookLoaded and webhook or nil
+
 local pl = {}
 local Spring = {}
 local TracerHook = {Hooks = {}}
