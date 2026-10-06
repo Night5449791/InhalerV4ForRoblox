@@ -941,6 +941,6 @@ run(function()
 		table.clear(whitelist)
 	end)
 end)
-entitylib.start()0
+entitylib.start()
 
 notif("Inhaler", "Welcome to Inhaler V4, the better exploiting solution.", 5)
