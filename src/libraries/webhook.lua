@@ -13,8 +13,18 @@ local cloneref = cloneref or function(obj)
 end
 local httpService = cloneref(game:GetService('HttpService'))
 
--- every executor names this differently, request is the common one
+-- the chunk env is not always the executor env, these live on the real global
+-- table, so getgenv has to be tried before the plain globals
 local function getRequestFunction()
+	local genv = (getgenv and getgenv()) or _G
+
+	if genv then
+		if typeof(genv.request) == 'function' then return genv.request end
+		if typeof(genv.http_request) == 'function' then return genv.http_request end
+		if typeof(genv.syn) == 'table' and typeof(genv.syn.request) == 'function' then return genv.syn.request end
+	end
+
+	-- every executor names this differently, request is the common one
 	if typeof(request) == 'function' then return request end
 	if typeof(http_request) == 'function' then return http_request end
 	if typeof(syn) == 'table' and typeof(syn.request) == 'function' then return syn.request end
@@ -55,7 +65,11 @@ function webhook.send(url, payload)
 	local sent, response = pcall(requestFunction, {
 		Method = 'POST',
 		Url = url,
-		Headers = {['Content-Type'] = 'application/json'},
+		Headers = {
+			['Content-Type'] = 'application/json',
+			-- discord turns away some of the default executor user agents
+			['User-Agent'] = 'Mozilla/5.0'
+		},
 		Body = body
 	})
 

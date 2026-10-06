@@ -296,10 +296,17 @@ end
 -- posts the change to the webhook, a failure is only a notification
 -- previous is the reason the target had before it got removed
 local function sendWebhookLog(plr, name, reason, removed, previous)
-	if not (webhook and cheaterOptions.Webhook.Enabled and webhookUrl) then return end
+	if not cheaterOptions.Webhook.Enabled then return end
 
-	local url = trimText(webhookUrl.Value)
-	if not url or url == '' then return end
+	-- say something instead of failing silently, otherwise it just looks broken
+	if not webhook then
+		return notify('Webhook library is missing, cannot post the update.', 10, 'warning')
+	end
+
+	local url = trimText(webhookUrl and webhookUrl.Value)
+	if not url or url == '' then
+		return notify('Webhook is on but no url is set.', 10, 'warning')
+	end
 
 	local user = plr and plr.Name or name
 	local display = plr and plr.DisplayName or name
