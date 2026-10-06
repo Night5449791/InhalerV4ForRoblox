@@ -11,6 +11,7 @@ local ParticleColor1
 local ParticleColor2
 local ParticleSize
 local Face
+local TeamAttack
 local Overlay = OverlapParams.new()
 Overlay.FilterType = Enum.RaycastFilterType.Include
 local Particles, Boxes, AttackDelay = {}, {}, tick()
@@ -40,7 +41,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 						NPCs = Targets.NPCs.Enabled,
 						Limit = Max.Value,
 						AttackCheck = true,
-						SkipTeam = true
+						SkipTeam = TeamAttack.Enabled and nil or true
 					})
 
 					if #entities > 0 then
@@ -120,6 +121,11 @@ Max = Killaura:CreateSlider({
 	Default = 10
 })
 Mouse = Killaura:CreateToggle({Name = 'Require mouse down'})
+TeamAttack = Killaura:CreateToggle({
+	Name = 'Team attack',
+	Default = false,
+	Tooltip = 'Lets guards attack players on the same team too'
+})
 Killaura:CreateToggle({
 	Name = 'Show target',
 	Function = function(callback)
