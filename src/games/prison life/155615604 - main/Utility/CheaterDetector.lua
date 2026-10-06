@@ -8,15 +8,16 @@ local backupPath = 'newvape/cheaters.json.bak'
 local brokenPath = 'newvape/cheaters.json.broken'
 local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
 local httpService = cloneref(game:GetService('HttpService'))
+local TAG_COLOR = Color3.new(1, 0, 0)
 
-local function countCheaters(data)
+local function countCheaters(names, users)
 	local count = 0
 
-	for _ in type(data.Names) == 'table' and data.Names or {} do
+	for _ in names do
 		count += 1
 	end
 
-	for _ in type(data.Users) == 'table' and data.Users or {} do
+	for _ in users do
 		count += 1
 	end
 
@@ -27,6 +28,12 @@ local function trimText(text)
 	return text and text:match('^%s*(.-)%s*$') or nil
 end
 
+local function ensureFolder()
+	if not isfolder('newvape') then
+		pcall(makefolder, 'newvape')
+	end
+end
+
 -- vape.Notifications only exists once the gui is loaded, this file runs before that
 local function notify(text, duration, type)
 	if vape.Notifications then
@@ -35,12 +42,10 @@ local function notify(text, duration, type)
 end
 
 local function saveCheaters()
-	if not isfolder('newvape') then
-		pcall(makefolder, 'newvape')
-	end
+	ensureFolder()
 
 	-- derived, never trust a stale count from disk
-	Cheaters.Count = countCheaters(Cheaters)
+	Cheaters.Count = countCheaters(Cheaters.Names, Cheaters.Users)
 
 	local encoded, content = pcall(function()
 		return httpService:JSONEncode(Cheaters)
@@ -61,17 +66,10 @@ local function saveCheaters()
 	pcall(writefile, backupPath, content)
 end
 
--- v1 databases only carried Names/Users, every newer version rebuilds the
--- derived fields instead of trusting whatever is on disk
+-- an outdated database only needs the current version stamped on it, every
+-- derived field (Count) is rebuilt by saveCheaters anyway
 local function upgradeCheaters(data)
-	local version = type(data.Version) == 'number' and data.Version or 1
-
-	if version < 2 then
-		data.Count = countCheaters(data)
-	end
-
 	data.Version = DB_VERSION
-	return data
 end
 
 -- returns the decoded table plus the raw text it came from, the raw text is
@@ -97,10 +95,7 @@ end
 local function quarantineDatabase(content)
 	if not content then return end
 
-	if not isfolder('newvape') then
-		pcall(makefolder, 'newvape')
-	end
-
+	ensureFolder()
 	pcall(writefile, brokenPath, content)
 end
 
@@ -109,6 +104,7 @@ local function loadCheaters()
 	local restored = false
 
 	if not data then
+		-- unreadable, keep a copy of it and fall back to the last good snapshot
 		if content then
 			quarantineDatabase(content)
 			notify('Cheater database is unreadable, a copy was kept at '..brokenPath, 15, 'warning')
@@ -122,10 +118,8 @@ local function loadCheaters()
 	end
 
 	if not data then
-		-- nothing left to recover, start clean, the broken copy is already kept
-		Cheaters.Version = DB_VERSION
-		Cheaters.Count = 0
-		return saveCheaters() -- creates the file on first run
+		-- nothing left to recover, start clean, a broken copy was kept above
+		return saveCheaters()
 	end
 
 	local version = type(data.Version) == 'number' and data.Version or 1
@@ -141,12 +135,12 @@ local function loadCheaters()
 			upgraded = true
 		end
 
-		Cheaters.Version = DB_VERSION
+		Cheaters.Version = data.Version
 	end
 
 	Cheaters.Names = type(data.Names) == 'table' and data.Names or {}
 	Cheaters.Users = type(data.Users) == 'table' and data.Users or {}
-	Cheaters.Count = countCheaters(Cheaters)
+	Cheaters.Count = countCheaters(Cheaters.Names, Cheaters.Users)
 
 	if upgraded then
 		saveCheaters()
@@ -160,7 +154,7 @@ end
 
 -- a reason of nil removes the tag instead
 local function tagCheater(plr, reason, alert)
-	whitelist.customtags[plr.Name] = reason and {{text = 'Exploiter', color = Color3.new(1, 0, 0)}} or nil
+	whitelist.customtags[plr.Name] = reason and {{text = 'Exploiter', color = TAG_COLOR}} or nil
 	tempTargets[plr.Name] = reason and true or nil
 
 	if reason and alert and cheaterOptions.Notifications.Enabled then
@@ -195,12 +189,13 @@ local function splitCheaterText(text)
 
 	for i = #words, 1, -1 do
 		local name = table.concat(words, ' ', 1, i)
+		local rest = table.concat(words, ' ', i + 1)
 		local lowered = name:lower()
 		local partial
 
 		for _, entry in entries do
 			if entry[2] == lowered or entry[3] == lowered then
-				return entry[1], table.concat(words, ' ', i + 1), name
+				return entry[1], rest, name
 			end
 
 			if not partial and (entry[2]:sub(1, #lowered) == lowered or entry[3]:sub(1, #lowered) == lowered) then
@@ -210,7 +205,7 @@ local function splitCheaterText(text)
 
 		-- only fall back to a partial match once the whole server was checked
 		if partial then
-			return partial, table.concat(words, ' ', i + 1), name
+			return partial, rest, name
 		end
 	end
 
@@ -223,14 +218,14 @@ local function editCheater(text, reason, remove)
 	text = trimText(text)
 	if not text or text == '' then return notify('No player given.', 8, 'warning') end
 
+	-- splitCheaterText always hands a name back once text is not empty
 	local plr, rest, name = splitCheaterText(text)
-	if not name then return notify('No player given.', 8, 'warning') end
 
 	-- a removal has no reason, that is what untags the player
-	local given = trimText(reason)
 	if remove then
 		reason = nil
 	else
+		local given = trimText(reason)
 		reason = (given and given ~= '' and given) or (rest and rest ~= '' and rest) or 'manually added'
 	end
 
@@ -269,7 +264,7 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 		if callback then
 			CheaterDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
 			for _, v in playersService:GetPlayers() do
-				task.spawn(playerAdded, v)
+				playerAdded(v)
 			end
 		end
 	end,
