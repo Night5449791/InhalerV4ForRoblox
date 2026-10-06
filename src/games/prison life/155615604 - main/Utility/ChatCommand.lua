@@ -419,13 +419,6 @@ addTarget = function(name, enabled)
 	end
 end
 
-local kickMethods = {
-	normal = 'Normal',
-	kill = 'Killfling',
-	killfling = 'Killfling',
-	head = 'Killfling',
-	headfling = 'Killfling'
-}
 local kickTeams = {}
 local kickTeamMembers = {}
 
@@ -540,31 +533,6 @@ local function handleKickTeam(args)
 	startKick('Individual', 'Flinging '..table.concat(names, ', ')..'.')
 end
 
-local function handleKickMethod(args)
-	if not options.Kick.Enabled then return end
-
-	local module = kickModule()
-	if not module then
-		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
-		return
-	end
-
-	local method = trim(args)
-	if not method or method == '' then return end
-
-	local option = module.Options and module.Options['Kick Mode']
-	if not option or not option.SetValue then return end
-
-	local mode = kickMethods[method:lower()]
-	if not mode then
-		notif('KickExploit', 'Invalid method. (normal/killfling)', 5, 'warning')
-		return
-	end
-
-	option:SetValue(mode)
-	notif('KickExploit', 'Kick method: '..mode, 5)
-end
-
 -- Movement / camera commands
 
 local function handleTP(args)
@@ -619,7 +587,7 @@ local toggles = {
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>'},
 	{Name = 'Broadcast', Tooltip = '.broadcast'},
 	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
 }
@@ -665,7 +633,6 @@ local commands = {
 	end,
 	kick = handleKick,
 	kickteam = handleKickTeam,
-	kickmethod = handleKickMethod,
 	team = handleTeam,
 	hop = handleHop,
 	rj = handleRejoin,
