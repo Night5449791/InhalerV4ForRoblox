@@ -224,6 +224,12 @@ end
 local hash = loadstring(downloadFile('newvape/libraries/hash.lua'), 'hash')()
 local prediction = loadstring(downloadFile('newvape/libraries/prediction.lua'), 'prediction')()
 entitylib = loadstring(downloadFile('newvape/libraries/entity.lua'), 'entitylibrary')()
+
+-- optional, a missing webhook library must never take every game down with it
+local webhookLoaded, webhook = pcall(function()
+	return loadstring(downloadFile('newvape/libraries/webhook.lua'), 'webhook')()
+end)
+
 local whitelist = {
 	alreadychecked = {},
 	customtags = {},
@@ -243,6 +249,7 @@ vape.Libraries.entity = entitylib
 vape.Libraries.whitelist = whitelist
 vape.Libraries.prediction = prediction
 vape.Libraries.hash = hash
+vape.Libraries.webhook = webhookLoaded and webhook or nil
 vape.Libraries.auraanims = {
 	Normal = {
 		{CFrame = CFrame.new(-0.17, -0.14, -0.12) * CFrame.Angles(math.rad(-53), math.rad(50), math.rad(-64)), Time = 0.1},
