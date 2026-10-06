@@ -237,7 +237,14 @@ local function handleBroadcast()
 	local module = vape.Modules.UniversalBroadcast
 	if module then
 		module:Toggle()
-		notif('UniversalBroadcast', 'Automatically broadcasting in console. Press F9 or chat /console to see result', 5)
+		local message = 'Automatically broadcasting in console. Press F9 or chat /console to see result'
+		task.delay(0.1, function()
+			if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+				textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+			else
+				replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+			end
+		end)
 	else
 		notif('ChatCommand', 'UniversalBroadcast is not available in this game.', 5, 'warning')
 	end
