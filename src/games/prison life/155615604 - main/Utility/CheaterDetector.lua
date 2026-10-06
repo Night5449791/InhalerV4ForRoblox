@@ -1,11 +1,27 @@
 -- cheaters are stored locally in newvape/cheaters.json
--- the list starts empty and is user managed
 
 local CheaterDetector
+local DB_VERSION = 2
 local cheaterOptions = {}
 local filePath = 'newvape/cheaters.json'
-local Cheaters = {Names = {}, Users = {}}
+local backupPath = 'newvape/cheaters.json.bak'
+local brokenPath = 'newvape/cheaters.json.broken'
+local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
 local httpService = cloneref(game:GetService('HttpService'))
+
+local function countCheaters(data)
+	local count = 0
+
+	for _ in type(data.Names) == 'table' and data.Names or {} do
+		count += 1
+	end
+
+	for _ in type(data.Users) == 'table' and data.Users or {} do
+		count += 1
+	end
+
+	return count
+end
 
 local function trimText(text)
 	return text and text:match('^%s*(.-)%s*$') or nil
@@ -23,6 +39,9 @@ local function saveCheaters()
 		pcall(makefolder, 'newvape')
 	end
 
+	-- derived, never trust a stale count from disk
+	Cheaters.Count = countCheaters(Cheaters)
+
 	local encoded, content = pcall(function()
 		return httpService:JSONEncode(Cheaters)
 	end)
@@ -34,24 +53,109 @@ local function saveCheaters()
 	local written, err = pcall(writefile, filePath, content)
 	if not written then
 		notify('Failed to write '..filePath..' ('..tostring(err)..')', 15, 'warning')
+		return
 	end
+
+	-- mirror only once the live file is known good, so a later truncated write
+	-- can always be rolled back to this snapshot
+	pcall(writefile, backupPath, content)
 end
 
-local function loadCheaters()
-	if not isfile(filePath) then
-		return saveCheaters() -- creates the file on first run
+-- v1 databases only carried Names/Users, every newer version rebuilds the
+-- derived fields instead of trusting whatever is on disk
+local function upgradeCheaters(data)
+	local version = type(data.Version) == 'number' and data.Version or 1
+
+	if version < 2 then
+		data.Count = countCheaters(data)
 	end
 
+	data.Version = DB_VERSION
+	return data
+end
+
+-- returns the decoded table plus the raw text it came from, the raw text is
+-- handed back on failure so the caller can still preserve it
+local function readDatabase(path)
+	if not isfile(path) then return end
+
+	local read, content = pcall(readfile, path)
+	if not read or type(content) ~= 'string' then return end
+
 	local decoded, data = pcall(function()
-		return httpService:JSONDecode(readfile(filePath))
+		return httpService:JSONDecode(content)
 	end)
 
 	if not decoded or type(data) ~= 'table' then
-		return saveCheaters()
+		return nil, content
+	end
+
+	return data, content
+end
+
+-- never overwrite data we failed to read, keep a copy for manual recovery
+local function quarantineDatabase(content)
+	if not content then return end
+
+	if not isfolder('newvape') then
+		pcall(makefolder, 'newvape')
+	end
+
+	pcall(writefile, brokenPath, content)
+end
+
+local function loadCheaters()
+	local data, content = readDatabase(filePath)
+	local restored = false
+
+	if not data then
+		if content then
+			quarantineDatabase(content)
+			notify('Cheater database is unreadable, a copy was kept at '..brokenPath, 15, 'warning')
+		end
+
+		data = readDatabase(backupPath)
+		if data then
+			restored = true
+			notify('Restored the cheater database from backup.', 15, 'warning')
+		end
+	end
+
+	if not data then
+		-- nothing left to recover, start clean, the broken copy is already kept
+		Cheaters.Version = DB_VERSION
+		Cheaters.Count = 0
+		return saveCheaters() -- creates the file on first run
+	end
+
+	local version = type(data.Version) == 'number' and data.Version or 1
+	local upgraded = false
+
+	if version > DB_VERSION then
+		-- written by a newer script, do not rewrite it and drop unknown fields
+		Cheaters.Version = version
+		notify('Cheater database is newer (v'..version..') than this script (v'..DB_VERSION..'), using it as is.', 15, 'warning')
+	else
+		if version < DB_VERSION then
+			upgradeCheaters(data)
+			upgraded = true
+		end
+
+		Cheaters.Version = DB_VERSION
 	end
 
 	Cheaters.Names = type(data.Names) == 'table' and data.Names or {}
 	Cheaters.Users = type(data.Users) == 'table' and data.Users or {}
+	Cheaters.Count = countCheaters(Cheaters)
+
+	if upgraded then
+		saveCheaters()
+		notify('Upgraded cheater database to v'..DB_VERSION..'.', 10)
+	elseif restored then
+		saveCheaters() -- write the recovered data back over the broken file
+	elseif content and not isfile(backupPath) then
+		pcall(writefile, backupPath, content) -- seed the backup on first run
+	end
 end
 
 -- a reason of nil removes the tag instead
@@ -73,24 +177,9 @@ local function getCheaterReason(plr)
 	return Cheaters.Names[plr.Name:lower()] or Cheaters.Names[plr.DisplayName:lower()]
 end
 
-local function findCheaterPlayer(text)
-	text = text and text:lower()
-	if not text or text == '' then return end
-
-	local partial
-	for _, plr in playersService:GetPlayers() do
-		if plr.Name:lower() == text or plr.DisplayName:lower() == text then return plr end
-
-		if not partial and (plr.Name:lower():sub(1, #text) == text or plr.DisplayName:lower():sub(1, #text) == text) then
-			partial = plr
-		end
-	end
-
-	return partial
-end
-
 -- ".addskid <display name> <reason>" - display names can contain spaces, so the
--- longest match against an online player wins and whatever follows is the reason
+-- longest match against an online player wins and whatever follows is the reason.
+-- the players are lowered once here instead of once per candidate name
 local function splitCheaterText(text)
 	local words = {}
 	for word in text:gmatch('%S+') do
@@ -99,11 +188,29 @@ local function splitCheaterText(text)
 
 	if #words == 0 then return end
 
+	local entries = {}
+	for _, plr in playersService:GetPlayers() do
+		table.insert(entries, {plr, plr.Name:lower(), plr.DisplayName:lower()})
+	end
+
 	for i = #words, 1, -1 do
 		local name = table.concat(words, ' ', 1, i)
-		local plr = findCheaterPlayer(name)
-		if plr then
-			return plr, table.concat(words, ' ', i + 1), name
+		local lowered = name:lower()
+		local partial
+
+		for _, entry in entries do
+			if entry[2] == lowered or entry[3] == lowered then
+				return entry[1], table.concat(words, ' ', i + 1), name
+			end
+
+			if not partial and (entry[2]:sub(1, #lowered) == lowered or entry[3]:sub(1, #lowered) == lowered) then
+				partial = entry[1]
+			end
+		end
+
+		-- only fall back to a partial match once the whole server was checked
+		if partial then
+			return partial, table.concat(words, ' ', i + 1), name
 		end
 	end
 
