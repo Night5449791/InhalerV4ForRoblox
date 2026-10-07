@@ -410,13 +410,22 @@ local function kickMethodOption()
 	local module = kickModule()
 	if not module then return end
 
-	return (module.Options and module.Options['KickMode']) or module.KickMode
+	return (module.Options and module.Options['Kick Mode']) or module.KickMode
 end
 
 local function setKickMethod(method)
 	local option = kickMethodOption()
 	if option and option.SetValue then
 		option:SetValue(method)
+	end
+
+	-- headfling only runs while Equipment is on, it supplies the gun that kills the target
+	if method == 'Headfling' then
+		local module = kickModule()
+		local equipment = module and module.Options and module.Options['Equipment']
+		if equipment and not equipment.Enabled then
+			equipment:Toggle()
+		end
 	end
 end
 
