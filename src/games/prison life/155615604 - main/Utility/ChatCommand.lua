@@ -406,6 +406,20 @@ local function setKickMode(mode)
 	end
 end
 
+local function kickMethodOption()
+	local module = kickModule()
+	if not module then return end
+
+	return (module.Options and module.Options['KickMode']) or module.KickMode
+end
+
+local function setKickMethod(method)
+	local option = kickMethodOption()
+	if option and option.SetValue then
+		option:SetValue(method)
+	end
+end
+
 addTarget = function(name, enabled)
 	setKickTarget(name, enabled)
 	setListValue(vape.Categories.Targets, name, enabled)
@@ -498,6 +512,39 @@ local function handleKick(args)
 	startKick('Individual', 'Flinging '..player.Name..'.')
 end
 
+local kickMethods = {
+	normal = 'Normal',
+	n = 'Normal',
+	headfling = 'Headfling',
+	head = 'Headfling',
+	h = 'Headfling'
+}
+
+local function handleKickMethod(args)
+	if not options.Kick.Enabled then return end
+
+	local option = kickMethodOption()
+	if not option then
+		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
+		return
+	end
+
+	args = trim(args)
+	if not args or args == '' then
+		notif('KickExploit', 'Current kick method: '..tostring(option.Value), 5)
+		return
+	end
+
+	local method = kickMethods[args:lower():match('^%S+$')]
+	if not method then
+		notif('KickExploit', 'Unknown kick method. (normal/headfling)', 5, 'warning')
+		return
+	end
+
+	setKickMethod(method)
+	notif('KickExploit', 'Kick method set to '..method..(method == 'Headfling' and ', dead targets only.' or '.'), 5)
+end
+
 local function handleKickTeam(args)
 	if not options.Kick.Enabled then return end
 
@@ -587,7 +634,7 @@ local toggles = {
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>'},
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/headfling>'},
 	{Name = 'Broadcast', Tooltip = '.broadcast'},
 	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
 }
@@ -633,6 +680,7 @@ local commands = {
 	end,
 	kick = handleKick,
 	kickteam = handleKickTeam,
+	kickmethod = handleKickMethod,
 	team = handleTeam,
 	hop = handleHop,
 	rj = handleRejoin,
