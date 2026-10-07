@@ -496,12 +496,13 @@ for _, toggle in toggles do
 	})
 end
 
-local CommandBox = ChatCommand:CreateTextBox({
+local CommandBox
+CommandBox = ChatCommand:CreateTextBox({
 	Name = 'Command',
 	Placeholder = 'Type a command (.tp player)',
 	Tooltip = 'Runs a chat command without opening the chat. Press Enter to execute.',
 	Function = function(enter)
-		if enter and CommandBox.Value ~= '' then
+		if enter and CommandBox and CommandBox.Value ~= '' then
 			onChatted(CommandBox.Value)
 		end
 	end
