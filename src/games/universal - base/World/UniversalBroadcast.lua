@@ -57,9 +57,5 @@ UniversalBroadcast = vape.Categories.World:CreateModule({
 Message = UniversalBroadcast:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
-	Tooltip = 'leave it blank to use preset',
-	Function = function()
-        UniversalBroadcast:Toggle()
-		UniversalBroadcast:Toggle()
-    end,
+	Tooltip = 'leave it blank to use preset'
 })
