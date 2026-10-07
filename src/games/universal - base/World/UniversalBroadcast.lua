@@ -58,5 +58,8 @@ Message = UniversalBroadcast:CreateTextBox({
 	Name = 'Message',
 	Placeholder = 'Message',
 	Tooltip = 'leave it blank to use preset'
-	
+	Function = function()
+        UniversalLagger:Toggle()
+		UniversalLagger:Toggle()
+    end,
 })
