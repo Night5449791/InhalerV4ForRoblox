@@ -6,13 +6,14 @@
   </picture>
 </p>
 <h2 align="center">
-  A VAPE V4 fork that may improve your experience.
+  VAPE V4 fork that may improve your experience.
   <br/>
   Rise up to the top while remaining completely undetectable. (or isnt it)
 </h2>
 
 ## Contacts
 [My Discord](https://discord.com/users/1448308188439904309)
+<br/>
 [7GrandDad's Community Discord](https://discord.gg/VZEQJxMSnG)
 <br/>
 [7GrandDad's YouTube](https://youtube.com/c/7GrandDadVape)
