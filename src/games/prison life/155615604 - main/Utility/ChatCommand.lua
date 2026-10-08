@@ -1,6 +1,4 @@
 local ChatCommand
-local addTarget
-local kickTargetList
 local TARGET_COLOR = Color3.new(1, 0, 0)
 
 local options = {}
@@ -19,23 +17,24 @@ local teamsService = cloneref(game:GetService('Teams'))
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 local danceTrack
+local kickTeams = {}
+local kickTeamMembers = {}
 
-local function trim(text)
-	return text and text:match('^%s*(.-)%s*$') or nil
-end
-
-local function disconnect(connection)
-	if connection then
-		connection:Disconnect()
-	end
-
-	return nil
+-- nil when the text is missing or only whitespace
+local function argument(text)
+	text = text and text:match('^%s*(.-)%s*$') or nil
+	return text ~= '' and text or nil
 end
 
 local function getLocalHumanoid()
 	local character = lplr.Character
 	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
 	return humanoid or (entitylib.character and entitylib.character.Humanoid)
+end
+
+-- vape.Modules is a flat list of every module by name
+local function getModule(name)
+	return vape.Modules and vape.Modules[name]
 end
 
 -- Lists
@@ -46,11 +45,12 @@ local function setListValue(list, value, enabled)
 	end
 end
 
+-- returns how many entries were dropped
 local function clearListValues(list)
 	if not list or not list.List then return 0 end
 
-	local count = #list.List
-	if count == 0 and #list.ListEnabled == 0 then return 0 end
+	local count = #list.List + #list.ListEnabled
+	if count == 0 then return 0 end
 
 	table.clear(list.List)
 	table.clear(list.ListEnabled)
@@ -58,39 +58,80 @@ local function clearListValues(list)
 	return count
 end
 
--- Camera
+-- KickExploit bridge
 
-local function clearViewConnection()
-	viewPlayer = nil
+local function kickModule()
+	return getModule('KickExploit')
 end
 
-local function restoreCamera()
-	clearViewConnection()
+local function kickOption(name)
+	local module = kickModule()
+	if not module then return end
 
-	local humanoid = getLocalHumanoid()
-	if humanoid then
-		gameCamera.CameraSubject = humanoid
-		gameCamera.CameraType = Enum.CameraType.Custom
+	return (module.Options and module.Options[name]) or module[name]
+end
+
+local function setKickMode(mode)
+	local option = kickOption('Mode')
+	if option and option.SetValue then
+		option:SetValue(mode)
 	end
+end
+
+local function setKickMethod(method)
+	local option = kickOption('Kick Mode')
+	if option and option.SetValue then
+		option:SetValue(method)
+	end
+
+	-- headfling only runs while Equipment is on, it supplies the gun that kills the target
+	if method == 'Headfling' then
+		local equipment = kickOption('Equipment')
+		if equipment and not equipment.Enabled then
+			equipment:Toggle()
+		end
+	end
+end
+
+local function addTarget(name, enabled)
+	setListValue(kickOption('Targets'), name, enabled)
+	setListValue(vape.Categories.Targets, name, enabled)
+
+	if enabled then
+		whitelist.customtags[name] = {{text = 'Exploiter', color = TARGET_COLOR}}
+		tempTargets[name] = true
+	else
+		whitelist.customtags[name] = nil
+		tempTargets[name] = nil
+	end
+end
+
+local function addKickTeamMember(plr)
+	if not plr or not next(kickTeams) or not plr.Team or not table.find(kickTeams, plr.Team) then return end
+	if table.find(kickTeamMembers, plr.Name) then return end
+
+	table.insert(kickTeamMembers, plr.Name)
+	addTarget(plr.Name, true)
 end
 
 -- Player lookup
 
--- exact match wins, otherwise the first prefix match
-local function matchPlayer(players, text)
-	local lowered = text:lower()
+-- entries are either entities, which expose their player, or plain players.
+-- filter drops entries, an exact match wins over the first prefix match
+local function search(list, lowered, filter)
 	local partial
 
-	for _, plr in players do
-		local name = plr.Name:lower()
-		local display = plr.DisplayName:lower()
+	for _, entry in list do
+		if filter and not filter(entry) then continue end
 
+		local plr = entry.Player or entry
+		local name, display = plr.Name:lower(), plr.DisplayName:lower()
 		if name == lowered or display == lowered then
-			return plr
+			return entry
 		end
 
 		if not partial and (name:sub(1, #lowered) == lowered or display:sub(1, #lowered) == lowered) then
-			partial = plr
+			partial = entry
 		end
 	end
 
@@ -98,19 +139,13 @@ local function matchPlayer(players, text)
 end
 
 local function findEntity(prefix, includeDead)
-	prefix = trim(prefix)
-	if not prefix or prefix == '' then return end
+	local text = argument(prefix)
+	if not text then return end
 
-	local players, entities = {}, {}
-	for _, entity in entitylib.List do
-		if entity.Player and (includeDead or entity.Humanoid.Health > 0) then
-			table.insert(players, entity.Player)
-			entities[entity.Player] = entity
-		end
-	end
-
-	local plr = matchPlayer(players, prefix)
-	return plr and entities[plr] or nil
+	-- npcs carry no player and dead characters only count when asked for
+	return search(entitylib.List, text:lower(), function(entity)
+		return entity.Player and (includeDead or entity.Humanoid.Health > 0)
+	end)
 end
 
 -- spawned players first, then everyone still in the server when allowLeft is set
@@ -120,29 +155,37 @@ local function findPlayer(prefix, allowLeft)
 		return entity.Player
 	end
 
-	prefix = trim(prefix)
-	if not allowLeft or not prefix or prefix == '' then return end
+	local text = allowLeft and argument(prefix)
+	if not text then return end
 
-	return matchPlayer(playersService:GetPlayers(), prefix)
+	return search(playersService:GetPlayers(), text:lower())
+end
+
+-- Camera
+
+local function restoreCamera()
+	viewPlayer = nil
+
+	local humanoid = getLocalHumanoid()
+	if humanoid then
+		gameCamera.CameraSubject = humanoid
+		gameCamera.CameraType = Enum.CameraType.Custom
+	end
 end
 
 -- Follow
 
-local function getFollowEntity()
-	if not followPlayer then return end
-
-	return entitylib.getEntity(followPlayer)
-end
-
 local function stopFollow()
-	followConnection = disconnect(followConnection)
+	if followConnection then
+		followConnection:Disconnect()
+		followConnection = nil
+	end
 
 	if followModule and followOldMove then
 		followModule.moveFunction = followOldMove
 	end
 
-	followModule, followOldMove = nil, nil
-	followPlayer = nil
+	followModule, followOldMove, followPlayer = nil, nil, nil
 end
 
 local function startFollow(player)
@@ -166,8 +209,8 @@ local function startFollow(player)
 			return followOldMove(self, vec, face)
 		end
 
-		local targetEntity = getFollowEntity()
-		local targetRoot = targetEntity and targetEntity.RootPart
+		local target = followPlayer and entitylib.getEntity(followPlayer)
+		local targetRoot = target and target.RootPart
 		local root = entitylib.character and entitylib.character.RootPart
 		if targetRoot and root then
 			local direction = (targetRoot.Position - root.Position) * Vector3.new(1, 0, 1)
@@ -199,8 +242,8 @@ end
 -- Team switching
 
 local function findTeam(name)
-	name = trim(name)
-	if not name or name == '' then return end
+	name = argument(name)
+	if not name then return end
 
 	local lowered = name:lower()
 	local team = teamsService:FindFirstChild(teamAliases[lowered] or name)
@@ -256,7 +299,7 @@ local function handleHop()
 	if not options.ServerHop.Enabled then return end
 
 	local serverHop = vape.Modules.ServerHop
-	if serverHop then
+	if serverHop and not serverHop.Enabled then
 		serverHop:Toggle()
 	end
 end
@@ -274,19 +317,20 @@ local function handleBroadcast()
 	if not options.Broadcast.Enabled then return end
 
 	local module = vape.Modules.UniversalBroadcast
-	if module then
-		module:Toggle()
-		local message = 'Automatically broadcasting in console. Press F9 or chat /console to see result'
-		task.delay(0.1, function()
-			if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-				textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
-			else
-				replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
-			end
-		end)
-	else
+	if not module then
 		notif('ChatCommand', 'UniversalBroadcast is not available in this game.', 5, 'warning')
+		return
 	end
+
+	module:Toggle()
+	local message = 'Automatically broadcasting in console. Press F9 or chat /console to see result'
+	task.delay(0.1, function()
+		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+		else
+			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+		end
+	end)
 end
 
 local function handleUndance()
@@ -300,8 +344,7 @@ end
 local function handleDance()
 	if not options.Dance.Enabled then return end
 
-	local character = lplr.Character
-	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
+	local humanoid = getLocalHumanoid()
 	if not humanoid then
 		notif('ChatCommand', 'You have no character.', 5, 'warning')
 		return
@@ -336,15 +379,15 @@ local function handleWhitelist(args, remove)
 end
 
 local function clearAllTargets()
-	local count = clearListValues(vape.Categories.Targets) + clearListValues(kickTargetList())
+	local count = clearListValues(vape.Categories.Targets) + clearListValues(kickOption('Targets'))
 	notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
 end
 
 local function handleTargets(args, remove)
 	if not options.Blacklist.Enabled then return end
 
-	args = trim(args)
-	if not args or args == '' then return end
+	args = argument(args)
+	if not args then return end
 
 	if args:lower() == 'all' then
 		clearAllTargets()
@@ -366,7 +409,7 @@ end
 local function handleCheater(args, remove)
 	if not options.Cheater.Enabled then return end
 
-	local module = vape.Modules and vape.Modules.CheaterDetector
+	local module = getModule('CheaterDetector')
 	if not (module and module.AddCheater) then
 		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
 		return
@@ -379,79 +422,7 @@ local function handleCheater(args, remove)
 	end
 end
 
--- KickExploit bridge (vape.Modules is a flat list of every module by name)
-
-local function kickModule()
-	return vape.Modules and vape.Modules.KickExploit
-end
-
-kickTargetList = function()
-	local module = kickModule()
-	if not module then return end
-
-	return (module.Options and module.Options['Targets']) or module.List or module.Targets
-end
-
-local function setKickTarget(name, enabled)
-	setListValue(kickTargetList(), name, enabled)
-end
-
-local function setKickMode(mode)
-	local module = kickModule()
-	if not module then return end
-
-	local modeOption = (module.Options and module.Options['Mode']) or module.Mode
-	if modeOption and modeOption.SetValue then
-		modeOption:SetValue(mode)
-	end
-end
-
-local function kickMethodOption()
-	local module = kickModule()
-	if not module then return end
-
-	return (module.Options and module.Options['Kick Mode']) or module.KickMode
-end
-
-local function setKickMethod(method)
-	local option = kickMethodOption()
-	if option and option.SetValue then
-		option:SetValue(method)
-	end
-
-	-- headfling only runs while Equipment is on, it supplies the gun that kills the target
-	if method == 'Headfling' then
-		local module = kickModule()
-		local equipment = module and module.Options and module.Options['Equipment']
-		if equipment and not equipment.Enabled then
-			equipment:Toggle()
-		end
-	end
-end
-
-addTarget = function(name, enabled)
-	setKickTarget(name, enabled)
-	setListValue(vape.Categories.Targets, name, enabled)
-
-	if enabled then
-		whitelist.customtags[name] = {{text = 'Exploiter', color = TARGET_COLOR}}
-		tempTargets[name] = true
-	else
-		whitelist.customtags[name] = nil
-		tempTargets[name] = nil
-	end
-end
-
-local kickTeams = {}
-local kickTeamMembers = {}
-
-local function addKickTeamMember(plr)
-	if not plr or not next(kickTeams) or not plr.Team or not table.find(kickTeams, plr.Team) then return end
-	if table.find(kickTeamMembers, plr.Name) then return end
-
-	table.insert(kickTeamMembers, plr.Name)
-	addTarget(plr.Name, true)
-end
+-- Kick commands
 
 local function stopKickTeam()
 	table.clear(kickTeams)
@@ -498,15 +469,17 @@ local function handleKick(args)
 		return
 	end
 
-	local name = trim((args or ''):match('^target%s+(.+)$') or args)
-	if not name or name == '' then return end
+	local name = argument((args or ''):match('^target%s+(.+)$') or args)
+	if not name then return end
 
 	local lowered = name:lower()
 	if lowered == 'all' then
 		stopKickTeam()
 		startKick('All', 'Flinging all players.')
 		return
-	elseif lowered == 'none' or lowered == 'off' or lowered == 'stop' then
+	end
+
+	if lowered == 'none' or lowered == 'off' or lowered == 'stop' then
 		stopKick()
 		return
 	end
@@ -532,14 +505,14 @@ local kickMethods = {
 local function handleKickMethod(args)
 	if not options.Kick.Enabled then return end
 
-	local option = kickMethodOption()
+	local option = kickOption('Kick Mode')
 	if not option then
 		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
 		return
 	end
 
-	args = trim(args)
-	if not args or args == '' then
+	args = argument(args)
+	if not args then
 		notif('KickExploit', 'Current kick method: '..tostring(option.Value), 5)
 		return
 	end
@@ -589,13 +562,14 @@ local function handleKickTeam(args)
 	startKick('Individual', 'Flinging '..table.concat(names, ', ')..'.')
 end
 
+-- flags the player as a skid and flings them in one go
 local function handleKickSkid(args)
 	if not (options.Kick.Enabled and options.Cheater.Enabled) then
 		notif('ChatCommand', 'Kick and Cheater are both needed for .kickskid.', 5, 'warning')
 		return
 	end
 
-	local cheater = vape.Modules and vape.Modules.CheaterDetector
+	local cheater = getModule('CheaterDetector')
 	if not (cheater and cheater.AddCheater) then
 		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
 		return
@@ -606,8 +580,8 @@ local function handleKickSkid(args)
 		return
 	end
 
-	args = trim(args)
-	if not args or args == '' then
+	args = argument(args)
+	if not args then
 		notif('ChatCommand', 'No player given. (.kickskid <plr> <reason>)', 5, 'warning')
 		return
 	end
@@ -619,7 +593,7 @@ local function handleKickSkid(args)
 	end
 
 	-- the name is passed instead of the raw text, the split already resolved it
-	cheater:AddCheater(plr.Name, trim(reason))
+	cheater:AddCheater(plr.Name, argument(reason))
 	addTarget(plr.Name, true)
 	startKick('Individual', 'Flinging '..plr.Name..'.')
 end
@@ -659,17 +633,27 @@ local function handleUnfollow()
 	notif('ChatCommand', 'Stopped following.', 5)
 end
 
+local function handleView(args)
+	if not options.PlayerView.Enabled then return end
+
+	local player = findPlayer(args)
+	local entity = player and entitylib.getEntity(player)
+	if not entity then
+		notif('ChatCommand', 'No player found.', 5, 'warning')
+		return
+	end
+
+	viewPlayer = player
+	gameCamera.CameraSubject = entity.Humanoid
+end
+
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
-		if not enabled then
-			stopFollow()
-		end
+		if not enabled then stopFollow() end
 	end},
 	{Name = 'PlayerView', Tooltip = '.view <plr>\n.unview', Function = function(enabled)
-		if not enabled then
-			restoreCamera()
-		end
+		if not enabled then restoreCamera() end
 	end},
 	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
@@ -682,21 +666,6 @@ local toggles = {
 	{Name = 'Broadcast', Tooltip = '.broadcast'},
 	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
 }
-
-local function handleView(args)
-	if not options.PlayerView.Enabled then return end
-
-	local player = findPlayer(args)
-	local entity = player and entitylib.getEntity(player)
-	if not entity then
-		notif('ChatCommand', 'No player found.', 5, 'warning')
-		return
-	end
-
-	clearViewConnection()
-	viewPlayer = player
-	gameCamera.CameraSubject = entity.Humanoid
-end
 
 local commands = {
 	tp = handleTP,
@@ -748,8 +717,8 @@ for alias, name in {
 end
 
 local function onChatted(message)
-	message = trim(message)
-	if message:sub(1, 1) ~= '.' then return end
+	message = argument(message)
+	if not message or message:sub(1, 1) ~= '.' then return end
 
 	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
 	command = command and command:lower()

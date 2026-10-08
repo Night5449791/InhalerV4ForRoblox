@@ -5,16 +5,10 @@ local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 local danceTrack
 
-local function trim(text)
-	return text and text:match('^%s*(.-)%s*$') or nil
-end
-
-local function disconnect(connection)
-	if connection then
-		connection:Disconnect()
-	end
-
-	return nil
+-- nil when the text is missing or only whitespace
+local function argument(text)
+	text = text and text:match('^%s*(.-)%s*$') or nil
+	return text ~= '' and text or nil
 end
 
 local function getLocalHumanoid()
@@ -31,11 +25,12 @@ local function setListValue(list, value, enabled)
 	end
 end
 
+-- returns how many entries were dropped
 local function clearListValues(list)
 	if not list or not list.List then return 0 end
 
-	local count = #list.List
-	if count == 0 and #list.ListEnabled == 0 then return 0 end
+	local count = #list.List + #list.ListEnabled
+	if count == 0 then return 0 end
 
 	table.clear(list.List)
 	table.clear(list.ListEnabled)
@@ -43,18 +38,57 @@ local function clearListValues(list)
 	return count
 end
 
-local function addTarget(name, enabled)
-	setListValue(vape.Categories.Targets, name, enabled)
+-- Player lookup
+
+-- entries are either entities, which expose their player, or plain players.
+-- filter drops entries, an exact match wins over the first prefix match
+local function search(list, lowered, filter)
+	local partial
+
+	for _, entry in list do
+		if filter and not filter(entry) then continue end
+
+		local plr = entry.Player or entry
+		local name, display = plr.Name:lower(), plr.DisplayName:lower()
+		if name == lowered or display == lowered then
+			return entry
+		end
+
+		if not partial and (name:sub(1, #lowered) == lowered or display:sub(1, #lowered) == lowered) then
+			partial = entry
+		end
+	end
+
+	return partial
+end
+
+local function findEntity(prefix, includeDead)
+	local text = argument(prefix)
+	if not text then return end
+
+	-- npcs carry no player and dead characters only count when asked for
+	return search(entitylib.List, text:lower(), function(entity)
+		return entity.Player and (includeDead or entity.Humanoid.Health > 0)
+	end)
+end
+
+-- spawned players first, then everyone still in the server when allowLeft is set
+local function findPlayer(prefix, allowLeft)
+	local entity = findEntity(prefix, true)
+	if entity then
+		return entity.Player
+	end
+
+	local text = allowLeft and argument(prefix)
+	if not text then return end
+
+	return search(playersService:GetPlayers(), text:lower())
 end
 
 -- Camera
 
-local function clearViewConnection()
-	viewPlayer = nil
-end
-
 local function restoreCamera()
-	clearViewConnection()
+	viewPlayer = nil
 
 	local humanoid = getLocalHumanoid()
 	if humanoid then
@@ -63,84 +97,19 @@ local function restoreCamera()
 	end
 end
 
--- Player lookup
-
-local function findEntity(prefix, includeDead)
-	prefix = trim(prefix)
-	if not prefix or prefix == '' then return end
-
-	local lowered = prefix:lower()
-	local length = #lowered
-	local partial
-
-	for _, entity in entitylib.List do
-		local humanoid = entity.Humanoid
-		if not humanoid or (not includeDead and humanoid.Health <= 0) then continue end
-
-		local player = entity.Player
-		if not player then continue end
-
-		local name = player.Name:lower()
-		local display = player.DisplayName:lower()
-		if name == lowered or display == lowered then
-			return entity
-		end
-
-		if not partial and (name:sub(1, length) == lowered or display:sub(1, length) == lowered) then
-			partial = entity
-		end
-	end
-
-	return partial
-end
-
-local function findPlayer(prefix, allowLeft)
-	local entity = findEntity(prefix, true)
-	if entity then
-		return entity.Player
-	end
-
-	if not allowLeft then return end
-
-	prefix = trim(prefix)
-	if not prefix or prefix == '' then return end
-
-	local lowered = prefix:lower()
-	local length = #lowered
-	local partial
-
-	for _, plr in playersService:GetPlayers() do
-		local name = plr.Name:lower()
-		local display = plr.DisplayName:lower()
-		if name == lowered or display == lowered then
-			return plr
-		end
-
-		if not partial and (name:sub(1, length) == lowered or display:sub(1, length) == lowered) then
-			partial = plr
-		end
-	end
-
-	return partial
-end
-
 -- Follow
 
-local function getFollowEntity()
-	if not followPlayer then return end
-
-	return entitylib.getEntity(followPlayer)
-end
-
 local function stopFollow()
-	followConnection = disconnect(followConnection)
+	if followConnection then
+		followConnection:Disconnect()
+		followConnection = nil
+	end
 
 	if followModule and followOldMove then
 		followModule.moveFunction = followOldMove
 	end
 
-	followModule, followOldMove = nil, nil
-	followPlayer = nil
+	followModule, followOldMove, followPlayer = nil, nil, nil
 end
 
 local function startFollow(player)
@@ -164,8 +133,8 @@ local function startFollow(player)
 			return followOldMove(self, vec, face)
 		end
 
-		local targetEntity = getFollowEntity()
-		local targetRoot = targetEntity and targetEntity.RootPart
+		local target = followPlayer and entitylib.getEntity(followPlayer)
+		local targetRoot = target and target.RootPart
 		local root = entitylib.character and entitylib.character.RootPart
 		if targetRoot and root then
 			local direction = (targetRoot.Position - root.Position) * Vector3.new(1, 0, 1)
@@ -236,19 +205,20 @@ local function handleBroadcast()
 	if not options.Broadcast.Enabled then return end
 
 	local module = vape.Modules.UniversalBroadcast
-	if module then
-		module:Toggle()
-		local message = 'Automatically broadcasting in console. Press F9 or chat /console to see result'
-		task.delay(0.1, function()
-			if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-				textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
-			else
-				replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
-			end
-		end)
-	else
+	if not module then
 		notif('ChatCommand', 'UniversalBroadcast is not available in this game.', 5, 'warning')
+		return
 	end
+
+	module:Toggle()
+	local message = 'Automatically broadcasting in console. Press F9 or chat /console to see result'
+	task.delay(0.1, function()
+		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+		else
+			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+		end
+	end)
 end
 
 local function handleUndance()
@@ -262,8 +232,7 @@ end
 local function handleDance()
 	if not options.Dance.Enabled then return end
 
-	local character = lplr.Character
-	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
+	local humanoid = getLocalHumanoid()
 	if not humanoid then
 		notif('ChatCommand', 'You have no character.', 5, 'warning')
 		return
@@ -305,8 +274,8 @@ end
 local function handleTargets(args, remove)
 	if not options.Blacklist.Enabled then return end
 
-	args = trim(args)
-	if not args or args == '' then return end
+	args = argument(args)
+	if not args then return end
 
 	if args:lower() == 'all' then
 		clearAllTargets()
@@ -319,7 +288,7 @@ local function handleTargets(args, remove)
 		return
 	end
 
-	addTarget(player.Name, not remove)
+	setListValue(vape.Categories.Targets, player.Name, not remove)
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
@@ -358,27 +327,6 @@ local function handleUnfollow()
 	notif('ChatCommand', 'Stopped following.', 5)
 end
 
-local toggles = {
-	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
-	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
-		if not enabled then
-			stopFollow()
-		end
-	end},
-	{Name = 'PlayerView', Tooltip = '.view <plr>\n.unview', Function = function(enabled)
-		if not enabled then
-			restoreCamera()
-		end
-	end},
-	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
-	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
-	{Name = 'ReloadVape', Tooltip = '.reload'},
-	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
-	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Broadcast', Tooltip = '.broadcast'},
-	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
-}
-
 local function handleView(args)
 	if not options.PlayerView.Enabled then return end
 
@@ -389,19 +337,26 @@ local function handleView(args)
 		return
 	end
 
-	clearViewConnection()
 	viewPlayer = player
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
-local function handleDebugNetworkOwner()
-	local ShowNetworkOwner = vape.Modules.ShowNetworkOwner
-	if ShowNetworkOwner and ShowNetworkOwner.Enabled then
-		ShowNetworkOwner.Enabled = false
-	else
-		ShowNetworkOwner.Enabled = true
-	end
-end
+local toggles = {
+	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
+	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
+		if not enabled then stopFollow() end
+	end},
+	{Name = 'PlayerView', Tooltip = '.view <plr>\n.unview', Function = function(enabled)
+		if not enabled then restoreCamera() end
+	end},
+	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
+	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
+	{Name = 'ReloadVape', Tooltip = '.reload'},
+	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
+	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
+	{Name = 'Broadcast', Tooltip = '.broadcast'},
+	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
+}
 
 local commands = {
 	tp = handleTP,
@@ -412,42 +367,38 @@ local commands = {
 	wl = function(args)
 		handleWhitelist(args, false)
 	end,
-	whitelist = function(args)
-		handleWhitelist(args, false)
-	end,
 	unwl = function(args)
-		handleWhitelist(args, true)
-	end,
-	unwhitelist = function(args)
 		handleWhitelist(args, true)
 	end,
 	target = function(args)
 		handleTargets(args, false)
 	end,
-	blacklist = function(args)
-		handleTargets(args, false)
-	end,
 	untarget = function(args)
 		handleTargets(args, true)
 	end,
-	unblacklist = function(args)
-		handleTargets(args, true)
-	end,
 	hop = handleHop,
-	serverhop = handleHop,
 	rj = handleRejoin,
-	rejoin = handleRejoin,
 	reload = handleReload,
 	broadcast = handleBroadcast,
 	dance = handleDance,
-	undance = handleUndance,
-	debugnet = handleDebugNetworkOwner,
-	debugnetworkowner = handleDebugNetworkOwner,
+	undance = handleUndance
 }
 
+-- long forms point at the same handler as the short ones
+for alias, name in {
+	whitelist = 'wl',
+	unwhitelist = 'unwl',
+	blacklist = 'target',
+	unblacklist = 'untarget',
+	serverhop = 'hop',
+	rejoin = 'rj'
+} do
+	commands[alias] = commands[name]
+end
+
 local function onChatted(message)
-	message = trim(message)
-	if message:sub(1, 1) ~= '.' then return end
+	message = argument(message)
+	if not message or message:sub(1, 1) ~= '.' then return end
 
 	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
 	command = command and command:lower()
@@ -456,7 +407,10 @@ local function onChatted(message)
 	local handler = commands[command]
 	if handler then
 		handler(args ~= '' and args or nil)
+		return true
 	end
+
+	return false
 end
 
 ChatCommand = vape.Categories.Utility:CreateModule({
@@ -503,7 +457,10 @@ CommandBox = ChatCommand:CreateTextBox({
 	Tooltip = 'Runs a chat command without opening the chat. Press Enter to execute.',
 	Function = function(enter)
 		if enter and CommandBox and CommandBox.Value ~= '' then
-			onChatted(CommandBox.Value)
+			-- the command never reaches the chat, so the box is emptied to show it ran
+			if onChatted(CommandBox.Value) then
+				CommandBox:SetValue('')
+			end
 		end
 	end
 })
