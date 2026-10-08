@@ -44,7 +44,7 @@ AimAssist = vape.Categories.Combat:CreateModule({
 							if calc then 
 								local pos = gameCamera:WorldToViewportPoint(calc)
 								local localmouse = (inputService:GetMouseLocation() - Vector2.new(pos.X, pos.Y)) * dt * (Speed.Value / 10000)
-								targetinfo.Targets[ent] = tick() + 1
+								targetinfo.Targets[ent] = os.clock() + 1
 								frontlines.Main.exe_set(frontlines.Main.exe_set_t.CTRL_SOL_ATT_ROT, localmouse.Y, localmouse.X)
 							end
 						end

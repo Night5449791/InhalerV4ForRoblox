@@ -53,7 +53,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 							local delta = (entity.RootPart.Position - selfpos) * flatMask
 							if math.acos(localfacing:Dot(delta.Unit)) > maxAngle then continue end
 
-							targetinfo.Targets[entity] = tick() + 1
+							targetinfo.Targets[entity] = os.clock() + 1
 							table.insert(attacked, {
 								Entity = entity,
 								Check = BoxAttackColor
