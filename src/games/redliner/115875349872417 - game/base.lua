@@ -228,7 +228,7 @@ if not select(1, ...) then
 		end)
 	else
 		vape.Load = function()
-			notif('Vape', 'Missing actor functions.', 10, 'alert')
+			notif('Inhaler', 'Missing actor functions.', 10, 'alert')
 		end
 	end
 

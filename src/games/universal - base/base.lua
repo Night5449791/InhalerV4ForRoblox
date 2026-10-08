@@ -152,7 +152,7 @@ local function serverHop(pointer, filter)
 	end
 
 	if not pointer then
-		notif('Vape', 'Searching for an available server.', 2)
+		notif('Inhaler', 'Searching for an available server.', 2)
 	end
 
 	local success, httpdata = pcall(function()
@@ -166,7 +166,7 @@ local function serverHop(pointer, filter)
 				cacheExpire, cache = os.clock() + 60, httpdata
 				table.insert(attempted, v.id)
 
-				notif('Vape', 'Found! Teleporting.', 5)
+				notif('Inhaler', 'Found! Teleporting.', 5)
 				teleportService:TeleportToPlaceInstance(game.PlaceId, v.id)
 				return
 			end
@@ -175,10 +175,10 @@ local function serverHop(pointer, filter)
 		if data.nextPageCursor then
 			serverHop(data.nextPageCursor, filter)
 		else
-			notif('Vape', 'Failed to find an available server.', 5, 'warning')
+			notif('Inhaler', 'Failed to find an available server.', 5, 'warning')
 		end
 	else
-		notif('Vape', 'Failed to grab servers. ('..(data and data.errors[1].message or 'no data')..')', 5, 'warning')
+		notif('Inhaler', 'Failed to grab servers. ('..(data and data.errors[1].message or 'no data')..')', 5, 'warning')
 	end
 end
 
@@ -458,7 +458,7 @@ run(function()
 			if self.localprio == 0 then
 				olduninject = vape.Uninject
 				vape.Uninject = function()
-					notif('Vape', 'No escaping the private members :)', 10)
+					notif('Inhaler', 'No escaping the private members :)', 10)
 				end
 			end
 		end

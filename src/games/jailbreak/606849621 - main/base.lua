@@ -733,7 +733,7 @@ run(function()
 
 	function jb:FireServer(id, ...)
 		if not remotes[id] then
-			notif('Vape', 'Failed to find remote ('..id..')', 10, 'alert')
+			notif('Inhaler', 'Failed to find remote ('..id..')', 10, 'alert')
 			return
 		end
 

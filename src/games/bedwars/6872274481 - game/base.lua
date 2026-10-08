@@ -777,7 +777,7 @@ run(function()
 	for i, v in remoteNames do
 		local remote = dumpRemote(debug.getconstants(v))
 		if remote == '' then
-			notif('Vape', 'Failed to grab remote ('..i..')', 10, 'alert')
+			notif('Inhaler', 'Failed to grab remote ('..i..')', 10, 'alert')
 		end
 		remotes[i] = remote
 	end
