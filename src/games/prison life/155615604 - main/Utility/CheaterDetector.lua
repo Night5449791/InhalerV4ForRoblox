@@ -409,6 +409,16 @@ function CheaterDetector:RemoveCheater(text)
 	editCheater(text, nil, true)
 end
 
+-- other modules use this to split "<display name> <reason>" the same way,
+-- returns the player (nil when nobody online matches), the reason that
+-- followed and the matched name
+function CheaterDetector:FindCheater(text)
+	text = trimText(text)
+	if not text or text == '' then return end
+
+	return splitCheaterText(text)
+end
+
 cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 	Name = 'Notifications',
 	Default = true,
