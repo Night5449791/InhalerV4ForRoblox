@@ -84,8 +84,8 @@ local function setKickMethod(method)
 		option:SetValue(method)
 	end
 
-	-- headfling only runs while Equipment is on, it supplies the gun that kills the target
-	if method == 'Headfling' then
+	-- killfling only runs while Equipment is on, it supplies the gun that kills the target
+	if method == 'Killfling' then
 		local equipment = kickOption('Equipment')
 		if equipment and not equipment.Enabled then
 			equipment:Toggle()
@@ -497,9 +497,9 @@ end
 local kickMethods = {
 	normal = 'Normal',
 	n = 'Normal',
-	headfling = 'Headfling',
-	head = 'Headfling',
-	h = 'Headfling'
+	killfling = 'Killfling',
+	kill = 'Killfling',
+	k = 'Killfling'
 }
 
 local function handleKickMethod(args)
@@ -519,12 +519,12 @@ local function handleKickMethod(args)
 
 	local method = kickMethods[args:lower():match('^%S+$')]
 	if not method then
-		notif('KickExploit', 'Unknown kick method. (normal/headfling)', 5, 'warning')
+		notif('KickExploit', 'Unknown kick method. (normal/killfling)', 5, 'warning')
 		return
 	end
 
 	setKickMethod(method)
-	notif('KickExploit', 'Kick method set to '..method..(method == 'Headfling' and ', dead targets only.' or '.'), 5)
+	notif('KickExploit', 'Kick method set to '..method..(method == 'Killfling' and ', dead targets only.' or '.'), 5)
 end
 
 local function handleKickTeam(args)
@@ -662,7 +662,7 @@ local toggles = {
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>\n.kickskid <plr> <reason>'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/headfling>'},
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
 	{Name = 'Broadcast', Tooltip = '.broadcast'},
 	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
 }
