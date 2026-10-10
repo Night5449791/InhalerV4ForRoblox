@@ -1,37 +1,59 @@
 local GetHash
+local Hash
+
+-- whitelist.hashes is the same cache whitelist:get reads from, so this is exactly
+-- the hash the whitelist gets checked against
+local function getHash()
+	return whitelist.hashes[lplr.Name..lplr.UserId]
+end
 
 GetHash = vape.Categories.World:CreateModule({
 	Name = 'GetHash',
 	Function = function(callback)
 		if callback then
-			local input = (GetHashUsername.Value or ''):gsub('%s+', '')
-			local name, userid
+			GetHash:Toggle()
 
-			if input == '' then
-				-- self hash
-				name = lplr.Name
-				userid = lplr.UserId
-			else
-				local s, id = pcall(playersService.GetUserIdFromNameAsync, playersService, input)
-				if not s then
-					notif('GetHash', 'failed to find user: '..input, 5)
-					return
-				end
-				name = input
-				userid = id
+			local value = getHash()
+			if value == '' then
+				notif('GetHash', 'Hash library is not loaded.', 5, 'warning')
+				return
 			end
 
-			-- matches whitelist:get() -> hash.sha512(Name..UserId..'SelfReport')
-			local h = hash.sha512(name..userid..'SelfReport')
-			pcall(setclipboard, h)
-			notif('GetHash', 'copied hash for '..name..'\n'..h, 10)
+			Hash:SetValue(value)
+
+			if not setclipboard then
+				notif('GetHash', 'Your executor does not support clipboard.', 5, 'warning')
+				return
+			end
+
+			setclipboard(value)
+			notif('GetHash', 'Copied your whitelist hash.', 5)
 		end
 	end,
 	Tooltip = 'generate hash for whitelist'
 })
+Hash = GetHash:CreateTextBox({
+	Name = 'Hash',
+	Placeholder = 'Enable to generate',
+	Darker = true,
+	Tooltip = 'sha512 of your name, user id and SelfReport'
+})
+GetHash:CreateButton({
+	Name = 'Copy Hash',
+	Function = function()
+		if not setclipboard then
+			notif('GetHash', 'Your executor does not support clipboard.', 5, 'warning')
+			return
+		end
 
-GetHashUsername = GetHash:CreateTextBox({
-	Name = 'Username',
-	Placeholder = 'roblox username',
-	Tooltip = 'leave it blank to copy self hash',
+		local value = Hash.Value ~= '' and Hash.Value or getHash()
+		if value == '' then
+			notif('GetHash', 'Hash library is not loaded.', 5, 'warning')
+			return
+		end
+
+		setclipboard(value)
+		notif('GetHash', 'Copied your whitelist hash.', 5)
+	end,
+	Tooltip = 'Copies your whitelist hash to the clipboard'
 })
