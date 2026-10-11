@@ -122,8 +122,8 @@ discord.MouseButton1Click:Connect(function()
 		local body = httpService:JSONEncode({
 			nonce = httpService:GenerateGUID(false),
 			args = {
-				invite = {code = 'VZEQJxMSnG'},
-				code = 'VZEQJxMSnG'
+				invite = {code = 'YSzD7f9neR'},
+				code = 'YSzD7f9neR'
 			},
 			cmd = 'INVITE_BROWSER'
 		})
