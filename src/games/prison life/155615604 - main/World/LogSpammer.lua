@@ -2,7 +2,7 @@ local UniversalBroadcast
 local Message
 local rand = Random.new()
 
-UniversalBroadcast = vape.Categories.Utility:CreateModule({
+UniversalBroadcast = vape.Categories.World:CreateModule({
 	Name = 'UniversalBroadcast',
 	Function = function(callback)
 		if callback then
