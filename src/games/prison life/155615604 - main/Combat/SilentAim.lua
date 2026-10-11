@@ -173,6 +173,22 @@ run(function()
 			end
 
 			if callback then
+				-- A fast reload/reinject can spawn this enable before the previous
+				-- injection's async cleanup (restorefunction runs inside a spawned
+				-- thread) has restored pl.Bullet, leaving a stale wrapper stacked on
+				-- top. Stacked hooks break wallbang's stack-origin replacement while
+				-- aim still works, so unwind any existing hook back to the original
+				-- first.
+				if restorefunction then
+					for _ = 1, 4 do
+						local before = pl.Bullet
+						pcall(restorefunction, before)
+						if pl.Bullet == before then break end
+					end
+				elseif old and hooked then
+					hookfunction(hooked, old)
+				end
+
 				hooked = pl.Bullet
 				old = hookfunction(hooked, function(...)
 					return Hook(...)
