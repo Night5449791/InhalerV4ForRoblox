@@ -1,10 +1,28 @@
 local KillNotifications
 local KNMode
 
+local MAX_STACK = 4
+local LIFETIME = 2.5
+local ENTRY_W = 460
+local ENTRY_H = 22
+local ENTRY_GAP = 3
+local BASE_OFFSET = 28
+
+local killfeedGui, stack
+
 KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
 	Function = function(callback)
 		if callback then
+			stack = {}
+
+			killfeedGui = Instance.new('ScreenGui')
+			killfeedGui.Name = 'KillNotifications'
+			killfeedGui.ResetOnSpawn = false
+			killfeedGui.IgnoreGuiInset = true
+			killfeedGui.DisplayOrder = 10
+			killfeedGui.Parent = coreGui
+
 			local myName = lplr.Name
 			local myDisp = lplr.DisplayName
 
@@ -100,19 +118,64 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					end
 				end
 
-				notif('KillNotifications',
-					(kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)..' killed '
+				-- newest goes to the bottom of the stack, older ones get pushed up
+				local entry = Instance.new('TextLabel')
+				entry.Name = 'Killfeed'
+				entry.AnchorPoint = Vector2.new(0.5, 1)
+				entry.BackgroundColor3 = Color3.new(0, 0, 0)
+				entry.BackgroundTransparency = 0.35
+				entry.BorderSizePixel = 0
+				entry.Font = Enum.Font.GothamBold
+				entry.RichText = true
+				entry.Text = (kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)..' killed '
 					..(vHex and '<font color="'..vHex..'">'..vDisp..'</font>' or vDisp)
-					..(weapon and ' ['..weapon..']' or ''),
-					mine and 2.5 or 1)
+					..(weapon and ' ['..weapon..']' or '')
+				entry.TextColor3 = Color3.new(1, 1, 1)
+				entry.TextSize = 15
+				entry.TextStrokeColor3 = Color3.new()
+				entry.TextStrokeTransparency = 0.7
+				entry.TextXAlignment = Enum.TextXAlignment.Center
+				entry.Size = UDim2.new(0, ENTRY_W, 0, ENTRY_H)
+				entry.Parent = killfeedGui
+
+				local corner = Instance.new('UICorner')
+				corner.CornerRadius = UDim.new(0, 4)
+				corner.Parent = entry
+
+				table.insert(stack, 1, entry)
+				if #stack > MAX_STACK then
+					stack[#stack]:Destroy()
+					table.remove(stack)
+				end
+				for i, other in stack do
+					other.Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * (ENTRY_H + ENTRY_GAP))
+				end
+
+				task.delay(LIFETIME, function()
+					local idx = table.find(stack, entry)
+					if not idx then return end
+					table.remove(stack, idx)
+					entry:Destroy()
+					for i, other in stack do
+						other.Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * (ENTRY_H + ENTRY_GAP))
+					end
+				end)
 			end))
+
+			KillNotifications:Clean(function()
+				if killfeedGui then
+					killfeedGui:Destroy()
+					killfeedGui = nil
+				end
+				table.clear(stack)
+			end)
 		end
 	end,
-	Tooltip = 'Sends a notification of who killed you.'
+	Tooltip = 'Shows a killfeed of who killed who at the bottom of the screen.'
 })
 
 KNMode = KillNotifications:CreateDropdown({
 	Name = 'Mode',
 	List = {'Self', 'All killfeeds'},
-	Tooltip = 'Self = only notify when you are killed. All killfeeds = notify for every kill in the server.'
+	Tooltip = 'Self = only show kills involving you. All killfeeds = show every kill in the server.'
 })
