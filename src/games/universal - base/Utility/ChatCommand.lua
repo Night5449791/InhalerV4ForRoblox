@@ -201,26 +201,6 @@ local function handleRejoin()
 	end
 end
 
-local function handleBroadcast()
-	if not options.Broadcast.Enabled then return end
-
-	local module = vape.Modules.UniversalBroadcast
-	if not module then
-		notif('ChatCommand', 'UniversalBroadcast is not available in this game.', 5, 'warning')
-		return
-	end
-
-	module:Toggle()
-	local message = 'Automatically broadcasting in console. Press F9 or chat /console to see result'
-	task.delay(0.1, function()
-		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
-		else
-			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
-		end
-	end)
-end
-
 local function handleUndance()
 	if danceTrack then
 		danceTrack:Stop()
@@ -354,7 +334,6 @@ local toggles = {
 	{Name = 'ReloadVape', Tooltip = '.reload'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Broadcast', Tooltip = '.broadcast'},
 	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
 }
 
@@ -379,7 +358,6 @@ local commands = {
 	hop = handleHop,
 	rj = handleRejoin,
 	reload = handleReload,
-	broadcast = handleBroadcast,
 	dance = handleDance,
 	undance = handleUndance
 }
