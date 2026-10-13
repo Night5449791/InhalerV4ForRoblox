@@ -1,12 +1,13 @@
 local KillNotifications
 local KNMode
+local KNHeight
 
 local MAX_STACK = 4
 local LIFETIME = 2.5
 local ENTRY_W = 460
 local ENTRY_H = 22
 local ENTRY_GAP = 3
-local BASE_OFFSET = 100
+local BASE_OFFSET
 
 local killfeedGui, stack
 
@@ -179,4 +180,22 @@ KNMode = KillNotifications:CreateDropdown({
 	Name = 'Mode',
 	List = {'Self', 'All killfeeds'},
 	Tooltip = 'Self = only show kills involving you. All killfeeds = show every kill in the server.'
+})
+
+KNHeight = KillNotifications:CreateSlider({
+	Name = 'Height',
+	Min = 0,
+	Max = 300,
+	Default = 100,
+	Suffix = 'px',
+	Tooltip = 'How far above the bottom of the screen the killfeed sits.',
+	Function = function(value)
+		BASE_OFFSET = value
+	end
+})
+BASE_OFFSET = KNHeight.Value
+
+BASE_OFFSET = KillNotifications:CreateSlider({
+	Name = 'Y axis Offset',
+	Tooltip = 'How far down the screen the killfeed is.'
 })
