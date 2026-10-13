@@ -1,17 +1,21 @@
 local KillNotifications
 local KNMode
 
+local ALL_MODE = 'All killfeeds'
+
 -- the notification label is RichText, so a name can be tinted with its team
 -- color (inmate orange / guard blue / neutral grey). Falls back to plain text
 -- when the player or their team can't be resolved.
-local function teamHex(plrName)
-	local plr = plrName and playersService:FindFirstChild(plrName)
-	local color = plr and plr.Team and plr.TeamColor and plr.TeamColor.Color
+local function hexOf(color)
 	if not color then return nil end
 	return string.format('#%02x%02x%02x', math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5))
 end
 
-local function colored(text, hex)
+local function teamColorOf(plr)
+	return plr and plr.Team and plr.TeamColor and plr.TeamColor.Color
+end
+
+local function wrap(text, hex)
 	return hex and ('<font color="'..hex..'">'..text..'</font>') or text
 end
 
@@ -19,6 +23,9 @@ KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
 	Function = function(callback)
 		if callback then
+			local myName = lplr.Name
+			local myColor = teamColorOf(lplr)
+
 			-- listen to the killfeed directly instead of relying on the
 			-- vapeEvents.PlayerKill BindableEvent, so a missed delivery (cross-file
 			-- BindableEvent plumbing) can't silently drop the notification. The
@@ -41,27 +48,27 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				local victim = endchar and name:sub(start, endchar - 1) or name:sub(start)
 
 				-- decide relevance first so irrelevant kills do no extra string work
-				local selfDeath = victim == lplr.Name and killer ~= lplr.Name
-				local allKills = KNMode.Value == 'All killfeeds'
-				if not (selfDeath or allKills) then return end
+				local mine = victim == myName and killer ~= myName
+				if not mine and KNMode.Value ~= ALL_MODE then return end
 
-				-- only now pull the weapon out of the "with Weapon" trailer
+				-- weapon, taken from "with Weapon" and trimmed of any " (distance)"
 				local weapon
 				if endchar then
 					local wstart = name:find('with ', endchar)
 					if wstart then
-						weapon = name:sub(wstart + 5):match('^%s*(.-)%s*$')
-						weapon = weapon:match('^(.-)%s*%([^()]*%)$') or weapon
+						weapon = name:match('with%s+(.-)%s*%(', wstart) or name:match('with%s+(.-)%s*$', wstart)
 					end
 				end
-				local extra = weapon and weapon ~= '' and (' ['..weapon..']') or ''
 
-				if selfDeath then
+				local killerHex = hexOf(teamColorOf(playersService:FindFirstChild(killer)))
+
+				if mine then
 					-- your own death lingers longer so it isn't missed
-					notif('KillNotifications', colored(killer, teamHex(killer))..' killed '..colored('you', teamHex(lplr.Name))..'!'..extra, 2.5)
+					notif('KillNotifications', wrap(killer, killerHex)..' killed '..wrap('you', hexOf(myColor))..(weapon and ' ['..weapon..']' or ''), 2.5)
 				else
 					-- every other kill in the server stays brief
-					notif('KillNotifications', colored(killer, teamHex(killer))..' killed '..colored(victim, teamHex(victim))..'!'..extra, 1)
+					local victimHex = hexOf(teamColorOf(playersService:FindFirstChild(victim)))
+					notif('KillNotifications', wrap(killer, killerHex)..' killed '..wrap(victim, victimHex)..(weapon and ' ['..weapon..']' or ''), 1)
 				end
 			end))
 		end
@@ -71,6 +78,6 @@ KillNotifications = vape.Categories.Render:CreateModule({
 
 KNMode = KillNotifications:CreateDropdown({
 	Name = 'Mode',
-	List = {'Self', 'All killfeeds'},
+	List = {'Self', ALL_MODE},
 	Tooltip = 'Self = only notify when you are killed. All killfeeds = notify for every kill in the server.'
 })
