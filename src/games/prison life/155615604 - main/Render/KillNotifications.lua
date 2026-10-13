@@ -28,6 +28,12 @@ local function wrap(text, hex)
 	return hex and ('<font color="'..hex..'">'..text..'</font>') or text
 end
 
+-- the killfeed reads "DisplayName (@UserName)", so the raw slice taken before
+-- the @ still ends with " (" -- strip that off down to just the display name.
+local function displayName(raw)
+	return raw:match('^(.-)%s*%(%s*$') or raw:match('^%s*(.-)%s*$') or raw
+end
+
 KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
 	Function = function(callback)
@@ -70,11 +76,11 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				if not mine and KNMode.Value ~= ALL_MODE then return end
 
 				-- DisplayNames are only needed once we know we will notify
-				local killerDisp = name:sub(1, killerAt - 1):match('^%s*(.-)%s*$')
+				local killerDisp = displayName(name:sub(1, killerAt - 1))
 				if killerDisp == '' then killerDisp = killerName end
 				local victimDisp
 				if victimAt and victimClose then
-					victimDisp = name:sub(killedAt + 7, victimAt - 1):match('^%s*(.-)%s*$')
+					victimDisp = displayName(name:sub(killedAt + 7, victimAt - 1))
 					if victimDisp == '' then victimDisp = victimName end
 				else
 					victimDisp = victimName
