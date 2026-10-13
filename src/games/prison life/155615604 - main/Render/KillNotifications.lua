@@ -6,7 +6,7 @@ local LIFETIME = 2.5
 local ENTRY_W = 460
 local ENTRY_H = 22
 local ENTRY_GAP = 3
-local BASE_OFFSET = 28
+local BASE_OFFSET = 100
 
 local killfeedGui, stack
 
@@ -128,8 +128,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				local entry = Instance.new('TextLabel')
 				entry.Name = 'Killfeed'
 				entry.AnchorPoint = Vector2.new(0.5, 1)
-				entry.BackgroundColor3 = Color3.new(0, 0, 0)
-				entry.BackgroundTransparency = 0.35
+				entry.BackgroundTransparency = 1
 				entry.BorderSizePixel = 0
 				entry.Font = Enum.Font.GothamBold
 				entry.RichText = true
@@ -143,10 +142,6 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				entry.TextXAlignment = Enum.TextXAlignment.Center
 				entry.Size = UDim2.new(0, ENTRY_W, 0, ENTRY_H)
 				entry.Parent = killfeedGui
-
-				local corner = Instance.new('UICorner')
-				corner.CornerRadius = UDim.new(0, 4)
-				corner.Parent = entry
 
 				table.insert(stack, 1, entry)
 				if #stack > MAX_STACK then
