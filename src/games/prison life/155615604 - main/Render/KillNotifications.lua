@@ -84,10 +84,16 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				kDisp = kDisp:match('^(.-)%s*%(%s*$') or kDisp:match('^%s*(.-)%s*$')
 				if kDisp == '' then kDisp = killerName end
 
-				local vDisp = mine and myDisp or name:sub(killedAt + 7, victimAt - 1)
-				if not mine then
+				local vDisp
+				if mine then
+					vDisp = myDisp
+				elseif victimAt then
+					vDisp = name:sub(killedAt + 7, victimAt - 1)
 					vDisp = vDisp:match('^(.-)%s*%(%s*$') or vDisp:match('^%s*(.-)%s*$')
 					if vDisp == '' then vDisp = victimName end
+				else
+					-- no (@...) on the victim, the token we parsed is the whole name
+					vDisp = victimName
 				end
 
 				-- team colors straight off Player.TeamColor
