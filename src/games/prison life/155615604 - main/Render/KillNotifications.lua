@@ -3,37 +3,6 @@ local KNMode
 
 local ALL_MODE = 'All killfeeds'
 
--- the notification label is RichText, so a name can be tinted with its team
--- color (inmate orange / guard blue / neutral grey).
-local function hexOf(plr)
-	local teamColor = plr and plr.TeamColor
-	if not teamColor then return nil end
-	local color = teamColor.Color
-	return string.format('#%02x%02x%02x', math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5))
-end
-
--- the killfeed may show either the UserName or the DisplayName, so fall back to
--- a DisplayName scan when FindFirstChild (which matches Name) comes up empty.
-local function findPlayer(who)
-	if not who then return nil end
-	local plr = playersService:FindFirstChild(who)
-	if plr then return plr end
-	for _, p in playersService:GetPlayers() do
-		if p.DisplayName == who then return p end
-	end
-	return nil
-end
-
-local function wrap(text, hex)
-	return hex and ('<font color="'..hex..'">'..text..'</font>') or text
-end
-
--- the killfeed reads "DisplayName (@UserName)", so the raw slice taken before
--- the @ still ends with " (" -- strip that off down to just the display name.
-local function displayName(raw)
-	return raw:match('^(.-)%s*%(%s*$') or raw:match('^%s*(.-)%s*$') or raw
-end
-
 KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
 	Function = function(callback)
@@ -47,17 +16,19 @@ KillNotifications = vape.Categories.Render:CreateModule({
 			-- parsing matches base.lua / upstream, which drives the kills/deaths
 			-- counters off the same ChildAdded signal.
 			KillNotifications:Clean(replicatedStorage.Killfeed.ChildAdded:Connect(function(obj)
+				-- "DisplayName (@UserName)  killed DisplayName2 (@UserName2) with Weapon"
 				local name = obj.Name
 
-				-- "DisplayName (@UserName)  killed DisplayName2 (@UserName2) with Weapon"
 				local killedAt = name:find('killed ')
 				if not killedAt then return end
 
+				-- killer UserName, from the (@...) before "killed"
 				local killerAt = name:find('@')
 				local killerClose = killerAt and name:find(')', killerAt)
 				if not (killerAt and killerClose and killerClose < killedAt) then return end
 				local killerName = name:sub(killerAt + 1, killerClose - 1)
 
+				-- victim UserName, from the (@...) after "killed", else the first token
 				local victimAt = name:find('@', killedAt)
 				local victimClose = victimAt and name:find(')', victimAt)
 				local victimName, victimEnd
@@ -75,15 +46,51 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				local mine = victimName == myName and killerName ~= myName
 				if not mine and KNMode.Value ~= ALL_MODE then return end
 
-				-- DisplayNames are only needed once we know we will notify
-				local killerDisp = displayName(name:sub(1, killerAt - 1))
-				if killerDisp == '' then killerDisp = killerName end
-				local victimDisp
-				if victimAt and victimClose then
-					victimDisp = displayName(name:sub(killedAt + 7, victimAt - 1))
-					if victimDisp == '' then victimDisp = victimName end
-				else
-					victimDisp = victimName
+				-- killer player: UserName first, DisplayName only as a fallback since
+				-- FindFirstChild matches Name
+				local kplr = playersService:FindFirstChild(killerName)
+				if not kplr then
+					for _, p in playersService:GetPlayers() do
+						if p.DisplayName == killerName then kplr = p break end
+					end
+				end
+
+				-- victim player, yourself on your own death
+				local vplr = mine and lplr or playersService:FindFirstChild(victimName)
+				if not mine and not vplr then
+					for _, p in playersService:GetPlayers() do
+						if p.DisplayName == victimName then vplr = p break end
+					end
+				end
+
+				-- display names, the raw slices still end with " (" from "(@...)"
+				local kDisp = name:sub(1, killerAt - 1)
+				kDisp = kDisp:match('^(.-)%s*%(%s*$') or kDisp:match('^%s*(.-)%s*$')
+				if kDisp == '' then kDisp = killerName end
+
+				local vDisp = mine and myDisp or name:sub(killedAt + 7, victimAt - 1)
+				if not mine then
+					vDisp = vDisp:match('^(.-)%s*%(%s*$') or vDisp:match('^%s*(.-)%s*$')
+					if vDisp == '' then vDisp = victimName end
+				end
+
+				-- team colors straight off Player.TeamColor
+				local kHex
+				do
+					local teamColor = kplr and kplr.TeamColor
+					if teamColor then
+						local c = teamColor.Color
+						kHex = string.format('#%02x%02x%02x', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+					end
+				end
+
+				local vHex
+				do
+					local teamColor = vplr and vplr.TeamColor
+					if teamColor then
+						local c = teamColor.Color
+						vHex = string.format('#%02x%02x%02x', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+					end
 				end
 
 				-- weapon, taken from "with Weapon" and trimmed of any " (distance)"
@@ -95,16 +102,11 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					end
 				end
 
-				local killerHex = hexOf(findPlayer(killerName))
-
-				if mine then
-					-- your own death lingers longer so it isn't missed
-					notif('KillNotifications', wrap(killerDisp, killerHex)..' killed '..wrap(myDisp, hexOf(lplr))..(weapon and ' ['..weapon..']' or ''), 2.5)
-				else
-					-- every other kill in the server stays brief
-					local victimHex = hexOf(findPlayer(victimName))
-					notif('KillNotifications', wrap(killerDisp, killerHex)..' killed '..wrap(victimDisp, victimHex)..(weapon and ' ['..weapon..']' or ''), 1)
-				end
+				notif('KillNotifications',
+					(kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)..' killed '
+					..(vHex and '<font color="'..vHex..'">'..vDisp..'</font>' or vDisp)
+					..(weapon and ' ['..weapon..']' or ''),
+					mine and 2.5 or 1)
 			end))
 		end
 	end,
