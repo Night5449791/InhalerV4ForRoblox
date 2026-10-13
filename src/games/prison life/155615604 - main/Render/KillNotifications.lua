@@ -4,15 +4,24 @@ local KNMode
 local ALL_MODE = 'All killfeeds'
 
 -- the notification label is RichText, so a name can be tinted with its team
--- color (inmate orange / guard blue / neutral grey). Falls back to plain text
--- when the player or their team can't be resolved.
+-- color (inmate orange / guard blue / neutral grey).
 local function hexOf(color)
 	if not color then return nil end
 	return string.format('#%02x%02x%02x', math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5))
 end
 
-local function teamColorOf(plr)
-	return plr and plr.Team and plr.TeamColor and plr.TeamColor.Color
+-- Prison Life blanks a player's Team the moment they die, so the killfeed fires
+-- while the victim already has no team. Keep the last color we saw for each
+-- player and fall back to it, otherwise the dead victim would render uncolored.
+local lastHex = {}
+
+local function colorHex(plr)
+	if not plr then return nil end
+	local color = plr.Team and plr.TeamColor and plr.TeamColor.Color
+	if color then
+		lastHex[plr.Name] = hexOf(color)
+	end
+	return lastHex[plr.Name]
 end
 
 local function wrap(text, hex)
@@ -23,8 +32,12 @@ KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
 	Function = function(callback)
 		if callback then
+			-- seed the cache so players who die before we ever resolved them
+			-- still carry their team color into the notification
+			for _, plr in playersService:GetPlayers() do
+				colorHex(plr)
+			end
 			local myName = lplr.Name
-			local myColor = teamColorOf(lplr)
 
 			-- listen to the killfeed directly instead of relying on the
 			-- vapeEvents.PlayerKill BindableEvent, so a missed delivery (cross-file
@@ -60,14 +73,14 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					end
 				end
 
-				local killerHex = hexOf(teamColorOf(playersService:FindFirstChild(killer)))
+				local killerHex = colorHex(playersService:FindFirstChild(killer))
 
 				if mine then
 					-- your own death lingers longer so it isn't missed
-					notif('KillNotifications', wrap(killer, killerHex)..' killed '..wrap('you', hexOf(myColor))..(weapon and ' ['..weapon..']' or ''), 2.5)
+					notif('KillNotifications', wrap(killer, killerHex)..' killed '..wrap('you', colorHex(lplr))..(weapon and ' ['..weapon..']' or ''), 2.5)
 				else
 					-- every other kill in the server stays brief
-					local victimHex = hexOf(teamColorOf(playersService:FindFirstChild(victim)))
+					local victimHex = colorHex(playersService:FindFirstChild(victim))
 					notif('KillNotifications', wrap(killer, killerHex)..' killed '..wrap(victim, victimHex)..(weapon and ' ['..weapon..']' or ''), 1)
 				end
 			end))
