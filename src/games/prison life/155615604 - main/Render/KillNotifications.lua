@@ -1,8 +1,6 @@
 local KillNotifications
 local KNMode
 
-local ALL_MODE = 'All killfeeds'
-
 KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
 	Function = function(callback)
@@ -44,7 +42,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 
 				-- decide relevance first so irrelevant kills do no extra string work
 				local mine = victimName == myName and killerName ~= myName
-				if not mine and KNMode.Value ~= ALL_MODE then return end
+				if not mine and KNMode.Value ~= 'All killfeeds' then return end
 
 				-- killer player: UserName first, DisplayName only as a fallback since
 				-- FindFirstChild matches Name
@@ -115,6 +113,6 @@ KillNotifications = vape.Categories.Render:CreateModule({
 
 KNMode = KillNotifications:CreateDropdown({
 	Name = 'Mode',
-	List = {'Self', ALL_MODE},
+	List = {'Self', 'All killfeeds'},
 	Tooltip = 'Self = only notify when you are killed. All killfeeds = notify for every kill in the server.'
 })
