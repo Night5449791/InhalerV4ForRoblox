@@ -1,7 +1,7 @@
 local UniversalBroadcast
 local Message
-local rand = Random.new()
-local defaultmsg = 'Join https://discord.gg/bMZ4BSUR47 get better exploits or have fun :v'
+local random = Random.new()
+local DEFAULT_MESSAGE = 'Join https://discord.gg/bMZ4BSUR47 get better exploits or have fun :v'
 
 UniversalBroadcast = vape.Categories.World:CreateModule({
 	Name = 'UniversalBroadcast',
@@ -15,15 +15,17 @@ UniversalBroadcast = vape.Categories.World:CreateModule({
 
 					if animator then
 						-- fall back to the default message when the textbox is empty
-						local text = (Message.Value and Message.Value ~= '') and Message.Value or defaultmsg
-						local payload = ('http=507770677'..utf8.char(rand:NextInteger(1, 65535))..text):sub(1, 256)
+						local id = 'http=507770677\1'..random:NextInteger(1, 1000000)..'\n \n'
+						local text = Message.Value ~= '' and Message.Value or DEFAULT_MESSAGE
+						-- cap the message so the id + both "\n \n" pads stay under 256
+						local payload = id..text:sub(1, 256 - #id - 3)..'\n \n'
 
 						if replicatesignal and useSignal then
 							useSignal = pcall(replicatesignal, animator.OnCombinedUpdate, payload, true, 0, 0.0001, 0, 0, Enum.AnimationPriority.Core, true, 255)
 						else
-							local anim = Instance.new('Animation')
-							anim.AnimationId = payload
-							local track = animator:LoadAnimation(anim)
+							local animation = Instance.new('Animation')
+							animation.AnimationId = payload
+							local track = animator:LoadAnimation(animation)
 							track:Play(0, 0.0001, 0)
 						end
 					end
@@ -37,5 +39,5 @@ UniversalBroadcast = vape.Categories.World:CreateModule({
 })
 Message = UniversalBroadcast:CreateTextBox({
 	Name = 'Message',
-	Placeholder = 'text (242 character limit)'
+	Placeholder = 'text (~228 character limit)'
 })
