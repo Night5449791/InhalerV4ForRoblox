@@ -11,6 +11,10 @@
   Rise up to the top while remaining completely undetectable. (or isnt it)
 </h2>
 
+## License
+- **[Original Project Vape V4](https://github.com/7GrandDadPGN/VapeV4ForRoblox)** is licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) — the text that ships in [LICENSE](./LICENSE).
+- **This fork** is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): use, modify and redistribute it freely, including commercially, as long as you give appropriate credit to this repository and to the original Vape V4 project.
+
 ## Contacts
 [My Discord](https://discord.com/users/1448308188439904309)
 <br/>
