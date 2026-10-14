@@ -1,5 +1,4 @@
 local KillNotifications
-local KNMode
 local KNHeight
 
 local MAX_STACK = 4
@@ -59,9 +58,8 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					victimEnd = space
 				end
 
-				-- decide relevance first so irrelevant kills do no extra string work
+				-- your own death, lets the victim resolve to the local player below
 				local mine = victimName == myName and killerName ~= myName
-				if not mine and KNMode.Value ~= 'All killfeeds' then return end
 
 				-- killer player: UserName first, DisplayName only as a fallback since
 				-- FindFirstChild matches Name
@@ -107,6 +105,16 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					end
 				end
 
+				-- killer health at kill time, shown as [health%] after their name
+				local kHealth
+				if kplr then
+					local character = kplr.Character
+					local humanoid = character and character:FindFirstChildOfClass('Humanoid')
+					if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
+						kHealth = math.floor(humanoid.Health / humanoid.MaxHealth * 100 + 0.5)
+					end
+				end
+
 				local vHex
 				do
 					local teamColor = vplr and vplr.TeamColor
@@ -133,7 +141,8 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				entry.BorderSizePixel = 0
 				entry.Font = Enum.Font.GothamBold
 				entry.RichText = true
-				entry.Text = (kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)..' killed '
+				entry.Text = (kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)
+					..(kHealth and ' ['..kHealth..'%]' or '')..' killed '
 					..(vHex and '<font color="'..vHex..'">'..vDisp..'</font>' or vDisp)
 					..(weapon and ' ['..weapon..']' or '')
 				entry.TextColor3 = Color3.new(1, 1, 1)
@@ -176,19 +185,13 @@ KillNotifications = vape.Categories.Render:CreateModule({
 	Tooltip = 'Shows a killfeed of who killed who at the bottom of the screen.'
 })
 
-KNMode = KillNotifications:CreateDropdown({
-	Name = 'Mode',
-	List = {'Self', 'All killfeeds'},
-	Tooltip = 'Self = only show kills involving you. All killfeeds = show every kill in the server.'
-})
-
 KNHeight = KillNotifications:CreateSlider({
 	Name = 'Height',
 	Min = 0,
 	Max = 300,
 	Default = 100,
 	Suffix = 'px',
-	Tooltip = 'How far above the bottom of the screen the killfeed sits.',
+	Tooltip = 'killfeed gui y axis',
 	Function = function(value)
 		BASE_OFFSET = value
 	end
