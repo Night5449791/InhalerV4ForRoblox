@@ -76,7 +76,8 @@ KillNotifications = vape.Categories.Render:CreateModule({
 			-- parsing matches base.lua / upstream, which drives the kills/deaths
 			-- counters off the same ChildAdded signal.
 			KillNotifications:Clean(replicatedStorage.Killfeed.ChildAdded:Connect(function(obj)
-				-- "DisplayName (@UserName)  killed DisplayName2 (@UserName2) with Weapon"
+				-- "Display Name (@UserName)  killed Display Name with Weapon", the victim
+				-- side carries no (@UserName) here, so it is parsed as a display name
 				local name = obj.Name
 
 				local killedAt = name:find('killed ')
@@ -88,7 +89,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				if not (killerAt and killerClose and killerClose < killedAt) then return end
 				local killerName = name:sub(killerAt + 1, killerClose - 1)
 
-				-- victim UserName, from the (@...) after "killed", else the first token
+				-- victim UserName, from the (@...) after "killed", else the whole name
 				local victimAt = name:find('@', killedAt)
 				local victimClose = victimAt and name:find(')', victimAt)
 				local victimName, victimEnd
@@ -96,14 +97,20 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					victimName = name:sub(victimAt + 1, victimClose - 1)
 					victimEnd = victimClose
 				else
+					-- the name runs up to the " with Weapon" separator, so cutting at the
+					-- first space would halve a display name that contains one and the
+					-- victim would never resolve to a player; the separator is taken from
+					-- the back because an earlier " with " can sit inside the name itself
 					local vStart = killedAt + 7
-					local space = name:find(' ', vStart)
-					victimName = space and name:sub(vStart, space - 1) or name:sub(vStart)
-					victimEnd = space
+					local _, _, withAt = name:find('.*() with ', vStart)
+					victimName = withAt and name:sub(vStart, withAt - 1) or name:sub(vStart)
+					victimName = victimName:match('^%s*(.-)%s*$')
+					victimEnd = withAt
 				end
 
-				-- your own death, lets the victim resolve to the local player below
-				local mine = victimName == myName and killerName ~= myName
+				-- your own death, lets the victim resolve to the local player below;
+				-- the no (@...) form carries a DisplayName, so that has to match too
+				local mine = (victimName == myName or victimName == myDisp) and killerName ~= myName
 
 				-- killer player: UserName first, DisplayName only as a fallback since
 				-- FindFirstChild matches Name; the victim is yourself on your own death
