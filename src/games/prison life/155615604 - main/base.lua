@@ -520,7 +520,10 @@ run(function()
 				local shootParams = debug.getupvalue(func, 2)
 				local equip = debug.getupvalue(func, 3)
 
-				if typeof(shootParams) == 'table' then
+				-- ShootParams is the controller's RaycastParams rather than a plain table,
+				-- so accepting only tables left it nil and VehicleWallbang threw on it
+				local paramsType = typeof(shootParams)
+				if paramsType == 'table' or paramsType == 'RaycastParams' or paramsType == 'OverlapParams' then
 					pl.ShootParams = shootParams
 				end
 
