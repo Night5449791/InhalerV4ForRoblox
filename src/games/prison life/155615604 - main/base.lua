@@ -102,6 +102,36 @@ local function removeTags(str)
 	return (str:gsub('<[^<>]->', ''))
 end
 
+-- hookfunction rejects anything that is not a function, and pl is rebuilt from the
+-- live game objects on every reinject, so a target that is missing or has the wrong
+-- type is skipped instead of taking the whole module down with it
+local function safeHook(target, replacement)
+	if typeof(target) ~= 'function' then
+		return
+	end
+
+	-- unwind a wrapper left by a previous injection before installing ours: two
+	-- stacked Bullet hooks stop wallbang's stack-origin replacement from finding
+	-- the origin, which is what breaks wallbang after a reload
+	if restorefunction then
+		pcall(restorefunction, target)
+	end
+
+	return hookfunction(target, replacement)
+end
+
+local function safeUnhook(target, original)
+	if typeof(target) ~= 'function' then
+		return
+	end
+
+	if restorefunction then
+		pcall(restorefunction, target)
+	elseif typeof(original) == 'function' then
+		hookfunction(target, original)
+	end
+end
+
 local OriginScanner = {Cache = {}}
 run(function()
 	local rayParams = RaycastParams.new()
@@ -450,35 +480,86 @@ run(function()
 	end
 
 	local function getShootFunction()
+		-- more than one handler lives on this action area (tools, melee) and only the
+		-- gun one carries the shoot/reload/bullet closures; taking the first connection
+		-- blindly handed pl.Bullet a number after a reload, which hookfunction then
+		-- rejected, so every field is type checked before it is committed
+		local fallbackShoot, fallbackReload
 		for _, connection in getconnections(gui.InputBegan) do
-			if connection.Function then
-				pl.Shoot = debug.getupvalue(connection.Function, 2)
-				pl.Reload = debug.getupvalue(pl.Shoot, 2)
-				pl.Bullet = debug.getupvalue(pl.Shoot, 16)
-				pl.PlaySound = debug.getupvalue(pl.Reload, 3)
-				break
+			local func = connection.Function
+			if func then
+				local shoot = debug.getupvalue(func, 2)
+				local reload = typeof(shoot) == 'function' and debug.getupvalue(shoot, 2) or nil
+				local bullet = typeof(reload) == 'function' and debug.getupvalue(shoot, 16) or nil
+
+				if typeof(shoot) == 'function' and typeof(reload) == 'function' and typeof(bullet) == 'function' then
+					pl.Shoot = shoot
+					pl.Reload = reload
+					pl.Bullet = bullet
+					pl.PlaySound = debug.getupvalue(reload, 3)
+					return
+				end
+
+				if not fallbackShoot then
+					fallbackShoot = typeof(shoot) == 'function' and shoot or nil
+					fallbackReload = typeof(reload) == 'function' and reload or nil
+				end
 			end
 		end
 
+		-- nothing matched the gun layout: keep what is genuinely callable so the
+		-- modules reading pl.Shoot stay inert instead of being handed a number
+		pl.Shoot = pl.Shoot or fallbackShoot
+		pl.Reload = pl.Reload or fallbackReload
+	end
+
+	local function getGunController()
 		for _, connection in getconnections(lplr.CharacterAdded) do
-			if connection.Function and debug.info(connection.Function, 's'):find('GunController') then
-				pl.ShootParams = debug.getupvalue(connection.Function, 2)
-				pl.Equip = debug.getupvalue(connection.Function, 3)
-				break
+			local func = connection.Function
+			if func and debug.info(func, 's'):find('GunController') then
+				local shootParams = debug.getupvalue(func, 2)
+				local equip = debug.getupvalue(func, 3)
+
+				if typeof(shootParams) == 'table' then
+					pl.ShootParams = shootParams
+				end
+
+				if typeof(equip) == 'function' then
+					pl.Equip = equip
+				end
+
+				if pl.ShootParams and pl.Equip then
+					break
+				end
 			end
 		end
 
 		for _, connection in getconnections(lplr:GetAttributeChangedSignal('BackpackEnabled')) do
-			pl.SwitchUpdate = debug.getupvalue(debug.getupvalue(connection.Function, 10), 5)
-			pl.SwitchTable = debug.getupvalue(debug.getupvalue(connection.Function, 8), 2)
-			break
+			local func = connection.Function
+			if func then
+				local update = debug.getupvalue(func, 10)
+				local switchTable = debug.getupvalue(func, 8)
+				update = typeof(update) == 'function' and debug.getupvalue(update, 5) or nil
+				switchTable = typeof(switchTable) == 'function' and debug.getupvalue(switchTable, 2) or nil
+
+				if typeof(update) == 'function' and typeof(switchTable) == 'table' then
+					pl.SwitchUpdate = update
+					pl.SwitchTable = switchTable
+					break
+				end
+			end
 		end
 	end
 
-	getShootFunction()
+	local function resolveGunFunctions()
+		getShootFunction()
+		getGunController()
+	end
+
+	resolveGunFunctions()
 	if not (pl.Bullet and pl.SwitchTable) then
 		repeat
-			getShootFunction()
+			resolveGunFunctions()
 			task.wait()
 		until pl.Bullet and pl.SwitchTable or vape.Loaded == nil
 
@@ -637,6 +718,7 @@ end)
 
 run(function()
 	local oldtracer, oldtracertaser, oldtracersniper
+	local hookedtracer, hookedtracertaser, hookedtracersniper
 
 	local function Hook(...)
 		if debug.info(3, 's') ~= 'ReplicatedStorage.Scripts.Replication.ClientReplicator' then
@@ -675,17 +757,26 @@ run(function()
 		end)
 
 		if not oldtracer then
-			oldtracer = hookfunction(pl.GunTracers.createBullet, function(...)
-				return Hook(...)
-			end)
+			local tracers = pl.GunTracers
+			local bullet = tracers and tracers.createBullet
+			local taser = tracers and tracers.createTaser
+			local sniper = tracers and tracers.createSniper
 
-			oldtracertaser = hookfunction(pl.GunTracers.createTaser, function(...)
-				return HookTaser(...)
-			end)
+			if typeof(bullet) == 'function' and typeof(taser) == 'function' and typeof(sniper) == 'function' then
+				hookedtracer, hookedtracertaser, hookedtracersniper = bullet, taser, sniper
 
-			oldtracersniper = hookfunction(pl.GunTracers.createSniper, function(...)
-				return HookSniper(...)
-			end)
+				oldtracer = safeHook(bullet, function(...)
+					return Hook(...)
+				end)
+
+				oldtracertaser = safeHook(taser, function(...)
+					return HookTaser(...)
+				end)
+
+				oldtracersniper = safeHook(sniper, function(...)
+					return HookSniper(...)
+				end)
+			end
 		end
 	end
 
@@ -698,19 +789,14 @@ run(function()
 		end
 
 		if oldtracer and not next(self.Hooks) then
-			if restorefunction then
-				restorefunction(pl.GunTracers.createBullet)
-				restorefunction(pl.GunTracers.createTaser)
-				restorefunction(pl.GunTracers.createSniper)
-			else
-				hookfunction(pl.GunTracers.createBullet, oldtracer)
-				hookfunction(pl.GunTracers.createTaser, oldtracertaser)
-				hookfunction(pl.GunTracers.createSniper, oldtracersniper)
-			end
+			-- restored through the references captured while hooking: pl is cleared on
+			-- uninject before this can run, so reading pl.GunTracers here is not safe
+			safeUnhook(hookedtracer, oldtracer)
+			safeUnhook(hookedtracertaser, oldtracertaser)
+			safeUnhook(hookedtracersniper, oldtracersniper)
 
-			oldtracer = nil
-			oldtracertaser = nil
-			oldtracersniper = nil
+			oldtracer, oldtracertaser, oldtracersniper = nil, nil, nil
+			hookedtracer, hookedtracertaser, hookedtracersniper = nil, nil, nil
 		end
 	end
 end)

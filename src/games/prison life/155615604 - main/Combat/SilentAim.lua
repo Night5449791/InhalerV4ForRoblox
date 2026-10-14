@@ -187,11 +187,15 @@ run(function()
 
 			if callback then
 				if old and hooked then
-					hookfunction(hooked, old)
+					safeUnhook(hooked, old)
 				end
 
+				-- safeHook unwinds a wrapper left behind by a previous injection before
+				-- installing this one: two stacked Bullet hooks stop wallbang's
+				-- stack-origin replacement from finding the origin, so aim keeps
+				-- working while wallbang silently dies after a reload
 				hooked = pl.Bullet
-				old = hookfunction(hooked, function(...)
+				old = safeHook(hooked, function(...)
 					return Hook(...)
 				end)
 
@@ -246,7 +250,7 @@ run(function()
 				until not SilentAim.Enabled
 			else
 				if old and hooked then
-					hookfunction(hooked, old)
+					safeUnhook(hooked, old)
 					old, hooked = nil, nil
 				end
 			end
