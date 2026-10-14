@@ -20,6 +20,20 @@ local danceTrack
 local kickTeams = {}
 local kickTeamMembers = {}
 
+-- ============================================================================
+-- functions
+-- helpers first, then one handler per command family; the commands that call them
+-- are listed under the commands banner at the bottom
+-- ============================================================================
+
+-- where .tp lands the local character (the flat mask itself comes from base.lua)
+local TP_OFFSET = Vector3.new(0, 2, 0)
+-- animation ids per rig, so .dance stops rebuilding two lists every time
+local DANCE_IDS = {
+	R6 = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'},
+	R15 = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
+}
+
 -- nil when the text is missing or only whitespace
 local function argument(text)
 	text = text and text:match('^%s*(.-)%s*$') or nil
@@ -84,8 +98,9 @@ local function setKickMethod(method)
 		option:SetValue(method)
 	end
 
-	-- headfling only runs while Equipment is on, it supplies the gun that kills the target
-	if method == 'Headfling' then
+	-- both part flings only run while Equipment is on, it supplies the gun that
+	-- kills the target before the corpse gets flung
+	if method ~= 'Normal' then
 		local equipment = kickOption('Equipment')
 		if equipment and not equipment.Enabled then
 			equipment:Toggle()
@@ -213,7 +228,7 @@ local function startFollow(player)
 		local targetRoot = target and target.RootPart
 		local root = entitylib.character and entitylib.character.RootPart
 		if targetRoot and root then
-			local direction = (targetRoot.Position - root.Position) * Vector3.new(1, 0, 1)
+			local direction = (targetRoot.Position - root.Position) * flatMask
 			if direction.Magnitude > 1 then
 				vec = direction.Unit
 			end
@@ -331,11 +346,8 @@ local function handleDance()
 	end
 
 	handleUndance()
-	local dances = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'}
-	if humanoid.RigType == Enum.HumanoidRigType.R15 then
-		dances = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
-	end
 
+	local dances = humanoid.RigType == Enum.HumanoidRigType.R15 and DANCE_IDS.R15 or DANCE_IDS.R6
 	local animation = Instance.new('Animation')
 	animation.AnimationId = 'rbxassetid://'..dances[math.random(1, #dances)]
 	danceTrack = humanoid:LoadAnimation(animation)
@@ -474,14 +486,13 @@ local function handleKick(args)
 	startKick('Individual', 'Flinging '..player.Name..'.')
 end
 
+-- short names for the Kick Mode values the command accepts: normal or killfling
 local kickMethods = {
 	normal = 'Normal',
 	n = 'Normal',
-	headfling = 'Headfling',
-	hf = 'Headfling',
-	killfling = 'Headfling',
-	kill = 'Headfling',
-	k = 'Headfling'
+	killfling = 'Killfling',
+	kill = 'Killfling',
+	k = 'Killfling'
 }
 
 local function handleKickMethod(args)
@@ -501,12 +512,13 @@ local function handleKickMethod(args)
 
 	local method = kickMethods[args:lower():match('^%S+$')]
 	if not method then
-		notif('KickExploit', 'Unknown kick method. (normal/headfling)', 5, 'warning')
+		notif('KickExploit', 'Unknown kick method. (normal/killfling)', 5, 'warning')
 		return
 	end
 
 	setKickMethod(method)
-	notif('KickExploit', 'Kick method set to '..method..(method == 'Headfling' and ', dead targets only.' or '.'), 5)
+	-- both part flings only work on a corpse, which is what the note says
+	notif('KickExploit', 'Kick method set to '..method..(method == 'Normal' and '.' or ', dead targets only.'), 5)
 end
 
 local function handleKickTeam(args)
@@ -592,7 +604,7 @@ local function handleTP(args)
 		return
 	end
 
-	localRoot.CFrame = target.RootPart.CFrame + Vector3.new(0, 2, 0)
+	localRoot.CFrame = target.RootPart.CFrame + TP_OFFSET
 end
 
 local function handleFollow(args)
@@ -629,6 +641,12 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
+-- ============================================================================
+-- commands
+-- one toggle per command family, then the dispatch table; the short names are the
+-- real handlers and the long names are aliased onto them right after
+-- ============================================================================
+
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
@@ -644,7 +662,7 @@ local toggles = {
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>\n.kickskid <plr> <reason>'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/headfling>'},
+	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
 	{Name = 'Dance', Tooltip = '.dance\n.undance'}
 }
 
@@ -713,6 +731,7 @@ local function onChatted(message)
 	return false
 end
 
+-- module registration: the toggles above are the options the handlers check
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
 	Function = function(callback)

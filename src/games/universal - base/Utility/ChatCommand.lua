@@ -5,6 +5,22 @@ local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 local danceTrack
 
+-- ============================================================================
+-- functions
+-- helpers first, then one handler per command family; the commands that call them
+-- are listed under the commands banner at the bottom
+-- ============================================================================
+
+-- built once instead of per call: the follow steering runs on every frame
+local FLAT_MASK = Vector3.new(1, 0, 1)
+-- where .tp lands the local character
+local TP_OFFSET = Vector3.new(0, 2, 0)
+-- animation ids per rig, so .dance stops rebuilding two lists every time
+local DANCE_IDS = {
+	R6 = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'},
+	R15 = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
+}
+
 -- nil when the text is missing or only whitespace
 local function argument(text)
 	text = text and text:match('^%s*(.-)%s*$') or nil
@@ -137,7 +153,7 @@ local function startFollow(player)
 		local targetRoot = target and target.RootPart
 		local root = entitylib.character and entitylib.character.RootPart
 		if targetRoot and root then
-			local direction = (targetRoot.Position - root.Position) * Vector3.new(1, 0, 1)
+			local direction = (targetRoot.Position - root.Position) * FLAT_MASK
 			if direction.Magnitude > 1 then
 				vec = direction.Unit
 			end
@@ -219,11 +235,8 @@ local function handleDance()
 	end
 
 	handleUndance()
-	local dances = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'}
-	if humanoid.RigType == Enum.HumanoidRigType.R15 then
-		dances = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
-	end
 
+	local dances = humanoid.RigType == Enum.HumanoidRigType.R15 and DANCE_IDS.R15 or DANCE_IDS.R6
 	local animation = Instance.new('Animation')
 	animation.AnimationId = 'rbxassetid://'..dances[math.random(1, #dances)]
 	danceTrack = humanoid:LoadAnimation(animation)
@@ -284,7 +297,7 @@ local function handleTP(args)
 		return
 	end
 
-	localRoot.CFrame = target.RootPart.CFrame + Vector3.new(0, 2, 0)
+	localRoot.CFrame = target.RootPart.CFrame + TP_OFFSET
 end
 
 local function handleFollow(args)
@@ -320,6 +333,12 @@ local function handleView(args)
 	viewPlayer = player
 	gameCamera.CameraSubject = entity.Humanoid
 end
+
+-- ============================================================================
+-- commands
+-- one toggle per command family, then the dispatch table; the short names are the
+-- real handlers and the long names are aliased onto them right after
+-- ============================================================================
 
 local toggles = {
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
@@ -391,6 +410,7 @@ local function onChatted(message)
 	return false
 end
 
+-- module registration: the toggles above are the options the handlers check
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
 	Function = function(callback)
