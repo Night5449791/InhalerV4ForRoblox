@@ -10,11 +10,19 @@ local lines = {
 }
 
 local function sendMessage(obj)
+	-- the anticheat names the kicked player by display name, so a line about us reads as
+	-- our own display name and mocking ourselves in chat is the one thing this must never
+	-- do; the payload is the first token, so it arrives with a trailing space
+	local name = (obj or ''):match('^%s*(.-)%s*$')
+	if name == '' or name == lplr.DisplayName or name == lplr.Name then
+		return
+	end
+
 	if not next(cloned) then
 		cloned = table.clone(lines)
 	end
 
-	local message = table.remove(cloned, random:NextInteger(1, #cloned)):gsub('<obj>', obj or '')
+	local message = table.remove(cloned, random:NextInteger(1, #cloned)):gsub('<obj>', name)
 
 	if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
 		local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
