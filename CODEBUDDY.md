@@ -338,4 +338,22 @@ From `CONTRIBUTING.md` plus observed style:
 9. Cross-file forward declarations: base declares `local Reach = {}` / `local Spider = {Enabled = false}`; the module file assigns **without** `local` (`Reach = vape.Categories.Combat:CreateModule({...})`).
 10. Add a heavy, cacheable cross-game library under `src/libraries/` (returns a table, loaded via `downloadFile`); GUI-internal helpers go in `src/guis/new/libraries/` as global assignments.
 
-Vape V3-era APIs found in older forks — `runFunction`, `GuiLibrary.ObjectsThatCanBeSaved` — **do not exist here**. Use `vape.Categories` / `vape.Modules` / `run`.
+---
+## 11. Updates thru Discord webhook
+1. notice inhaler_send_update.bash is added in .gitignore that u have to remake it
+2. Sche. updates to a md file called "UPDATES.md", once run script, it will automatic convert to json payload and gets REMOVED, do NOT commit UPDATES.md, it will be auto generated and removed after script run.
+3. Follow how u should format the update in UPDATES.md
+4. Once any inhaler files been changed, write them down in UPDATES.md by following this
+```md
+[%GAMENAME%]
+- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
+(gap, just space)
+- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
+(gap, just space)
+[%GAMENAME%]
+- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
+(gap, just space)
+- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
+```
+5. If its a Universal Update, just write it down as [Universal] and the update message
+6. If anything is overrided, override the old update message (if there is) write final update message.
