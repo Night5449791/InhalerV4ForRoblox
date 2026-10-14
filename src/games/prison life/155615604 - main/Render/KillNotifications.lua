@@ -6,9 +6,37 @@ local LIFETIME = 2.5
 local ENTRY_W = 460
 local ENTRY_H = 22
 local ENTRY_GAP = 3
+local ENTRY_STEP = ENTRY_H + ENTRY_GAP
 local BASE_OFFSET
 
 local killfeedGui, stack
+
+-- the listener runs for every killfeed line in the server, so the two colour
+-- lookups are memoized: team colours repeat endlessly and health only ever
+-- lands on 0-100, which keeps fromHSV/string.format off the hot path
+local KNHexCache = {}
+local function knHex(color)
+	local r = math.floor(color.R * 255 + 0.5)
+	local g = math.floor(color.G * 255 + 0.5)
+	local b = math.floor(color.B * 255 + 0.5)
+	local key = r * 65536 + g * 256 + b
+	local hex = KNHexCache[key]
+	if not hex then
+		hex = string.format('#%02x%02x%02x', r, g, b)
+		KNHexCache[key] = hex
+	end
+	return hex
+end
+
+local KNHealthCache = {}
+local function knHealthHex(health)
+	local hex = KNHealthCache[health]
+	if not hex then
+		hex = knHex(Color3.fromHSV(math.clamp(health / 100, 0, 1) / 2.5, 0.89, 0.75))
+		KNHealthCache[health] = hex
+	end
+	return hex
+end
 
 KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
@@ -22,6 +50,22 @@ KillNotifications = vape.Categories.Render:CreateModule({
 			killfeedGui.IgnoreGuiInset = true
 			killfeedGui.DisplayOrder = 10
 			killfeedGui.Parent = coreGui
+
+			-- every kill clones this instead of writing a dozen properties, so the
+			-- per-kill instance cost is one Clone plus the Text
+			local prototype = Instance.new('TextLabel')
+			prototype.Name = 'Killfeed'
+			prototype.AnchorPoint = Vector2.new(0.5, 1)
+			prototype.BackgroundTransparency = 1
+			prototype.BorderSizePixel = 0
+			prototype.Font = Enum.Font.GothamBold
+			prototype.RichText = true
+			prototype.TextColor3 = Color3.new(1, 1, 1)
+			prototype.TextSize = 15
+			prototype.TextStrokeColor3 = Color3.new()
+			prototype.TextStrokeTransparency = 0.7
+			prototype.TextXAlignment = Enum.TextXAlignment.Center
+			prototype.Size = UDim2.new(0, ENTRY_W, 0, ENTRY_H)
 
 			local myName = lplr.Name
 			local myDisp = lplr.DisplayName
@@ -62,19 +106,16 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				local mine = victimName == myName and killerName ~= myName
 
 				-- killer player: UserName first, DisplayName only as a fallback since
-				-- FindFirstChild matches Name
+				-- FindFirstChild matches Name; the victim is yourself on your own death
 				local kplr = playersService:FindFirstChild(killerName)
-				if not kplr then
-					for _, p in playersService:GetPlayers() do
-						if p.DisplayName == killerName then kplr = p break end
-					end
-				end
-
-				-- victim player, yourself on your own death
 				local vplr = mine and lplr or playersService:FindFirstChild(victimName)
-				if not mine and not vplr then
+
+				-- one GetPlayers() pass fills both gaps instead of two separate scans
+				if not (kplr and vplr) then
 					for _, p in playersService:GetPlayers() do
-						if p.DisplayName == victimName then vplr = p break end
+						if not kplr and p.DisplayName == killerName then kplr = p end
+						if not vplr and p.DisplayName == victimName then vplr = p end
+						if kplr and vplr then break end
 					end
 				end
 
@@ -95,15 +136,11 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					vDisp = victimName
 				end
 
-				-- team colors straight off Player.TeamColor
-				local kHex
-				do
-					local teamColor = kplr and kplr.TeamColor
-					if teamColor then
-						local c = teamColor.Color
-						kHex = string.format('#%02x%02x%02x', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
-					end
-				end
+				-- team colors straight off Player.TeamColor, hex strings memoized
+				local killerTeam = kplr and kplr.TeamColor
+				local victimTeam = vplr and vplr.TeamColor
+				local kHex = killerTeam and knHex(killerTeam.Color)
+				local vHex = victimTeam and knHex(victimTeam.Color)
 
 				-- killer health at kill time, shown as [health%] after their name
 				local kHealth, kHealthHex
@@ -112,17 +149,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					local humanoid = character and character:FindFirstChildOfClass('Humanoid')
 					if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
 						kHealth = math.floor(humanoid.Health / humanoid.MaxHealth * 100 + 0.5)
-						local c = Color3.fromHSV(math.clamp(kHealth / 100, 0, 1) / 2.5, 0.89, 0.75)
-						kHealthHex = string.format('#%02x%02x%02x', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
-					end
-				end
-
-				local vHex
-				do
-					local teamColor = vplr and vplr.TeamColor
-					if teamColor then
-						local c = teamColor.Color
-						vHex = string.format('#%02x%02x%02x', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+						kHealthHex = knHealthHex(kHealth)
 					end
 				end
 
@@ -136,23 +163,11 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				end
 
 				-- newest goes to the bottom of the stack, older ones get pushed up
-				local entry = Instance.new('TextLabel')
-				entry.Name = 'Killfeed'
-				entry.AnchorPoint = Vector2.new(0.5, 1)
-				entry.BackgroundTransparency = 1
-				entry.BorderSizePixel = 0
-				entry.Font = Enum.Font.GothamBold
-				entry.RichText = true
+				local entry = prototype:Clone()
 				entry.Text = (kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)
 					..(kHealth and ' [<font color="'..kHealthHex..'">'..kHealth..'%</font>]' or '')..' killed '
 					..(vHex and '<font color="'..vHex..'">'..vDisp..'</font>' or vDisp)
 					..(weapon and ' ['..weapon..']' or '')
-				entry.TextColor3 = Color3.new(1, 1, 1)
-				entry.TextSize = 15
-				entry.TextStrokeColor3 = Color3.new()
-				entry.TextStrokeTransparency = 0.7
-				entry.TextXAlignment = Enum.TextXAlignment.Center
-				entry.Size = UDim2.new(0, ENTRY_W, 0, ENTRY_H)
 				entry.Parent = killfeedGui
 
 				table.insert(stack, 1, entry)
@@ -160,8 +175,8 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					stack[#stack]:Destroy()
 					table.remove(stack)
 				end
-				for i, other in stack do
-					other.Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * (ENTRY_H + ENTRY_GAP))
+				for i = 1, #stack do
+					stack[i].Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * ENTRY_STEP)
 				end
 
 				task.delay(LIFETIME, function()
@@ -169,8 +184,9 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					if not idx then return end
 					table.remove(stack, idx)
 					entry:Destroy()
-					for i, other in stack do
-						other.Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * (ENTRY_H + ENTRY_GAP))
+					-- only the entries above the hole shift down, the rest keep their slot
+					for i = idx, #stack do
+						stack[i].Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * ENTRY_STEP)
 					end
 				end)
 			end))
