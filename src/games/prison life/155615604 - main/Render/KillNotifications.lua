@@ -106,12 +106,14 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				end
 
 				-- killer health at kill time, shown as [health%] after their name
-				local kHealth
+				local kHealth, kHealthHex
 				if kplr then
 					local character = kplr.Character
 					local humanoid = character and character:FindFirstChildOfClass('Humanoid')
 					if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
 						kHealth = math.floor(humanoid.Health / humanoid.MaxHealth * 100 + 0.5)
+						local c = Color3.fromHSV(math.clamp(kHealth / 100, 0, 1) / 2.5, 0.89, 0.75)
+						kHealthHex = string.format('#%02x%02x%02x', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
 					end
 				end
 
@@ -142,7 +144,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				entry.Font = Enum.Font.GothamBold
 				entry.RichText = true
 				entry.Text = (kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)
-					..(kHealth and ' ['..kHealth..'%]' or '')..' killed '
+					..(kHealth and ' [<font color="'..kHealthHex..'">'..kHealth..'%</font>]' or '')..' killed '
 					..(vHex and '<font color="'..vHex..'">'..vDisp..'</font>' or vDisp)
 					..(weapon and ' ['..weapon..']' or '')
 				entry.TextColor3 = Color3.new(1, 1, 1)
