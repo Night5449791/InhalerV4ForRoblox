@@ -1,10 +1,14 @@
 local ToolGrip
 local DefaultGrip = Vector3.new(1, 2, 0)
+local LongerGrip = Vector3.new(1, 2, 1.5)
 local ToolGrips = {
-	['Remington 870'] = Vector3.new(1, 2, 1.5),
-	['AK-47'] = Vector3.new(1, 2, 1.5),
+	['Remington 870'] = LongerGrip,
+	['AK-47'] = LongerGrip,
+	M4A1 = LongerGrip,
+	FAL = LongerGrip,
 	['MP5'] = DefaultGrip,
-	['M9'] = DefaultGrip
+	['M9'] = DefaultGrip,
+	Taser = DefaultGrip
 }
 local originalGrips = setmetatable({}, {
 	__mode = 'k'

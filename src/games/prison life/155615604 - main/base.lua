@@ -308,6 +308,8 @@ run(function()
 		if entity.NPC then return true end
 		if isFriend(entity.Player) then return false end
 		if not select(2, whitelist:get(entity.Player)) then return false end
+		-- the team restriction holds even with skip, so a guard still cannot hit their
+		-- own team; skip only reaches the innocent inmate protection below
 		if vape.Settings.Modules.Options['Teams by server'].Enabled and (not skip or lplr.Team == teams.Guards) then
 			return lplr.Team ~= entity.Player.Team and entity.Player.Team ~= teams.Neutral
 		end
@@ -315,7 +317,9 @@ run(function()
 	end
 
 	entitylib.isVulnerable = function(entity, attackCheck, skipCheck)
-		if attackCheck and lplr.Team == teams.Guards and entity.Player.Team == teams.Inmates and not entity.Character:GetAttribute('Hostile') then
+		-- a guard shooting an innocent inmate is the one case blocked here, and it is the
+		-- only thing skipCheck (Killaura's Team Attack) is allowed to drop
+		if attackCheck and not skipCheck and lplr.Team == teams.Guards and entity.Player.Team == teams.Inmates and not entity.Character:GetAttribute('Hostile') then
 			return false
 		end
 
