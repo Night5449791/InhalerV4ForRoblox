@@ -120,6 +120,23 @@ run(function()
 		return entity, entity and entity[targetPart]
 	end
 
+	local function replaceOriginOnStack(origin, newOrigin)
+		for level = 4, 8 do
+			local stack = debug.getstack(level)
+			if not stack then break end
+
+			local replaced
+			for index, value in stack do
+				if value == origin then
+					debug.setstack(level, index, newOrigin)
+					replaced = true
+				end
+			end
+
+			if replaced then break end
+		end
+	end
+
 	local function Hook(origin, direction, ...)
 		local gundata = debug.getupvalue(oldshoot or pl.Shoot, 10)
 		local entity, targetPart = getTarget(origin, gundata and gundata.Range or 1000, not gundata or gundata.Behavior ~= 'Taser')
@@ -148,11 +165,7 @@ run(function()
 				)
 
 				if newOrigin then
-					for index, value in debug.getstack(3) do
-						if value == origin then
-							debug.setstack(3, index, newOrigin)
-						end
-					end
+					replaceOriginOnStack(origin, newOrigin)
 
 					origin = newOrigin
 					if hit then
@@ -173,19 +186,7 @@ run(function()
 			end
 
 			if callback then
-				-- A fast reload/reinject can spawn this enable before the previous
-				-- injection's async cleanup (restorefunction runs inside a spawned
-				-- thread) has restored pl.Bullet, leaving a stale wrapper stacked on
-				-- top. Stacked hooks break wallbang's stack-origin replacement while
-				-- aim still works, so unwind any existing hook back to the original
-				-- first.
-				if restorefunction then
-					for _ = 1, 4 do
-						local before = pl.Bullet
-						pcall(restorefunction, before)
-						if pl.Bullet == before then break end
-					end
-				elseif old and hooked then
+				if old and hooked then
 					hookfunction(hooked, old)
 				end
 
@@ -245,14 +246,7 @@ run(function()
 				until not SilentAim.Enabled
 			else
 				if old and hooked then
-					-- pl gets cleared on uninject before this thread runs, so the function
-					-- has to be restored through the reference captured while hooking
-					if restorefunction then
-						restorefunction(hooked)
-					else
-						hookfunction(hooked, old)
-					end
-
+					hookfunction(hooked, old)
 					old, hooked = nil, nil
 				end
 			end
