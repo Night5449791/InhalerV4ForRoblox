@@ -1,6 +1,7 @@
 local CheatDetector
 local AddTarget
 local Teleport
+local PingLimit
 local positions = {}
 local overlap = OverlapParams.new()
 overlap.CollisionGroup = 'Players'
@@ -10,6 +11,16 @@ local carOverlap = OverlapParams.new()
 carOverlap.FilterDescendantsInstances = {workspace.CarContainer}
 carOverlap.FilterType = Enum.RaycastFilterType.Include
 carOverlap.MaxParts = 1
+
+local stats = cloneref(game:GetService('Stats'))
+local pingItem = stats.Network.ServerStatsItem['Data Ping']
+
+-- the movement checks compare positions the client only sees fresh while the connection
+-- keeps up; an unreadable ping counts as fine so detection never silently stops
+local function getPing()
+	local success, value = pcall(pingItem.GetValue, pingItem)
+	return success and tonumber(value) or 0
+end
 
 local whiteliststates = {
 	[Enum.HumanoidStateType.Running] = true,
@@ -50,6 +61,10 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 
 			repeat
 				local clock = os.clock()
+				-- over the ping limit the client's view of everyone else is stale enough
+				-- that movement would be flagged on innocent players, so only the humanoid
+				-- state check keeps running (invalid animations are flagged elsewhere)
+				local movement = getPing() <= PingLimit.Value
 
 				for _, entity in entitylib.List do
 					if entity.Health > 0 and entity.Player and not Cheats.Flagged[entity.Player.UserId] then
@@ -57,34 +72,38 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 						local humanoid = entity.Humanoid
 						local playerPos = root.Position
 
-						if not checkPoint(entity.Head.Position, overlap) then
-							Cheats:Flag(entity.Player, 'phase/noclip', 20)
-						end
-
 						local state = humanoid:GetState()
 						if not whiteliststates[state] then
 							Cheats:Flag(entity.Player, 'invalid state '..state.Name, 1)
 						end
 
-						local velo = root.AssemblyLinearVelocity
 						if not humanoid.SeatPart then
-							if (velo * flatMask).Magnitude > 26 and #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
-								Cheats:Flag(entity.Player, 'speed', 20)
-							end
-
 							local last = positions[entity]
-							if last then
-								if Teleport.Enabled and ((playerPos - last[1]) * flatMask).Magnitude > 50 and #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
+
+							if movement then
+								if not checkPoint(entity.Head.Position, overlap) then
+									Cheats:Flag(entity.Player, 'phase/noclip', 20)
+								end
+
+								local velo = root.AssemblyLinearVelocity
+								if (velo * flatMask).Magnitude > 26 and #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
+									Cheats:Flag(entity.Player, 'speed', 20)
+								end
+
+								if last and Teleport.Enabled and ((playerPos - last[1]) * flatMask).Magnitude > 50 and #workspace:GetPartBoundsInRadius(playerPos, 30, carOverlap) <= 0 then
 									if entity.Player.Team ~= teams.Inmates or (clock - entity.SpawnTime) > 0.1 then
 										Cheats:Flag(entity.Player, 'teleport', 1)
 									end
 								end
+
+								if velo.Y > 50 then
+									Cheats:Flag(entity.Player, 'highjump', 20)
+								end
 							end
 
-							if velo.Y > 50 then
-								Cheats:Flag(entity.Player, 'highjump', 20)
-							end
-
+							-- the recorded position keeps updating while the movement checks
+							-- are paused, comparing against a stale entry on the next frame
+							-- would flag a teleport
 							if not last or (clock - last[2]) > 0.2 then
 								positions[entity] = {playerPos, clock}
 							end
@@ -112,4 +131,12 @@ Teleport = CheatDetector:CreateToggle({
 	Name = 'Teleport',
 	Tooltip = 'Detect people teleporting (EXPERIMENTAL)',
 	Default = true
+})
+PingLimit = CheatDetector:CreateSlider({
+	Name = 'Ping Limit',
+	Min = 100,
+	Max = 500,
+	Default = 100,
+	Suffix = 'ms',
+	Tooltip = 'Stops the movement checks (speed, teleport, highjump, noclip) while your ping is over this, high ping makes them flag innocent players.\nHumanoid state and invalid animation detection keep running.'
 })

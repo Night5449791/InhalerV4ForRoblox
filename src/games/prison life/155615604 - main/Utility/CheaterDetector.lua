@@ -386,6 +386,24 @@ local function playerAdded(plr)
 	end
 end
 
+-- "invalid state Running" and "invalid animation" are the CheatDetector flags a laggy
+-- connection cannot fake, so they are the ones worth an automatic entry
+local function isExploitFlag(flagType)
+	if flagType == 'invalid animation' then return true end
+
+	return flagType:find('invalid state') == 1
+end
+
+-- the reason keeps the raw flag so the list shows what tripped it, and an entry that is
+-- already there keeps its own reason instead of being overwritten by an automatic one
+local function autoAddCheater(plr, flagType)
+	if not cheaterOptions.AutomaticAdd.Enabled then return end
+	if not isExploitFlag(flagType) then return end
+	if plr == lplr or getCheaterReason(plr) then return end
+
+	CheaterDetector:AddCheater(plr.Name, 'exploits/'..flagType)
+end
+
 loadCheaters()
 
 CheaterDetector = vape.Categories.Utility:CreateModule({
@@ -393,6 +411,7 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 	Function = function(callback)
 		if callback then
 			CheaterDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
+			CheaterDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(autoAddCheater))
 			for _, v in playersService:GetPlayers() do
 				playerAdded(v)
 			end
@@ -423,6 +442,12 @@ cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 	Name = 'Notifications',
 	Default = true,
 	Tooltip = 'Notifies you when a known cheater joins'
+})
+
+cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
+	Name = 'Automatic Add',
+	Default = false,
+	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation.\nThe reason is logged as exploits/<flag>.'
 })
 
 cheaterOptions.Webhook = CheaterDetector:CreateToggle({
