@@ -394,11 +394,14 @@ local function playerAdded(plr)
 end
 
 -- "invalid state Running" and "invalid animation" are the CheatDetector flags a laggy
--- connection cannot fake, so they are the ones worth an automatic entry
+-- connection cannot fake, so those always count; the movement flags can be faked, which
+-- is why they sit behind their own toggles
 local function isExploitFlag(flagType)
 	if flagType == 'invalid animation' then return true end
+	if flagType:find('invalid state') == 1 then return true end
+	if flagType == 'teleport' then return cheaterOptions.Teleports.Enabled end
 
-	return flagType:find('invalid state') == 1
+	return flagType == 'speed' and cheaterOptions.Speed.Enabled
 end
 
 -- the reason keeps the raw flag so the list shows what tripped it, and an entry that is
@@ -419,6 +422,11 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 		if callback then
 			CheaterDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
 			CheaterDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(autoAddCheater))
+
+			-- Visible is not part of the saved profile, so it is reapplied on enable
+			cheaterOptions.Teleports.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
+			cheaterOptions.Speed.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
+
 			for _, v in playersService:GetPlayers() do
 				playerAdded(v)
 			end
@@ -454,7 +462,28 @@ cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
 	Name = 'Automatic Add',
 	Default = false,
-	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation.\nThe reason is logged as exploits/<flag>.'
+	Function = function(callback)
+		cheaterOptions.Teleports.Object.Visible = callback
+		cheaterOptions.Speed.Object.Visible = callback
+	end,
+	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation; the two options below add the movement flags as well.\nThe reason is logged as exploits/<flag>.'
+})
+
+-- the movement flags are the ones a laggy connection can fake, so they are opt in
+cheaterOptions.Teleports = CheaterDetector:CreateToggle({
+	Name = 'Teleports',
+	Default = false,
+	Visible = false,
+	Darker = true,
+	Tooltip = 'Also add players flagged for teleporting'
+})
+
+cheaterOptions.Speed = CheaterDetector:CreateToggle({
+	Name = 'Speed',
+	Default = false,
+	Visible = false,
+	Darker = true,
+	Tooltip = 'Also add players flagged for speeding'
 })
 
 cheaterOptions.Webhook = CheaterDetector:CreateToggle({

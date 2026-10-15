@@ -41,10 +41,11 @@ Killaura = vape.Categories.Blatant:CreateModule({
 						NPCs = Targets.NPCs.Enabled,
 						Limit = Max.Value,
 						AttackCheck = true,
-						-- only guards get anything out of this: the base keeps the team
-						-- restriction either way and just clears the innocent inmate
-						-- protection in isVulnerable, which applies to guards alone
-						SkipTeam = TeamAttack.Enabled and lplr.Team == teams.Guards
+						-- the base keeps the team restriction either way and only clears the
+						-- innocent inmate protection in isVulnerable, so this is safe for both
+						-- roles: a guard stops being blocked on innocent inmates and an inmate
+						-- stops being blocked on innocent teammates
+						SkipTeam = TeamAttack.Enabled
 					})
 
 					if #entities > 0 then
@@ -105,7 +106,7 @@ Targets = Killaura:CreateTargets({
 TeamAttack = Killaura:CreateToggle({
 	Name = 'Team Attack',
 	Default = false,
-	Tooltip = 'Lets guards hit innocent inmates'
+	Tooltip = 'Lets you hit innocent inmates'
 })
 AttackRange = Killaura:CreateSlider({
 	Name = 'Attack range',

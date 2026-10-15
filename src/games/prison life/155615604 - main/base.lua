@@ -317,8 +317,8 @@ run(function()
 	end
 
 	entitylib.isVulnerable = function(entity, attackCheck, skipCheck)
-		-- a guard shooting an innocent inmate is the one case blocked here, and it is the
-		-- only thing skipCheck (Killaura's Team Attack) is allowed to drop
+		-- skipCheck (Killaura's Team Attack) drops the guard block below and, through the
+		-- trailing clause, also lets an inmate reach innocent teammates
 		if attackCheck and not skipCheck and lplr.Team == teams.Guards and entity.Player.Team == teams.Inmates and not entity.Character:GetAttribute('Hostile') then
 			return false
 		end
