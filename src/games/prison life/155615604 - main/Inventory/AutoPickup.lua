@@ -1,6 +1,10 @@
 local AutoPickup
+local AutoPickOnDied
 local items = {}
 local PickupList = {}
+-- the same spot KickExploit grabs its gun from, standing on it keeps us in the spawner's range
+local PICKUP_GUN_POSITION = Vector3.new(816, 98, 2233)
+local PICKUP_GUN_CFRAME = CFrame.new(PICKUP_GUN_POSITION)
 
 local function AddPickup(pickup)
 	if pickup:IsA('Model') and pickup.Name ~= 'Model' and pickup:GetAttribute('ToolName') then
@@ -16,9 +20,87 @@ local function hasTool(name, backpack)
 	return backpack:FindFirstChild(name) or tool and tool.Name == name and tool
 end
 
+local function getBackpackTool(backpack)
+	return backpack and backpack:FindFirstChildWhichIsA('Tool')
+end
+
+-- spawn trip: teleport onto the gun spawner, let the pickup loop grab a gun and return,
+-- anything already carried is equipped instead of travelling
+local function grabEquipment()
+	local character = entitylib.character
+	local humanoid = character.Humanoid
+	local backpack = lplr:FindFirstChildWhichIsA('Backpack')
+	local held = lplr.Character:FindFirstChildWhichIsA('Tool')
+	local stash = getBackpackTool(backpack)
+
+	if held or stash then
+		if stash and not held then
+			humanoid:EquipTool(stash)
+		end
+
+		return
+	end
+
+	local root = character.RootPart
+	local origin = root.CFrame
+	local deadline = os.clock() + 2
+
+	repeat
+		root.CFrame = PICKUP_GUN_CFRAME
+		root.AssemblyLinearVelocity = Vector3.zero
+		task.wait(0.05)
+
+		local char = lplr.Character
+		backpack = lplr:FindFirstChildWhichIsA('Backpack')
+		held = char and char:FindFirstChildWhichIsA('Tool')
+		stash = getBackpackTool(backpack)
+	until held or stash or os.clock() > deadline or not entitylib.isAlive or not AutoPickup.Enabled
+
+	if not (AutoPickup.Enabled and entitylib.isAlive and entitylib.character == character) then
+		return
+	end
+
+	root.CFrame = origin
+	root.AssemblyLinearVelocity = Vector3.zero
+
+	if stash and not held then
+		humanoid:EquipTool(stash)
+	end
+end
+
 AutoPickup = vape.Categories.Inventory:CreateModule({
 	Name = 'AutoPickup',
 	Function = function(callback)
+		local diedConnection
+		local died = false
+
+		local function connectDeath(entity)
+			local humanoid = entity and entity.Humanoid
+			if not humanoid then return end
+
+			if diedConnection then
+				diedConnection:Disconnect()
+			end
+
+			diedConnection = humanoid.Died:Connect(function()
+				if AutoPickOnDied.Enabled then
+					died = true
+				end
+			end)
+		end
+
+		local function onRespawn(entity)
+			connectDeath(entity)
+
+			if died then
+				died = false
+
+				if AutoPickOnDied.Enabled then
+					task.spawn(grabEquipment)
+				end
+			end
+		end
+
 		if callback then
 			for _, pickup in workspace:GetChildren() do
 				task.spawn(AddPickup, pickup)
@@ -37,6 +119,11 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 					end
 				end
 			end))
+
+			AutoPickup:Clean(entitylib.Events.LocalAdded:Connect(onRespawn))
+			if entitylib.isAlive then
+				connectDeath(entitylib.character)
+			end
 
 			repeat
 				if entitylib.isAlive then
@@ -64,10 +151,22 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 				task.wait(0.05)
 			until not AutoPickup.Enabled
 		else
+			if diedConnection then
+				diedConnection:Disconnect()
+				diedConnection = nil
+			end
+
+			died = false
 			table.clear(items)
 		end
 	end,
 	Tooltip = 'Automatically grab item pickups'
+})
+
+AutoPickOnDied = AutoPickup:CreateToggle({
+	Name = 'OnDied',
+	Default = false,
+	Tooltip = 'Teleport to the gun spawner after respawning, grab a gun and teleport back.'
 })
 
 for _, team in {'Prisoner', 'Guard', 'Criminal'} do

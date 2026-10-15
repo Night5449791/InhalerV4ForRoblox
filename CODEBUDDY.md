@@ -3,6 +3,9 @@
 > Repo: `Night5449791/InhalerV4ForRoblox` — a fork of Vape V4, a Roblox combat/utility script GUI.
 > Runtime target is **Luau inside a Roblox exploit executor** (not standard Lua, not Node).
 > `src/` is the human-maintainable source tree; an external bundler flattens it into `Night5449791/InhalerCompiled`, which the runtime downloads at injection time.
+> Licensing: this fork CC BY 4.0, upstream Vape V4 CC0 1.0 (see `README.md` / `LICENSE`).
+>
+> Section numbers are referenced elsewhere (e.g. "§11"), so keep them stable when editing.
 
 ---
 
@@ -14,11 +17,21 @@ There is **no local build command**. Builds happen only in CI: `.github/workflow
 
 ### Lint / Test
 
-**None exist.** No selene/stylua/luacheck config, no `package.json`, no Makefile, no test suite anywhere in the repo. Do not invent or add one unless asked. Validate changes by review against the conventions in §10.
+**None exist.** No selene/stylua/luacheck config, no `package.json`, no Makefile, no test suite anywhere in the repo. Do not invent or add one unless asked. Validate changes by review against §10 plus, for syntax only, the two checks below.
+
+Static syntax check of one Luau file — there is no Lua compiler for Luau, so the Luau-only spellings are rewritten mechanically first, then parsed with the system Lua 5.4 (`luac -p`). This catches syntax errors only, never semantics or types:
+
+```bash
+sed -E -e 's/[[:space:]]+continue([[:space:]]|$)/ break\1/g' \
+       -e 's/([A-Za-z_][A-Za-z0-9_.]*) ([+-])= /\1 = \1 \2 /g' FILE.lua > /tmp/check.lua \
+  && luac -p /tmp/check.lua && echo "syntax OK"
+```
+
+The update tool is Python, so `python3 -m py_compile inhaler_send_update.py` (then delete `__pycache__/`) is its equivalent.
 
 ### Run / develop locally
 
-Copy files from `src/` into the executor's workspace so they mirror runtime paths (e.g. `src/games/<game>/<id> - x/Combat/Foo.lua` → `newvape/games/...` is *not* needed; only the compiled chunk matters — see below), then execute:
+Copy files from `src/` into the executor's workspace so they mirror runtime paths, then execute:
 
 ```lua
 shared.VapeDeveloper = true
@@ -27,7 +40,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/InhalerV
 
 `shared.VapeDeveloper = true` (set before load) skips fetching the remote commit sha, skips wiping cached files, and makes the loader read `newvape/loader.lua` from disk instead of downloading — so edits take effect on re-execute. Related globals: `shared.VapeIndependent` (don't auto-inject; `vape.Init` is exported so you call `finishLoading` yourself), `shared.VapeCustomProfile` (profile name), `shared.vapereload` (auto-reload after teleport).
 
-To test a single module, edit under `src/games/<game>/...`, then either run the bundler or hand-append the file's body to the matching compiled chunk `newvape/games/<PlaceId>.lua`, and re-run the loader.
+To test a single module, edit under `src/games/<game>/...`, then either run the bundler or hand-append the file's body to the matching compiled chunk `newvape/games/<PlaceId>.lua`, and re-run the loader. Sending an update to Discord is §11.
 
 ---
 
@@ -76,7 +89,9 @@ So `newvape/guis/new.lua` = base + libraries + components + overlays + init, end
 
 ### `src/games/` — the actual modules
 
-**Naming convention:** in `games/<game>/<PlaceId> - <description>/`, the text before the first ` - ` is the compiled product filename (`universal - base/` → `universal.lua`; `bedwars/6872274481 - game/` → `6872274481.lua`). A product folder is `base.lua` plus per-category subfolders (`Combat/`, `Blatant/`, `Render/`, `Utility/`, `World/`, `Legit/`, `Inventory/`). **The bundler concatenates them into one chunk**, so module files deliberately have no `require` and no `local vape =` — they reuse `base.lua`'s locals.
+**Naming convention:** in `games/<game>/<PlaceId> - <description>/`, the text before the first ` - ` is the compiled product filename (`universal - base/` → `universal.lua`; `bedwars/6872274481 - game/` → `6872274481.lua`). A product folder is `base.lua` plus per-category subfolders (`Combat/`, `Blatant/`, `Render/`, `Utility/`, `World/`, `Legit/`, `Inventory/`). **The bundler concatenates them into one chunk**, so module files deliberately have no `require` and no `local vape =` — they reuse `base.lua`'s locals, and **everything in one product shares one scope** (§10.5): a new top-level local name must be unique across that whole product, or it silently shadows another file's.
+
+Order inside the chunk is `base.lua` first, then the category files, so a base's top-level code runs *before* its own modules exist — see the `vape:Remove` note in §9.
 
 Current products (module counts are `CreateModule` call sites):
 
@@ -107,11 +122,15 @@ Runtime-added: `vape.gui`, `vape.holder`, `vape.Connections`, `vape.Blur`, `vape
 - **`vape.Place`** defaults to `game.PlaceId`; subplace redirect files overwrite it with the parent PlaceId so one save file spans subplaces.
 - **`vape.ThreadFix`** — when true, any core-GUI / Instance creation must be preceded by `setthreadidentity(8)`.
 
+`vape:Remove(obj)` looks the name up in `self.Modules`, then `self.Legit.Modules`, then `self.Categories`, and destroys whatever it finds — it never registers a "removed" flag, so it only affects objects that exist at call time.
+
 Methods (`base.lua`): `BlurCheck` :331 · `CreateCategory` :338 · `CreateCategoryList` :342 · `CreateNotification(title, text, duration, 'info'|'warning'|'alert')` :346 · `CreateOverlay` :444 · `Load(skipgui, profile)` :448 · `LoadOptions(obj, data)` :563 · `LoadGUI()` :573 (empty; replaced by init) · `Remove(name)` :577 · `Save(newProfile)` :608 · `SaveOptions(obj)` :642 · `SortCategories` :655 · `Uninject` :675 · `UpdateGUI` :721 · `UpdateGUIQueue(h,s,v)` :735 · `Clean(x)` via `addMaid` :166 (accepts connection / Instance / thread / function).
 
 Defined elsewhere: `vape:UpdateTextGUI(afterload)` (`overlays/TextGUI.lua:322`), `vape:Color(h)`, `vape:TextColor(h,s,v)` (`guis/new/libraries/color.lua`).
 
 Unexported `base.lua` helpers: `run(func)` :24 · `addBlur` :69 · `addCorner` :91 · `addCloseButton` :99 · `addDragHandler` :130 · `addMaid` :166 · `addTooltip` :195 · `createSignal()` :245 · `checkKeybinds` :272 · `getPlayerFromText` :288 · `getTableSize` :298 · `loopClean` :307 · `randomString` :317 · `removeTags` :326 · `loadJson` :59.
+
+Line numbers are from the state this file was written in (`guis/new/base.lua` and `libraries/entity.lua` have not been touched since); re-check before trusting one.
 
 ---
 
@@ -156,7 +175,7 @@ methods: `Toggle(multiple)` (flips `Enabled`; on disable disconnects and clears 
 | `CreateFont` / `CreateGUISlider` / `CreateImageToggle` | font picker / theme slider / overlay-bar icon toggle | see component file |
 | `CreateButton` / `CreateDivider` | `Name`, `Function` / `Text` | **none — return nil**, not stored |
 
-Option visibility: `<Option>.Object.Visible = bool`.
+Option visibility: `<Option>.Object.Visible = bool`. `Visible` is **never saved**, so a sub-option that must appear when a parent is already enabled has to reapply it on module enable too (see `KickExploit`'s Kick Mode / `CheaterDetector`'s Automatic Add children).
 
 **Legit modules** differ only in entry point: `vape.Legit:CreateModule({...})` (43 call sites), extra `Size = UDim2` prop, custom UI parented to `Module.Children`.
 
@@ -187,9 +206,9 @@ Module entry (`Module.lua:145` + `Bind.lua:176`):
 }
 ```
 
-Migration: `v ~= 1` drops `guiData.Categories.Main` and converts legacy single-key binds (`data.Bind = {Keys = data.Bind}; data.Visible = true`). Corrupt JSON degrades to an empty table, fires an `'alert'` notification, and sets `canSave = false`.
+Migration: `v ~= 1` drops `guiData.Categories.Main` and converts legacy single-key binds (`data.Bind = {Keys = data.Bind}; data.Visible = true`). Corrupt JSON degrades to an empty table, fires an `'alert'` notification, and sets `canSave = false`. Options whose module or name no longer exists are ignored on load and drop out of the next save.
 
-Other files: `commit.txt` (pinned remote sha), `asset.txt` (`'1'`), `gui.txt` (`'new'`), `whitelist.json`, `color.txt` (`{Main, Text, Font}` theme override read by `guis/new/libraries/uipallet.lua`).
+Other files: `commit.txt` (pinned remote sha), `asset.txt` (`'1'`), `gui.txt` (`'new'`), `whitelist.json`, `cheaters.json` (per-product cheater list, §9-adjacent), `color.txt` (`{Main, Text, Font}` theme override read by `guis/new/libraries/uipallet.lua`).
 
 ---
 
@@ -208,7 +227,12 @@ Selectors: `EntityMouse(settings)`, `EntityPosition(settings)`, `AllPosition(set
 
 `settings`: `Part` (required, e.g. `'RootPart'`), `Range` (required), `Players`, `NPCs`, `Origin`, `MouseOrigin` (EntityMouse), `Wallcheck`, `Sort`, `Limit` (AllPosition). Flow: skip non-`Targetable` → distance → `isVulnerable` → `Magnitude = entity.Target and -1 or mag` → sort → wallcheck.
 
-**Gotchas:** the settings table is `table.clear`ed before returning — build a fresh table per call. The library auto-calls `start()` at load (`entity.lua:477`), so after overriding hooks you must call `entitylib.start()` again (every game base ends with it).
+**Gotchas:** the settings table is `table.clear`ed before returning — build a fresh table per call. The library auto-calls `start()` at load (`entity.lua:477`), so after overriding hooks you must call `entitylib.start()` again (every game base ends with it). `entity.Targetable` is computed **once per spawn** from `targetCheck(entity)`, so it goes stale until `refreshEntity` runs.
+
+**Per-product hook overrides are the normal extension point** — a game base may widen the signatures and add extra settings keys, and modules then pass them:
+
+- prison life's `base.lua` overrides `AllPosition` and threads a `SkipTeam` setting through it: inclusion becomes `entity.Targetable or (SkipTeam and targetCheck(entity, true))`, and `isVulnerable(entity, attackCheck, skipCheck)` receives the same flag. `targetCheck`'s team branch stays in force for guards, while `skipCheck` drops the guard/inmate protections at the end of `isVulnerable` — that pair is what lets a whitelisted-style "attack teammates" option work per role.
+- Guards' innocent-inmate protection, the `Trespassing`/`Hostile` requirement and the `attackCheck` arguments all live in that same overridden `isVulnerable`; read the product's `base.lua` before assuming the library's behaviour.
 
 ### How libraries reach modules
 
@@ -227,12 +251,13 @@ Other library notes:
 - `hash`: `sha.md5/sha1/sha224/sha256/sha384/sha512*/sha3_*/shake128/shake256/hmac/hex_to_bin/base64_to_bin/bin_to_base64`, lowercase hex.
 - `drawing.lua`: guard `if not get_comm_channel then return '1' end`; otherwise installs `getgenv().Drawing` inside an Actor — always check the return value.
 - `getvapeasset(path)`: desktop + `getcustomasset` downloads and caches the png; otherwise falls back to a hardcoded inline table of ~60 `rbxassetid://` entries keyed by `newvape/assets/new/<file>.png`, returning `''` on miss. Assets live in `src/guis/new/assets/` (63 pngs).
+- `whitelist:get(plr)` returns `(level, attackable, tags)`; the **second** value is what `targetCheck` reads, and for anyone not on the whitelist it is `true`. `whitelist` is a chunk-local provided by each product's base, so module files may use it directly.
 
 ---
 
 ## 8. Authoring game modules
 
-A game `base.lua` follows this order: file-top shims → `cloneref` service locals + `gameCamera`/`lplr` → `local vape = shared.vape` + `vape.Libraries.*` → build a `store` state table → wait for the game framework (`require` / `debug.getupvalue` / `getgc`) inside `run(function() … end)` → override `entitylib.*` hooks → grab/hook remotes → `sessioninfo:AddItem(...)` → `vape:Clean(...)` restore functions → `entitylib.start()` → `for _, v in {'Reach', 'Disabler', …} do vape:Remove(v) end` to drop inapplicable universal modules.
+A game `base.lua` follows this order: file-top shims → `cloneref` service locals + `gameCamera`/`lplr` → `local vape = shared.vape` + `vape.Libraries.*` → build a `store` state table → wait for the game framework (`require` / `debug.getupvalue` / `getgc`) inside `run(function() … end)` → override `entitylib.*` hooks → grab/hook remotes → `sessioninfo:AddItem(...)` → `vape:Clean(...)` restore functions → `entitylib.start()` → `for _, v in {'Reach', 'Disabler', …} do vape:Remove(v) end` to drop inapplicable universal modules (this works because universal is already loaded; the base's own module files are not yet — see §9).
 
 Module files have **no `require` and no `local vape =`**; they reuse the base chunk's locals (`vape`, `entitylib`, `lplr`, `runService`, `inputService`, `gameCamera`, `store`, `notif`, `getTool`, …).
 
@@ -265,6 +290,8 @@ Mode = Reach:CreateDropdown({Name = 'Mode', List = {'TouchInterest', 'Resize'},
 Value = Reach:CreateSlider({Name = 'Range', Min = 0, Max = 2, Decimal = 10})
 Chance = Reach:CreateSlider({Name = 'Chance', Min = 0, Max = 100, Default = 100, Suffix = '%'})
 ```
+
+Large files are easier to navigate when the helper functions and the command/option tables are marked with banner comments (`-- === functions ===` / `-- === commands ===`), which the two `Utility/ChatCommand.lua` copies now do.
 
 ### Compatibility shims
 
@@ -320,6 +347,10 @@ Two `run(function() … end)` blocks: (1) `:330+` overrides `entitylib.getUpdate
 - `drawing.lua` returns the string `'1'` when unsupported; `prediction.SolveTrajectory` returns an aim point, `nil` on no solution.
 - `bedwars/6872274481 - game/base.lua:33-36` kicks the player on load — BedWars is retired.
 - MAKE CHATCOMMAND APPLY BOTH CHATCOMMAND UNLESS ITS A GAME SPECIFIC COMMAND
+- **`vape:Remove` timing:** a product's `base.lua` top-level runs before its own category files exist, so a removal written there can only drop modules that a *previously loaded* chunk created (universal for game bases, nothing for universal itself). To drop a module a product defines itself, call it from the module file (or defer it) instead.
+- **`Dropdown:SetValue`/profile loads are silent:** a value that is not in `List` falls back to `List[1]` with no error, so a renamed option value quietly becomes the first entry (this is what a stale chat-command alias hits).
+- **Always-true `and`/`or` fallbacks:** `Enabled and nil or true` evaluates to `true` in both branches. When a boolean is passed down to a hook, pass the boolean itself.
+- **Bundled scope:** every file in a product shares one scope, so two files declaring the same top-level local name silently overwrite each other (and a module file assigning without `local` writes the base's variable — which some base/module pairs rely on).
 
 ---
 
@@ -329,31 +360,34 @@ From `CONTRIBUTING.md` plus observed style:
 
 1. **Tab indentation**, no semicolons.
 2. Don't cram multi-arg calls onto one line (except a plain `return`); put arguments on their own lines.
-3. Localize aggressively — never index the same field or call the same function twice inside a loop.
+3. Localize aggressively — never index the same field or call the same function twice inside a loop; hoist per-frame constants (vectors, animation ids, tables) to the top of the file.
 4. Reproduce the file-top shim block when a new file needs `isfile`/`cloneref`/`queue_on_teleport`/`loadstring`.
-5. New modules go in `src/games/<game>/<PlaceId> - <desc>/<Category>/<Name>.lua`, with no `require`, relying on `base.lua` locals.
+5. New modules go in `src/games/<game>/<PlaceId> - <desc>/<Category>/<Name>.lua`, with no `require`, relying on `base.lua` locals — and with a top-level name that is unique inside that product (§9).
 6. **Route all cleanup through `vape:Clean(...)` / `<Module>:Clean(...)`**, never raw `:Connect()`.
 7. Idioms: `run(function() … end)` for immediately-invoked scoped blocks; module `Function` uses `repeat … task.wait() until not <Module>.Enabled` (the framework already `task.spawn`s it); target filtering chains `Targets.Players.Enabled` / `entity.Targetable` / `entitylib.targetCheck`; `isFriend(plr, recolor)` and `isTarget(plr)` read `vape.Categories.Friends/Targets.ListEnabled`; notifications via `vape:CreateNotification(title, text, duration, 'info'|'warning'|'alert')` (shortcut `notif(...)` inside bases).
 8. Option-change hot restart: `if Module.Enabled then Module:Toggle(); Module:Toggle() end`.
 9. Cross-file forward declarations: base declares `local Reach = {}` / `local Spider = {Enabled = false}`; the module file assigns **without** `local` (`Reach = vape.Categories.Combat:CreateModule({...})`).
 10. Add a heavy, cacheable cross-game library under `src/libraries/` (returns a table, loaded via `downloadFile`); GUI-internal helpers go in `src/guis/new/libraries/` as global assignments.
+11. In executor-facing code prefer guarded/type-checked paths (`typeof(x) == 'function'`, `pcall`) over raw calls with live game objects: `pl`-style tables are rebuilt from live closures on re-injection and can hand an executor a number where a function is expected, which takes the whole module down.
+12. When asked to optimize, touch **only the code the assistant itself wrote** in that file; the maintainer's and upstream's code stays as-is unless they ask for it explicitly.
 
 ---
+
 ## 11. Updates thru Discord webhook
-1. notice inhaler_send_update.bash is added in .gitignore that u have to remake it
-2. Sche. updates to a md file called "UPDATES.md", once run script, it will automatic convert to json payload and gets REMOVED, do NOT commit UPDATES.md, it will be auto generated and removed after script run.
-3. Follow how u should format the update in UPDATES.md
-4. Once any inhaler files been changed, write them down in UPDATES.md by following this
+
+1. The tool is `inhaler_send_update.py` (repo root, listed in `.gitignore` — it is a local tool, re-create it if a clone is missing it).
+2. Updates are collected in `UPDATES.md`. Running the script converts the file into a JSON embed payload and posts it; **on success the file is deleted**. Do **not** commit `UPDATES.md` — it is generated, consumed and removed.
+3. Follow the format in step 4 exactly.
+4. Once any inhaler file has been changed, write the changes into `UPDATES.md`:
 ```md
 [%GAMENAME%]
 - [%CHANGEDFILENAME%] %UPDATE MESSAGE%
-(gap, just space)
 - [%CHANGEDFILENAME%] %UPDATE MESSAGE%
-(gap, just space)
 [%GAMENAME%]
 - [%CHANGEDFILENAME%] %UPDATE MESSAGE%
-(gap, just space)
-- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
 ```
-5. If its a Universal Update, just write it down as [Universal] and the update message
-6. If anything is overrided, override the old update message (if there is) write final update message.
+   Entries are **short and meaningful** — one line per changed file saying what actually changed for the user; no long explanations, no restating error text or internal mechanics.
+5. If it is a Universal update, write it down as `[Universal]` and the update message.
+6. If anything is overridden, override the old update message (if there is one) and write the final update message.
+
+Script behaviour worth knowing: `./inhaler_send_update.py <WebhookURL>` (or `WEBHOOK_URL=…`); it looks for `UPDATES.md` in the cwd first, then next to the script (`UPDATES_FILE=…` overrides); `PROXY` defaults to `http://127.0.0.1:7890` (`off`/`none`/empty disables); a block over Discord's 1024-char field limit is split into `Name` / `Name (2)`; a failed send **keeps** the file so it can be sent again, and a successful one removes it; with no `UPDATES.md` it asks for the fields on the terminal (Enter ends a value, shift+enter or a trailing backslash adds a line). Do not post the webhook yourself unless asked — the maintainer normally runs it.
