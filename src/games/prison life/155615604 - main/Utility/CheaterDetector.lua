@@ -414,6 +414,13 @@ local function autoAddCheater(plr, flagType)
 	CheaterDetector:AddCheater(plr.Name, 'exploits/'..flagType)
 end
 
+-- Visible is not part of the saved profile, so the sub options follow Automatic Add:
+-- once when it is switched, once when the module comes back enabled
+local function syncAutoAddOptions(enabled)
+	cheaterOptions.Teleports.Object.Visible = enabled
+	cheaterOptions.Speed.Object.Visible = enabled
+end
+
 loadCheaters()
 
 CheaterDetector = vape.Categories.Utility:CreateModule({
@@ -423,9 +430,7 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 			CheaterDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
 			CheaterDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(autoAddCheater))
 
-			-- Visible is not part of the saved profile, so it is reapplied on enable
-			cheaterOptions.Teleports.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
-			cheaterOptions.Speed.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
+			syncAutoAddOptions(cheaterOptions.AutomaticAdd.Enabled)
 
 			for _, v in playersService:GetPlayers() do
 				playerAdded(v)
@@ -462,10 +467,7 @@ cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
 	Name = 'Automatic Add',
 	Default = false,
-	Function = function(callback)
-		cheaterOptions.Teleports.Object.Visible = callback
-		cheaterOptions.Speed.Object.Visible = callback
-	end,
+	Function = syncAutoAddOptions,
 	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation; the two options below add the movement flags as well.\nThe reason is logged as exploits/<flag>.'
 })
 

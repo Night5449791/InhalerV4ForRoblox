@@ -16,10 +16,20 @@ local stats = cloneref(game:GetService('Stats'))
 local pingItem = stats.Network.ServerStatsItem['Data Ping']
 
 -- the movement checks compare positions the client only sees fresh while the connection
--- keeps up; an unreadable ping counts as fine so detection never silently stops
+-- keeps up; the Data Ping stat itself only moves about once a second, so the value is
+-- cached instead of pcall'ing it twenty times a second, and an unreadable ping counts as
+-- fine so detection never silently stops
+local pingValue, pingTime = 0, 0
 local function getPing()
+	local now = os.clock()
+	if now - pingTime < 1 then
+		return pingValue
+	end
+
+	pingTime = now
 	local success, value = pcall(pingItem.GetValue, pingItem)
-	return success and tonumber(value) or 0
+	pingValue = success and tonumber(value) or 0
+	return pingValue
 end
 
 local whiteliststates = {
@@ -67,7 +77,10 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 				local movement = getPing() <= PingLimit.Value
 
 				for _, entity in entitylib.List do
-					if entity.Health > 0 and entity.Player and not Cheats.Flagged[entity.Player.UserId] then
+					-- whitelisted players are skipped, the second return of whitelist:get is
+					-- what targetCheck reads too (false only for a protected entry); the
+					-- lookup runs every pass because the whitelist can change at any time
+					if entity.Health > 0 and entity.Player and not Cheats.Flagged[entity.Player.UserId] and select(2, whitelist:get(entity.Player)) then
 						local root = entity.RootPart
 						local humanoid = entity.Humanoid
 						local playerPos = root.Position

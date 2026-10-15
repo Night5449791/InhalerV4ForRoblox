@@ -493,10 +493,12 @@ run(function()
 			local func = connection.Function
 			if func then
 				local shoot = debug.getupvalue(func, 2)
+				-- digging reload/bullet already collapses to nil when shoot is not a
+				-- function, so the match only has to re-check the two derived values
 				local reload = typeof(shoot) == 'function' and debug.getupvalue(shoot, 2) or nil
 				local bullet = typeof(reload) == 'function' and debug.getupvalue(shoot, 16) or nil
 
-				if typeof(shoot) == 'function' and typeof(reload) == 'function' and typeof(bullet) == 'function' then
+				if typeof(reload) == 'function' and typeof(bullet) == 'function' then
 					pl.Shoot = shoot
 					pl.Reload = reload
 					pl.Bullet = bullet
