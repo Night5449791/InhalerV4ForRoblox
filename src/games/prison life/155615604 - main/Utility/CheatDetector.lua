@@ -51,7 +51,7 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 	Function = function(callback)
 		if callback then
 			CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagType)
-				notif('CheatDetector', 'This player may be cheating! ('..flagType..'): '..plr.Name, 60, 'warning')
+				notif('CheatDetector', 'This player may be cheating! ('..flagType..'): '..plr.Name, 15, 'warning')
 				if AddTarget.Enabled then
 					tempTargets[plr.Name] = true
 				end
@@ -77,10 +77,7 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 				local movement = getPing() <= PingLimit.Value
 
 				for _, entity in entitylib.List do
-					-- whitelisted players are skipped, the second return of whitelist:get is
-					-- what targetCheck reads too (false only for a protected entry); the
-					-- lookup runs every pass because the whitelist can change at any time
-					if entity.Health > 0 and entity.Player and not Cheats.Flagged[entity.Player.UserId] and select(2, whitelist:get(entity.Player)) then
+					if entity.Health > 0 and entity.Player and not Cheats.Flagged[entity.Player.UserId] then
 						local root = entity.RootPart
 						local humanoid = entity.Humanoid
 						local playerPos = root.Position
