@@ -401,7 +401,7 @@ cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
 	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation; the two options below add the movement flags as well.\nThe reason is logged as exploits/<flag>.'
 })
 
-cheaterOptions.KXAutoAdd = KickExploit:CreateDropdown({
+cheaterOptions.KXAutoAdd = CheaterDetector:CreateDropdown({
 	Name = 'AutoAddMode',
 	List = {'Inhaler only', 'KX compatible'},
 	Tooltip = 'KX compatible sends the .addskid command in public chat.'
