@@ -119,10 +119,7 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 				died = false
 
 				if AutoPickOnDied.Enabled then
-					local diedTP = vape.Modules.DiedTP
-					if not (diedTP and diedTP.Enabled) then
-						pickupAfterRespawn(entity and entity.Character)
-					end
+					pickupAfterRespawn(entity and entity.Character)
 				end
 			end
 		end
@@ -192,15 +189,8 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 AutoPickOnDied = AutoPickup:CreateToggle({
 	Name = 'OnDied',
 	Default = false,
-	Tooltip = 'Teleport to the gun spawner after respawning, grab a gun and return. Works with DiedTP.'
+	Tooltip = 'Teleport to the gun spawner after respawning, grab a gun and return.'
 })
-
-function AutoPickup:OnDiedTPRespawn(char, destination)
-	if not (self.Enabled and AutoPickOnDied.Enabled) then return false end
-
-	pickupAfterRespawn(char, destination)
-	return true
-end
 
 for _, team in {'Prisoner', 'Guard', 'Criminal'} do
 	PickupList[team] = AutoPickup:CreateTextList({
