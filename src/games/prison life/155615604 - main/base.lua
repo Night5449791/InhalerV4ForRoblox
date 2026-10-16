@@ -309,8 +309,6 @@ run(function()
 		if entity.NPC then return true end
 		if isFriend(entity.Player) then return false end
 		if not select(2, whitelist:get(entity.Player)) then return false end
-		-- the team restriction holds even with skip, so a guard still cannot hit their
-		-- own team; skip only reaches the innocent inmate protection below
 		if vape.Settings.Modules.Options['Teams by server'].Enabled and (not skip or lplr.Team == teams.Guards) then
 			return lplr.Team ~= entity.Player.Team and entity.Player.Team ~= teams.Neutral
 		end
@@ -318,8 +316,6 @@ run(function()
 	end
 
 	entitylib.isVulnerable = function(entity, attackCheck, skipCheck)
-		-- skipCheck (Killaura's Team Attack) drops the guard block below and, through the
-		-- trailing clause, also lets an inmate reach innocent teammates
 		if attackCheck and not skipCheck and lplr.Team == teams.Guards and entity.Player.Team == teams.Inmates and not entity.Character:GetAttribute('Hostile') then
 			return false
 		end
@@ -416,10 +412,10 @@ run(function()
 			for _, entity in entitylib.List do
 				if not entitysettings.Players and entity.Player then continue end
 				if not entitysettings.NPCs and entity.NPC then continue end
-				if not (entity.Targetable or entitysettings.SkipTeam and entitylib.targetCheck(entity, true)) then continue end
+				if not (entity.Targetable or entitysettings.KillauraTeamAttack and entitylib.targetCheck(entity, true)) then continue end
 				local mag = (entity[partName].Position - localPosition).Magnitude
 				if mag > entitysettings.Range then continue end
-				if entitylib.isVulnerable(entity, entitysettings.AttackCheck, entitysettings.SkipTeam) then
+				if entitylib.isVulnerable(entity, entitysettings.AttackCheck, entitysettings.KillauraTeamAttack) then
 					table.insert(sortingTable, {
 						Entity = entity,
 						Magnitude = entity.Target and -1 or mag
