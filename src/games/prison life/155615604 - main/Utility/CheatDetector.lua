@@ -16,6 +16,10 @@ local whitelist = vape.Libraries.whitelist
 local stats = cloneref(game:GetService('Stats'))
 local pingItem = stats.Network.ServerStatsItem['Data Ping']
 
+local function isWhitelisted(plr)
+	return select(1, whitelist:get(plr)) ~= 0
+end
+
 -- the movement checks compare positions the client only sees fresh while the connection
 -- keeps up; the Data Ping stat itself only moves about once a second, so the value is
 -- cached instead of pcall'ing it twenty times a second, and an unreadable ping counts as
@@ -52,7 +56,7 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 	Function = function(callback)
 		if callback then
 			CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagType)
-				if not select(2, whitelist:get(plr)) then return end
+				if isWhitelisted(plr) then return end
 
 				notif('CheatDetector', 'This player may be cheating! ('..flagType..'): '..plr.Name, 15, 'warning')
 				if AddTarget.Enabled then
@@ -80,7 +84,7 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 				local movement = getPing() <= PingLimit.Value
 
 				for _, entity in entitylib.List do
-					if entity.Health > 0 and entity.Player and select(2, whitelist:get(entity.Player)) and not Cheats.Flagged[entity.Player.UserId] then
+					if entity.Health > 0 and entity.Player and not isWhitelisted(entity.Player) and not Cheats.Flagged[entity.Player.UserId] then
 						local root = entity.RootPart
 						local humanoid = entity.Humanoid
 						local playerPos = root.Position

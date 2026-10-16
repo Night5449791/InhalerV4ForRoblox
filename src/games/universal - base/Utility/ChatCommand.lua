@@ -446,8 +446,12 @@ CommandBox = ChatCommand:CreateTextBox({
 	Tooltip = 'Runs a chat command without opening the chat. Press Enter to execute.',
 	Function = function(enter)
 		if enter and CommandBox and CommandBox.Value ~= '' then
+			local command = CommandBox.Value
+			if command:sub(1, 1) ~= '.' then
+				command = '.'..command
+			end
 			-- the command never reaches the chat, so the box is emptied to show it ran
-			if onChatted(CommandBox.Value) then
+			if onChatted(command) then
 				CommandBox:SetValue('')
 			end
 		end
