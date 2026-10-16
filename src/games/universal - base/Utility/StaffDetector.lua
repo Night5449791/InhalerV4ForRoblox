@@ -1,6 +1,5 @@
 local StaffDetector
 local Mode
-local Profile
 local Users
 local Group
 local Role
@@ -56,19 +55,6 @@ local function playerAdded(plr)
 			})
 		elseif Mode.Value == 'ServerHop' then
 			serverHop()
-		elseif Mode.Value == 'Profile' then
-			vape.Save = function() end
-			if vape.Profile ~= Profile.Value then
-				vape.Profile = Profile.Value
-				vape:Load(true, Profile.Value)
-			end
-		elseif Mode.Value == 'AutoConfig' then
-			vape.Save = function() end
-			for _, module in vape.Modules do
-				if module.Enabled then
-					module:Toggle()
-				end
-			end
 		end
 	end
 end
@@ -123,18 +109,7 @@ StaffDetector = vape.Categories.Utility:CreateModule({
 })
 Mode = StaffDetector:CreateDropdown({
 	Name = 'Mode',
-	List = {'Uninject', 'ServerHop', 'Profile', 'AutoConfig', 'Notify'},
-	Function = function(value)
-		if Profile.Object then
-			Profile.Object.Visible = value == 'Profile'
-		end
-	end
-})
-Profile = StaffDetector:CreateTextBox({
-	Name = 'Profile',
-	Default = 'default',
-	Darker = true,
-	Visible = false
+	List = {'Uninject', 'ServerHop', 'Notify'}
 })
 Users = StaffDetector:CreateTextList({
 	Name = 'Users',

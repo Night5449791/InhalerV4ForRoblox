@@ -2,7 +2,6 @@ local StaffDetector
 local Mode
 local Clans
 local Party
-local Profile
 local Users
 local blacklistedclans = {'gg', 'gg2', 'DV', 'DV2'}
 local blacklisteduserids = {1502104539, 3826146717, 4531785383, 1049767300, 4926350670, 653085195, 184655415, 2752307430, 5087196317, 5744061325, 1536265275}
@@ -41,22 +40,6 @@ local function staffFunction(plr, checktype)
 		})
 	elseif Mode.Value == 'Requeue' then
 		bedwars.QueueController:joinQueue(store.queueType)
-	elseif Mode.Value == 'Profile' then
-		vape.Save = function() end
-		if vape.Profile ~= Profile.Value then
-			vape:Load(true, Profile.Value)
-		end
-	elseif Mode.Value == 'AutoConfig' then
-		local safe = {'AutoClicker', 'Reach', 'Sprint', 'HitFix', 'StaffDetector'}
-		vape.Save = function() end
-		for i, v in vape.Modules do
-			if not (table.find(safe, i) or v.Category == 'Render') then
-				if v.Enabled then
-					v:Toggle()
-				end
-				v:SetBind('')
-			end
-		end
 	end
 end
 
@@ -136,12 +119,7 @@ StaffDetector = vape.Categories.Utility:CreateModule({
 })
 Mode = StaffDetector:CreateDropdown({
 	Name = 'Mode',
-	List = {'Uninject', 'Profile', 'Requeue', 'AutoConfig', 'Notify'},
-	Function = function(val)
-		if Profile.Object then
-			Profile.Object.Visible = val == 'Profile'
-		end
-	end
+	List = {'Uninject', 'Requeue', 'Notify'}
 })
 Clans = StaffDetector:CreateToggle({
 	Name = 'Blacklist clans',
@@ -149,12 +127,6 @@ Clans = StaffDetector:CreateToggle({
 })
 Party = StaffDetector:CreateToggle({
 	Name = 'Leave party'
-})
-Profile = StaffDetector:CreateTextBox({
-	Name = 'Profile',
-	Default = 'default',
-	Darker = true,
-	Visible = false
 })
 Users = StaffDetector:CreateTextList({
 	Name = 'Users',
