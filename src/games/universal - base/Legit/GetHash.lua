@@ -1,6 +1,6 @@
 local GetHash
 
-GetHash = vape.Categories.World:CreateModule({
+GetHash = vape.Legit:CreateModule({
 	Name = 'GetHash',
 	Function = function(callback)
 		if callback then
