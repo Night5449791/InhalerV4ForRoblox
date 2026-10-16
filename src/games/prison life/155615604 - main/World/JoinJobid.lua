@@ -13,19 +13,21 @@ JoinJobid = vape.Categories.World:CreateModule({
 		if callback then
 			JoinJobid:Toggle()
 
+			local placeId = places[Place.Value] or game.PlaceId
 			local id = (JobId.Value or ''):gsub('%s+', '')
-			if id == '' then
-				notif('JoinJobid', 'Enter a job id first.', 5, 'warning')
-				return
-			end
 
-			if id == game.JobId and (places[Place.Value] or game.PlaceId) == game.PlaceId then
+			if id ~= '' and id == game.JobId and placeId == game.PlaceId then
 				notif('JoinJobid', 'Already in that server.', 5, 'warning')
 				return
 			end
 
 			notif('JoinJobid', 'Joining '..Place.Value..' server.', 5)
-			teleportService:TeleportToPlaceInstance(places[Place.Value] or game.PlaceId, id)
+			if id == '' then
+				teleportService:Teleport(placeId)
+				return
+			end
+
+			teleportService:TeleportToPlaceInstance(placeId, id)
 			JobId:SetValue('') -- spent, don't leave it saved to be rejoined by accident
 		end
 	end,
