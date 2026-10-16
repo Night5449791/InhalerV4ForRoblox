@@ -773,15 +773,6 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 	Tooltip = 'Chat commands, every command is a toggleable option'
 })
 
-for _, toggle in toggles do
-	options[toggle.Name] = ChatCommand:CreateToggle({
-		Name = toggle.Name,
-		Tooltip = toggle.Tooltip,
-		Default = true,
-		Function = toggle.Function
-	})
-end
-
 local CommandBox
 CommandBox = ChatCommand:CreateTextBox({
 	Name = 'Command',
@@ -796,3 +787,12 @@ CommandBox = ChatCommand:CreateTextBox({
 		end
 	end
 })
+
+for _, toggle in toggles do
+	options[toggle.Name] = ChatCommand:CreateToggle({
+		Name = toggle.Name,
+		Tooltip = toggle.Tooltip,
+		Default = true,
+		Function = toggle.Function
+	})
+end

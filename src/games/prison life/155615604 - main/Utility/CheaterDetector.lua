@@ -198,6 +198,12 @@ local function getCheaterReason(plr)
 	return Cheaters.Names[plr.Name:lower()] or Cheaters.Names[plr.DisplayName:lower()]
 end
 
+local function hasCheaterEntry(plr)
+	return Cheaters.Users[tostring(plr.UserId)] ~= nil
+		or Cheaters.Names[plr.Name:lower()] ~= nil
+		or Cheaters.Names[plr.DisplayName:lower()] ~= nil
+end
+
 local function matchesNamePattern(value, pattern)
 	value, pattern = value:lower(), pattern:lower()
 	if not pattern:find('*', 1, true) then
@@ -311,7 +317,18 @@ local function editCheater(text, reason, remove)
 		if #wildcardMatches == 0 and not remove then
 			return notify('No online players match that pattern.', 8, 'warning')
 		elseif remove and #wildcardMatches > 1 then
-			return notify('Pattern matches multiple players. Use a more specific name.', 10, 'warning')
+			local removed = 0
+			for _, matchedPlayer in wildcardMatches do
+				if hasCheaterEntry(matchedPlayer) then
+					editCheater(matchedPlayer.Name, nil, true)
+					removed += 1
+				end
+			end
+
+			if removed == 0 then
+				return notify('No matching players are on the cheater list.', 8, 'warning')
+			end
+			return
 		elseif not remove and #wildcardMatches > 1 then
 			local addReason = trimText(reason) or (rest and rest ~= '' and rest) or 'manually added'
 			for _, matchedPlayer in wildcardMatches do
@@ -321,7 +338,7 @@ local function editCheater(text, reason, remove)
 		end
 	end
 
-	if remove and plr and not getCheaterReason(plr) then
+	if remove and plr and not hasCheaterEntry(plr) then
 		plr = nil
 	end
 
@@ -359,7 +376,10 @@ local function editCheater(text, reason, remove)
 		return notify((plr and plr.DisplayName or name)..' is already on the cheater list ('..existing..'), not added again.', 10, 'warning')
 	end
 
-	if remove and not existing then
+	local listed = (plr and hasCheaterEntry(plr))
+		or storedUser ~= nil
+		or (not storedUserId and Cheaters.Names[name:lower()] ~= nil)
+	if remove and not listed then
 		return notify((plr and plr.DisplayName or name)..' is not on the cheater list.', 8, 'warning')
 	end
 
