@@ -194,8 +194,9 @@ do
 	end
 
 	local function readURLAndConfig(code)
-		local appCfg = code:find('appServerConfig" type="text/plain">')
-		return code:match('(https://[^"\']+/web%-player/web%-player%.[0-9a-f]+%.js)'), appCfg and httpService:JSONDecode(base64decode(code:sub(appCfg + 35, code:find('<', appCfg + 1) - 1))) or nil
+		local scriptUrl = code:match('(https://[^"]*/build/web%-player/web%-player%.[%w]+%.js)')
+		local appCfg = code:match('<script[^>]-id="appServerConfig"[^>]*>(.-)</script>')
+		return scriptUrl, appCfg and httpService:JSONDecode(base64decode(appCfg)) or nil
 	end
 
 	local function readOTPCodes(code)
