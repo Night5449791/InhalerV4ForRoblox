@@ -393,7 +393,17 @@ run(function()
 	function whitelist:get(plr)
 		local plrstr = self.hashes[plr.Name..plr.UserId]
 		for _, v in self.data.WhitelistedUsers do
-			if v.hash == plrstr then
+			local matched = v.hash == plrstr
+			if not matched and type(v.hashes) == 'table' then
+				for _, hashValue in v.hashes do
+					if hashValue == plrstr then
+						matched = true
+						break
+					end
+				end
+			end
+
+			if matched then
 				return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
 			end
 		end
