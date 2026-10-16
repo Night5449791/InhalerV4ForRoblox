@@ -811,6 +811,6 @@ run(function()
 	end
 end)
 
-for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector'} do
+for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health', 'GamingChair'} do
 	vape:Remove(v)
 end
