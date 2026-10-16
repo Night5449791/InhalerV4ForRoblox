@@ -198,6 +198,16 @@ local function getCheaterReason(plr)
 	return Cheaters.Names[plr.Name:lower()] or Cheaters.Names[plr.DisplayName:lower()]
 end
 
+local function matchesNamePattern(value, pattern)
+	value, pattern = value:lower(), pattern:lower()
+	if not pattern:find('*', 1, true) then
+		return value == pattern
+	end
+
+	pattern = '^'..pattern:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
+	return value:match(pattern) ~= nil
+end
+
 local function splitCheaterText(text)
 	local words = {}
 	for word in text:gmatch('%S+') do
@@ -222,17 +232,30 @@ local function splitCheaterText(text)
 			return exact[lowered], table.concat(words, ' ', i + 1), name
 		end
 
-		local partial
+		local partial, wildcardMatches
 
 		for _, entry in entries do
+			if lowered:find('*', 1, true) and (matchesNamePattern(entry[2], lowered) or matchesNamePattern(entry[3], lowered)) then
+				wildcardMatches = wildcardMatches or {}
+				table.insert(wildcardMatches, entry[1])
+			end
+
 			if not partial and (entry[2]:sub(1, #lowered) == lowered or entry[3]:sub(1, #lowered) == lowered) then
 				partial = entry[1]
 			end
 		end
 
+		if wildcardMatches then
+			return wildcardMatches[1], table.concat(words, ' ', i + 1), name, wildcardMatches
+		end
+
 		if partial then
 			return partial, table.concat(words, ' ', i + 1), name
 		end
+	end
+
+	if text:find('*', 1, true) then
+		return nil, nil, text, {}
 	end
 
 	return nil, table.concat(words, ' ', 2), words[1]
@@ -283,12 +306,61 @@ local function editCheater(text, reason, remove)
 	text = trimText(text)
 	if not text or text == '' then return notify('No player given.', 8, 'warning') end
 
-	local plr, rest, name = splitCheaterText(text)
+	local plr, rest, name, wildcardMatches = splitCheaterText(text)
+	if wildcardMatches then
+		if #wildcardMatches == 0 and not remove then
+			return notify('No online players match that pattern.', 8, 'warning')
+		elseif remove and #wildcardMatches > 1 then
+			return notify('Pattern matches multiple players. Use a more specific name.', 10, 'warning')
+		elseif not remove and #wildcardMatches > 1 then
+			local addReason = trimText(reason) or (rest and rest ~= '' and rest) or 'manually added'
+			for _, matchedPlayer in wildcardMatches do
+				editCheater(matchedPlayer.Name, addReason, false)
+			end
+			return
+		end
+	end
 
-	local existing = (plr and getCheaterReason(plr)) or Cheaters.Names[name:lower()]
+	if remove and plr and not getCheaterReason(plr) then
+		plr = nil
+	end
+
+	local storedUserId, storedUser
+	if not plr then
+		local matches = {}
+		for userId, user in Cheaters.Users do
+			if type(user) == 'table'
+				and ((type(user.Name) == 'string' and matchesNamePattern(user.Name, name))
+					or (type(user.DisplayName) == 'string' and matchesNamePattern(user.DisplayName, name))) then
+				matches[#matches + 1] = {Id = tostring(userId), User = user}
+			end
+		end
+
+		for storedName in Cheaters.Names do
+			if matchesNamePattern(storedName, name) then
+				matches[#matches + 1] = {Name = storedName}
+			end
+		end
+
+		if remove and #matches > 1 then
+			return notify('Pattern matches multiple cheater entries. Use a more specific name.', 10, 'warning')
+		end
+
+		local match = matches[1]
+		storedUserId, storedUser = match and match.Id, match and match.User
+		name = match and match.Name or (storedUser and (storedUser.Name or storedUser.DisplayName)) or name
+	end
+
+	local existing = (plr and getCheaterReason(plr))
+		or (storedUser and (storedUser.Reason or 'known cheater'))
+		or (not storedUserId and Cheaters.Names[name:lower()])
 
 	if not remove and existing then
 		return notify((plr and plr.DisplayName or name)..' is already on the cheater list ('..existing..'), not added again.', 10, 'warning')
+	end
+
+	if remove and not existing then
+		return notify((plr and plr.DisplayName or name)..' is not on the cheater list.', 8, 'warning')
 	end
 
 	if remove then
@@ -308,8 +380,12 @@ local function editCheater(text, reason, remove)
 		Cheaters.Names[plr.Name:lower()] = nil
 		Cheaters.Names[plr.DisplayName:lower()] = nil
 		tagCheater(plr, reason)
+	elseif storedUserId then
+		Cheaters.Users[storedUserId] = nil
+	elseif remove then
+		Cheaters.Names[name:lower()] = nil
 	else
-		Cheaters.Names[name:lower()] = not remove and reason or nil
+		Cheaters.Names[name:lower()] = reason
 	end
 
 	saveCheaters()
