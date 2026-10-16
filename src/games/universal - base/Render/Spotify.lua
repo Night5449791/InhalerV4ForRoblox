@@ -134,6 +134,15 @@ duration.TextColor3 = Color3.fromRGB(170, 170, 170)
 duration.TextSize = 13
 duration.TextXAlignment = Enum.TextXAlignment.Left
 duration.Parent = holder
+Spotify:CreateFont({
+	Name = 'Font',
+	Default = 'Arial',
+	Function = function(value)
+		title.FontFace = value
+		artist.FontFace = value
+		duration.FontFace = value
+	end
+})
 stroke = Instance.new('UIStroke')
 stroke.Enabled = false
 stroke.Color = Color3.fromHSV(0.44, 1, 1)
@@ -568,13 +577,19 @@ do
 	end
 
 	function SpotifyHandler:Start()
-		if not isfile('newvape/profiles/spotify.txt') then
-			notif('Spotify', 'Missing cookie! (dump sp_dc from the browser and write to profiles/spotify.txt)', 30, 'warning')
+		local cookieSuccess, cookie = pcall(readfile, 'newvape/profiles/spotify.txt')
+		cookie = cookieSuccess and type(cookie) == 'string' and cookie:match('^%s*(.-)%s*$') or nil
+		if not cookie or cookie == '' then
+			if not self.MissingCookie then
+				self.MissingCookie = true
+				notif('Spotify', 'Missing cookie! (dump sp_dc from the browser and write to profiles/spotify.txt)', 30, 'warning')
+			end
 			return
 		end
+		self.MissingCookie = nil
 
 		self.Headers = {
-			Cookie = 'sp_dc='..readfile('newvape/profiles/spotify.txt')..';',
+			Cookie = 'sp_dc='..cookie..';',
 			['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0'
 		}
 
