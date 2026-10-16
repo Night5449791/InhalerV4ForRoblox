@@ -24,6 +24,7 @@ local guiService = cloneref(game:GetService('GuiService'))
 local teleportService = cloneref(game:GetService('TeleportService'))
 local teams = cloneref(game:GetService('Teams'))
 local coreGui = cloneref(game:GetService('CoreGui'))
+local httpService = cloneref(game:GetService('HttpService'))
 
 local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer

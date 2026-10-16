@@ -2,6 +2,7 @@ local AutoPickup
 local AutoPickOnDied
 local items = {}
 local PickupList = {}
+local died = false
 -- the same spot KickExploit grabs its gun from, standing on it keeps us in the spawner's range
 local PICKUP_GUN_POSITION = Vector3.new(816, 98, 2233)
 local PICKUP_GUN_CFRAME = CFrame.new(PICKUP_GUN_POSITION)
@@ -26,14 +27,20 @@ end
 
 -- spawn trip: teleport onto the gun spawner, let the pickup loop grab a gun and return,
 -- anything already carried is equipped instead of travelling
-local function grabEquipment()
+local function grabEquipment(destination)
 	local character = entitylib.character
 	local humanoid = character.Humanoid
 	local backpack = lplr:FindFirstChildWhichIsA('Backpack')
 	local held = lplr.Character:FindFirstChildWhichIsA('Tool')
 	local stash = getBackpackTool(backpack)
+	local root = character.RootPart
 
 	if held or stash then
+		if destination then
+			root.CFrame = destination
+			root.AssemblyLinearVelocity = Vector3.zero
+		end
+
 		if stash and not held then
 			humanoid:EquipTool(stash)
 		end
@@ -41,8 +48,7 @@ local function grabEquipment()
 		return
 	end
 
-	local root = character.RootPart
-	local origin = root.CFrame
+	local origin = destination or root.CFrame
 	local deadline = os.clock() + 2
 
 	repeat
@@ -72,7 +78,6 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 	Name = 'AutoPickup',
 	Function = function(callback)
 		local diedConnection
-		local died = false
 
 		local function connectDeath(entity)
 			local humanoid = entity and entity.Humanoid
@@ -96,7 +101,10 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 				died = false
 
 				if AutoPickOnDied.Enabled then
-					task.spawn(grabEquipment)
+					local diedTP = vape.Modules.DiedTP
+					if not (diedTP and diedTP.Enabled) then
+						task.spawn(grabEquipment)
+					end
 				end
 			end
 		end
@@ -166,8 +174,25 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 AutoPickOnDied = AutoPickup:CreateToggle({
 	Name = 'OnDied',
 	Default = false,
-	Tooltip = 'Teleport to the gun spawner after respawning, grab a gun and teleport back.'
+	Tooltip = 'Teleport to the gun spawner after respawning, grab a gun and return. Works with DiedTP.'
 })
+
+function AutoPickup:OnDiedTPRespawn(char, destination)
+	if not (self.Enabled and AutoPickOnDied.Enabled) then return false end
+
+	task.spawn(function()
+		repeat
+			task.wait()
+		until not self.Enabled or not AutoPickOnDied.Enabled or (entitylib.isAlive and entitylib.character.Character == char)
+
+		if self.Enabled and AutoPickOnDied.Enabled and entitylib.isAlive and entitylib.character.Character == char then
+			died = false
+			grabEquipment(destination)
+		end
+	end)
+
+	return true
+end
 
 for _, team in {'Prisoner', 'Guard', 'Criminal'} do
 	PickupList[team] = AutoPickup:CreateTextList({

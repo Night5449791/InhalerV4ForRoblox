@@ -10,7 +10,6 @@ local filePath = 'newvape/cheaters.json'
 local backupPath = 'newvape/cheaters.json.bak'
 local brokenPath = 'newvape/cheaters.json.broken'
 local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
-local httpService = cloneref(game:GetService('HttpService'))
 local TAG_COLOR = Color3.new(1, 0, 0)
 local EMBED_RED = 15548997   -- discord red, used when a cheater is added
 local EMBED_GREEN = 5763911  -- discord green, used when one is removed
@@ -33,12 +32,6 @@ local function trimText(text)
 	return text and text:match('^%s*(.-)%s*$') or nil
 end
 
-local function ensureFolder()
-	if not isfolder('newvape') then
-		pcall(makefolder, 'newvape')
-	end
-end
-
 -- vape.Notifications only exists once the gui is loaded, this file runs before that
 local function notify(text, duration, type)
 	if vape.Notifications then
@@ -46,9 +39,6 @@ local function notify(text, duration, type)
 	end
 end
 
--- JSONEncode only emits compact json, this adds indentation so the file stays
--- readable when opened. everything inside a string is copied verbatim, so the
--- escaping JSONEncode produced is never touched
 local function beautifyJSON(json)
 	local out = {}
 	local indent = 0
@@ -57,7 +47,7 @@ local function beautifyJSON(json)
 	local length = #json
 
 	local function emit(text)
-		table.insert(out, text)
+		out[#out + 1] = text
 	end
 
 	local function newline()
@@ -68,7 +58,6 @@ local function beautifyJSON(json)
 	while i <= length do
 		local char = json:sub(i, i)
 
-		-- inside a string nothing is structural, quotes and escapes included
 		if inString then
 			emit(char)
 
@@ -119,14 +108,9 @@ local function beautifyJSON(json)
 end
 
 local function saveCheaters()
-	ensureFolder()
-
-	-- derived, never trust a stale count from disk
 	Cheaters.Count = countCheaters(Cheaters.Names, Cheaters.Users)
 
-	local encoded, content = pcall(function()
-		return httpService:JSONEncode(Cheaters)
-	end)
+	local encoded, content = pcall(httpService.JSONEncode, httpService, Cheaters)
 
 	if not encoded then
 		return notify('Failed to encode: '..tostring(content), 15, 'warning')
@@ -140,29 +124,16 @@ local function saveCheaters()
 		return
 	end
 
-	-- mirror only once the live file is known good, so a later truncated write
-	-- can always be rolled back to this snapshot
 	pcall(writefile, backupPath, content)
 end
 
--- an outdated database only needs the current version stamped on it, every
--- derived field (Count) is rebuilt by saveCheaters anyway. the resave right
--- after this is what actually rewrites the file in the newer format
-local function upgradeCheaters(data)
-	data.Version = DB_VERSION
-end
-
--- returns the decoded table plus the raw text it came from, the raw text is
--- handed back on failure so the caller can still preserve it
 local function readDatabase(path)
 	if not isfile(path) then return end
 
 	local read, content = pcall(readfile, path)
 	if not read or type(content) ~= 'string' then return end
 
-	local decoded, data = pcall(function()
-		return httpService:JSONDecode(content)
-	end)
+	local decoded, data = pcall(httpService.JSONDecode, httpService, content)
 
 	if not decoded or type(data) ~= 'table' then
 		return nil, content
@@ -171,11 +142,9 @@ local function readDatabase(path)
 	return data, content
 end
 
--- never overwrite data we failed to read, keep a copy for manual recovery
 local function quarantineDatabase(content)
 	if not content then return end
 
-	ensureFolder()
 	pcall(writefile, brokenPath, content)
 end
 
@@ -184,7 +153,6 @@ local function loadCheaters()
 	local restored = false
 
 	if not data then
-		-- unreadable, keep a copy of it and fall back to the last good snapshot
 		if content then
 			quarantineDatabase(content)
 			notify('Cheater database is unreadable, a copy was kept at '..brokenPath, 15, 'warning')
@@ -198,7 +166,6 @@ local function loadCheaters()
 	end
 
 	if not data then
-		-- nothing left to recover, start clean, a broken copy was kept above
 		return saveCheaters()
 	end
 
@@ -206,12 +173,11 @@ local function loadCheaters()
 	local upgraded = false
 
 	if version > DB_VERSION then
-		-- written by a newer script, do not rewrite it and drop unknown fields
 		Cheaters.Version = version
 		notify('Cheater database is newer (v'..version..') than this script (v'..DB_VERSION..'), using it as is.', 15, 'warning')
 	else
 		if version < DB_VERSION then
-			upgradeCheaters(data)
+			data.Version = DB_VERSION
 			upgraded = true
 		end
 
@@ -251,9 +217,6 @@ local function getCheaterReason(plr)
 	return Cheaters.Names[plr.Name:lower()] or Cheaters.Names[plr.DisplayName:lower()]
 end
 
--- ".addskid <display name> <reason>" - display names can contain spaces, so the
--- longest match against an online player wins and whatever follows is the reason.
--- the players are lowered once here instead of once per candidate name
 local function splitCheaterText(text)
 	local words = {}
 	for word in text:gmatch('%S+') do
@@ -263,42 +226,40 @@ local function splitCheaterText(text)
 	if #words == 0 then return end
 
 	local entries = {}
+	local exact = {}
 	for _, plr in playersService:GetPlayers() do
-		table.insert(entries, {plr, plr.Name:lower(), plr.DisplayName:lower()})
+		local username, displayName = plr.Name:lower(), plr.DisplayName:lower()
+		entries[#entries + 1] = {plr, username, displayName}
+		exact[username] = exact[username] or plr
+		exact[displayName] = exact[displayName] or plr
 	end
 
 	for i = #words, 1, -1 do
 		local name = table.concat(words, ' ', 1, i)
-		local rest = table.concat(words, ' ', i + 1)
 		local lowered = name:lower()
+		if exact[lowered] then
+			return exact[lowered], table.concat(words, ' ', i + 1), name
+		end
+
 		local partial
 
 		for _, entry in entries do
-			if entry[2] == lowered or entry[3] == lowered then
-				return entry[1], rest, name
-			end
-
 			if not partial and (entry[2]:sub(1, #lowered) == lowered or entry[3]:sub(1, #lowered) == lowered) then
 				partial = entry[1]
 			end
 		end
 
-		-- only fall back to a partial match once the whole server was checked
 		if partial then
-			return partial, rest, name
+			return partial, table.concat(words, ' ', i + 1), name
 		end
 	end
 
-	-- nobody online matches, the first word is the name and the rest the reason
 	return nil, table.concat(words, ' ', 2), words[1]
 end
 
--- posts the change to the webhook, a failure is only a notification
--- previous is the reason the target had before it got removed
 local function sendWebhookLog(plr, name, reason, removed, previous)
 	if not cheaterOptions.Webhook.Enabled then return end
 
-	-- say something instead of failing silently, otherwise it just looks broken
 	if not webhook then
 		return notify('Webhook library is missing, cannot post the update.', 10, 'warning')
 	end
@@ -320,11 +281,9 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 		table.insert(fields, {name = '⚠️ Reason', value = '`'..(reason or 'manually added')..'`'})
 	end
 
-	-- inline fields render side by side, that is what keeps the last row aligned
 	table.insert(fields, {name = 'Added By', value = lplr.Name, inline = true})
 	table.insert(fields, {name = 'Logged Date', value = os.date('%m/%d/%Y %H:%M:%S'), inline = true})
 
-	-- request blocks until discord answers, never do that on the calling thread
 	task.spawn(function()
 		local sent, err = webhook.sendEmbed(url, {
 			title = removed and '✅ Skid Removed / Unflagged' or '🚨 Detected Skid Target',
@@ -339,25 +298,18 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 	end)
 end
 
--- remove = true drops the player, otherwise they get added with the given reason
 local function editCheater(text, reason, remove)
 	text = trimText(text)
 	if not text or text == '' then return notify('No player given.', 8, 'warning') end
 
-	-- splitCheaterText always hands a name back once text is not empty
 	local plr, rest, name = splitCheaterText(text)
 
-	-- the reason the target already carries, read before anything is overwritten; it is
-	-- also what a removal logs as the previous reason
 	local existing = (plr and getCheaterReason(plr)) or Cheaters.Names[name:lower()]
 
-	-- adding someone who is already on the list would only rewrite their reason, so it
-	-- is skipped with a notice and the entry is left untouched
 	if not remove and existing then
 		return notify((plr and plr.DisplayName or name)..' is already on the cheater list ('..existing..'), not added again.', 10, 'warning')
 	end
 
-	-- a removal has no reason, that is what untags the player
 	if remove then
 		reason = nil
 	else
@@ -404,8 +356,6 @@ local function isExploitFlag(flagType)
 	return flagType == 'speed' and cheaterOptions.Speed.Enabled
 end
 
--- the reason keeps the raw flag so the list shows what tripped it, and an entry that is
--- already there keeps its own reason instead of being overwritten by an automatic one
 local function autoAddCheater(plr, flagType)
 	if not cheaterOptions.AutomaticAdd.Enabled then return end
 	if not isExploitFlag(flagType) then return end
@@ -414,8 +364,6 @@ local function autoAddCheater(plr, flagType)
 	CheaterDetector:AddCheater(plr.Name, 'exploits/'..flagType)
 end
 
--- Visible is not part of the saved profile, so the sub options follow Automatic Add:
--- once when it is switched, once when the module comes back enabled
 local function syncAutoAddOptions(enabled)
 	cheaterOptions.Teleports.Object.Visible = enabled
 	cheaterOptions.Speed.Object.Visible = enabled
@@ -448,9 +396,6 @@ function CheaterDetector:RemoveCheater(text)
 	editCheater(text, nil, true)
 end
 
--- other modules use this to split "<display name> <reason>" the same way,
--- returns the player (nil when nobody online matches), the reason that
--- followed and the matched name
 function CheaterDetector:FindCheater(text)
 	text = trimText(text)
 	if not text or text == '' then return end

@@ -86,6 +86,19 @@ DiedTP = vape.Categories.Blatant:CreateModule({
 		DiedTP:Clean(addedConnection)
 
 		local respawnConnection = lplr.CharacterAdded:Connect(function(char)
+			local autoPickup = vape.Modules.AutoPickup
+			if autoPickup and autoPickup.Enabled and autoPickup.OnDiedTPRespawn then
+				local destination = lastDeath
+				if isCriminalTeam() then
+					destination = nil
+				end
+
+				if autoPickup:OnDiedTPRespawn(char, destination) then
+					lastDeath = nil
+					return
+				end
+			end
+
 			task.spawn(returnToLastDeath, char, currentGeneration)
 		end)
 		table.insert(connections, respawnConnection)
