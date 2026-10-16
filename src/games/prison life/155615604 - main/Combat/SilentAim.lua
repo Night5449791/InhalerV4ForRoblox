@@ -121,19 +121,18 @@ run(function()
 	end
 
 	local function replaceOriginOnStack(origin, newOrigin)
+		-- every copy in range is replaced, not just the first frame holding one: the
+		-- payload the server validates the shot with can be built from any of them, and
+		-- stopping at the first match left the one that mattered behind
 		for level = 4, 8 do
 			local stack = debug.getstack(level)
 			if not stack then break end
 
-			local replaced
 			for index, value in stack do
 				if value == origin then
-					debug.setstack(level, index, newOrigin)
-					replaced = true
+					pcall(debug.setstack, level, index, newOrigin)
 				end
 			end
-
-			if replaced then break end
 		end
 	end
 
@@ -168,7 +167,11 @@ run(function()
 					replaceOriginOnStack(origin, newOrigin)
 
 					origin = newOrigin
-					if hit then
+					-- a scan result sitting on the aimed part itself means the shot can be
+					-- fired from the new origin for real; faking the hit there skipped the
+					-- bullet's own damage, which is why some wallbangs landed for nothing.
+					-- only the exposed-hitbox fallback (the part is unreachable) is faked
+					if hit and hit ~= aimPosition then
 						return targetPart, hit
 					end
 				end
