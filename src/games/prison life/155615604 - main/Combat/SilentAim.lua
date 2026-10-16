@@ -125,8 +125,8 @@ run(function()
 		-- payload the server validates the shot with can be built from any of them, and
 		-- stopping at the first match left the one that mattered behind
 		for level = 4, 8 do
-			local stack = debug.getstack(level)
-			if not stack then break end
+			local success, stack = pcall(debug.getstack, level)
+			if not success or not stack then break end
 
 			for index, value in stack do
 				if value == origin then

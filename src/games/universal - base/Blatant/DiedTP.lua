@@ -49,12 +49,6 @@ local function returnToLastDeath(char, currentGeneration)
 	local root = getRoot(char) or char:WaitForChild('HumanoidRootPart', 5) or char:FindFirstChild('RootPart')
 	if not root or not lastDeath or not enabled or currentGeneration ~= generation then return end
 
-	local humanoid = char:FindFirstChildOfClass('Humanoid')
-	if humanoid and humanoid.SeatPart then
-		humanoid.Sit = false
-		task.wait(0.1)
-	end
-
 	if enabled and currentGeneration == generation and root.Parent then
 		root.CFrame = lastDeath
 		lastDeath = nil
@@ -73,12 +67,16 @@ DiedTP = vape.Categories.Blatant:CreateModule({
 
 		local addedConnection = entitylib.Events.LocalAdded:Connect(function(entity)
 			if not enabled or currentGeneration ~= generation then return end
-			local char = entity and entity.Character
-			watchCharacter(char)
-			task.spawn(returnToLastDeath, char, currentGeneration)
+			watchCharacter(entity and entity.Character)
 		end)
 		table.insert(connections, addedConnection)
 		DiedTP:Clean(addedConnection)
+
+		local respawnConnection = lplr.CharacterAdded:Connect(function(char)
+			task.spawn(returnToLastDeath, char, currentGeneration)
+		end)
+		table.insert(connections, respawnConnection)
+		DiedTP:Clean(respawnConnection)
 
 		local removedConnection = entitylib.Events.LocalRemoved:Connect(function(entity)
 			if enabled and currentGeneration == generation and entity and entity.Character and not lastDeath then
