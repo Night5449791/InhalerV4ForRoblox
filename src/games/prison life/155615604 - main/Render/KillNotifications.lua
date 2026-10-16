@@ -1,58 +1,74 @@
 local KillNotifications
-local KNHeight
+local height
 
 local MAX_STACK = 4
 local LIFETIME = 2.5
-local ENTRY_W = 460
-local ENTRY_H = 22
-local ENTRY_GAP = 3
-local ENTRY_STEP = ENTRY_H + ENTRY_GAP
-local BASE_OFFSET
+local ENTRY_W, ENTRY_H, ENTRY_STEP = 460, 22, 25
+local offset
+local positions = {}
 
-local killfeedGui, stack
+local feed, stack
+local byDisp = {}
+local hexCache, healthCache = {}, {}
 
--- the listener runs for every killfeed line in the server, so the two colour
--- lookups are memoized: team colours repeat endlessly and health only ever
--- lands on 0-100, which keeps fromHSV/string.format off the hot path
-local KNHexCache = {}
-local function knHex(color)
+local function hex(color)
 	local r = math.floor(color.R * 255 + 0.5)
 	local g = math.floor(color.G * 255 + 0.5)
 	local b = math.floor(color.B * 255 + 0.5)
 	local key = r * 65536 + g * 256 + b
-	local hex = KNHexCache[key]
-	if not hex then
-		hex = string.format('#%02x%02x%02x', r, g, b)
-		KNHexCache[key] = hex
+	local value = hexCache[key]
+	if not value then
+		value = string.format('#%02x%02x%02x', r, g, b)
+		hexCache[key] = value
 	end
-	return hex
+	return value
 end
 
-local KNHealthCache = {}
-local function knHealthHex(health)
-	local hex = KNHealthCache[health]
-	if not hex then
-		hex = knHex(Color3.fromHSV(math.clamp(health / 100, 0, 1) / 2.5, 0.89, 0.75))
-		KNHealthCache[health] = hex
+local function healthHex(health)
+	local value = healthCache[health]
+	if not value then
+		value = hex(Color3.fromHSV(math.clamp(health / 100, 0, 1) / 2.5, 0.89, 0.75))
+		healthCache[health] = value
 	end
-	return hex
+	return value
 end
+
+for _, player in playersService:GetPlayers() do
+	byDisp[player.DisplayName] = byDisp[player.DisplayName] or player
+end
+vape:Clean(playersService.PlayerAdded:Connect(function(player)
+	byDisp[player.DisplayName] = byDisp[player.DisplayName] or player
+end))
+vape:Clean(playersService.PlayerRemoving:Connect(function(player)
+	if player == lplr then
+		table.clear(byDisp)
+	elseif byDisp[player.DisplayName] == player then
+		byDisp[player.DisplayName] = nil
+		for _, other in playersService:GetPlayers() do
+			if other ~= player and other.DisplayName == player.DisplayName then
+				byDisp[player.DisplayName] = other
+				break
+			end
+		end
+	end
+end))
 
 KillNotifications = vape.Categories.Render:CreateModule({
 	Name = 'KillNotifications',
 	Function = function(callback)
 		if callback then
 			stack = {}
+			for i = 1, MAX_STACK do
+				positions[i] = UDim2.new(0.5, 0, 1, -offset - (i - 1) * ENTRY_STEP)
+			end
 
-			killfeedGui = Instance.new('ScreenGui')
-			killfeedGui.Name = 'KillNotifications'
-			killfeedGui.ResetOnSpawn = false
-			killfeedGui.IgnoreGuiInset = true
-			killfeedGui.DisplayOrder = 10
-			killfeedGui.Parent = coreGui
+			feed = Instance.new('ScreenGui')
+			feed.Name = 'KillNotifications'
+			feed.ResetOnSpawn = false
+			feed.IgnoreGuiInset = true
+			feed.DisplayOrder = 10
+			feed.Parent = coreGui
 
-			-- every kill clones this instead of writing a dozen properties, so the
-			-- per-kill instance cost is one Clone plus the Text
 			local prototype = Instance.new('TextLabel')
 			prototype.Name = 'Killfeed'
 			prototype.AnchorPoint = Vector2.new(0.5, 1)
@@ -70,37 +86,24 @@ KillNotifications = vape.Categories.Render:CreateModule({
 			local myName = lplr.Name
 			local myDisp = lplr.DisplayName
 
-			-- listen to the killfeed directly instead of relying on the
-			-- vapeEvents.PlayerKill BindableEvent, so a missed delivery (cross-file
-			-- BindableEvent plumbing) can't silently drop the notification. The
-			-- parsing matches base.lua / upstream, which drives the kills/deaths
-			-- counters off the same ChildAdded signal.
 			KillNotifications:Clean(replicatedStorage.Killfeed.ChildAdded:Connect(function(obj)
-				-- "Display Name (@UserName)  killed Display Name with Weapon", the victim
-				-- side carries no (@UserName) here, so it is parsed as a display name
 				local name = obj.Name
 
-				local killedAt = name:find('killed ')
+				local killedAt = name:find('killed ', 1, true)
 				if not killedAt then return end
 
-				-- killer UserName, from the (@...) before "killed"
-				local killerAt = name:find('@')
-				local killerClose = killerAt and name:find(')', killerAt)
+				local killerAt = name:find('@', 1, true)
+				local killerClose = killerAt and name:find(')', killerAt, true)
 				if not (killerAt and killerClose and killerClose < killedAt) then return end
 				local killerName = name:sub(killerAt + 1, killerClose - 1)
 
-				-- victim UserName, from the (@...) after "killed", else the whole name
-				local victimAt = name:find('@', killedAt)
-				local victimClose = victimAt and name:find(')', victimAt)
+				local victimAt = name:find('@', killedAt, true)
+				local victimClose = victimAt and name:find(')', victimAt, true)
 				local victimName, victimEnd
 				if victimAt and victimClose then
 					victimName = name:sub(victimAt + 1, victimClose - 1)
 					victimEnd = victimClose
 				else
-					-- the name runs up to the " with Weapon" separator, so cutting at the
-					-- first space would halve a display name that contains one and the
-					-- victim would never resolve to a player; the separator is taken from
-					-- the back because an earlier " with " can sit inside the name itself
 					local vStart = killedAt + 7
 					local _, _, withAt = name:find('.*() with ', vStart)
 					victimName = withAt and name:sub(vStart, withAt - 1) or name:sub(vStart)
@@ -108,25 +111,11 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					victimEnd = withAt
 				end
 
-				-- your own death, lets the victim resolve to the local player below;
-				-- the no (@...) form carries a DisplayName, so that has to match too
 				local mine = (victimName == myName or victimName == myDisp) and killerName ~= myName
 
-				-- killer player: UserName first, DisplayName only as a fallback since
-				-- FindFirstChild matches Name; the victim is yourself on your own death
-				local kplr = playersService:FindFirstChild(killerName)
-				local vplr = mine and lplr or playersService:FindFirstChild(victimName)
+				local kplr = playersService:FindFirstChild(killerName) or byDisp[killerName]
+				local vplr = mine and lplr or playersService:FindFirstChild(victimName) or byDisp[victimName]
 
-				-- one GetPlayers() pass fills both gaps instead of two separate scans
-				if not (kplr and vplr) then
-					for _, p in playersService:GetPlayers() do
-						if not kplr and p.DisplayName == killerName then kplr = p end
-						if not vplr and p.DisplayName == victimName then vplr = p end
-						if kplr and vplr then break end
-					end
-				end
-
-				-- display names, the raw slices still end with " (" from "(@...)"
 				local kDisp = name:sub(1, killerAt - 1)
 				kDisp = kDisp:match('^(.-)%s*%(%s*$') or kDisp:match('^%s*(.-)%s*$')
 				if kDisp == '' then kDisp = killerName end
@@ -139,43 +128,38 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					vDisp = vDisp:match('^(.-)%s*%(%s*$') or vDisp:match('^%s*(.-)%s*$')
 					if vDisp == '' then vDisp = victimName end
 				else
-					-- no (@...) on the victim, the token we parsed is the whole name
 					vDisp = victimName
 				end
 
-				-- team colors straight off Player.TeamColor, hex strings memoized
 				local killerTeam = kplr and kplr.TeamColor
 				local victimTeam = vplr and vplr.TeamColor
-				local kHex = killerTeam and knHex(killerTeam.Color)
-				local vHex = victimTeam and knHex(victimTeam.Color)
+				local kHex = killerTeam and hex(killerTeam.Color)
+				local vHex = victimTeam and hex(victimTeam.Color)
 
-				-- killer health at kill time, shown as [health%] after their name
 				local kHealth, kHealthHex
 				if kplr then
 					local character = kplr.Character
 					local humanoid = character and character:FindFirstChildOfClass('Humanoid')
 					if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
 						kHealth = math.floor(humanoid.Health / humanoid.MaxHealth * 100 + 0.5)
-						kHealthHex = knHealthHex(kHealth)
+						kHealthHex = healthHex(kHealth)
 					end
 				end
 
-				-- weapon, taken from "with Weapon" and trimmed of any " (distance)"
 				local weapon
 				if victimEnd then
-					local wstart = name:find('with ', victimEnd)
+					local wstart = name:find('with ', victimEnd, true)
 					if wstart then
 						weapon = name:match('with%s+(.-)%s*%(', wstart) or name:match('with%s+(.-)%s*$', wstart)
 					end
 				end
 
-				-- newest goes to the bottom of the stack, older ones get pushed up
 				local entry = prototype:Clone()
 				entry.Text = (kHex and '<font color="'..kHex..'">'..kDisp..'</font>' or kDisp)
 					..(kHealth and ' [<font color="'..kHealthHex..'">'..kHealth..'%</font>]' or '')..' killed '
 					..(vHex and '<font color="'..vHex..'">'..vDisp..'</font>' or vDisp)
 					..(weapon and ' ['..weapon..']' or '')
-				entry.Parent = killfeedGui
+				entry.Parent = feed
 
 				table.insert(stack, 1, entry)
 				if #stack > MAX_STACK then
@@ -183,7 +167,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					table.remove(stack)
 				end
 				for i = 1, #stack do
-					stack[i].Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * ENTRY_STEP)
+					stack[i].Position = positions[i]
 				end
 
 				task.delay(LIFETIME, function()
@@ -191,17 +175,16 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					if not idx then return end
 					table.remove(stack, idx)
 					entry:Destroy()
-					-- only the entries above the hole shift down, the rest keep their slot
 					for i = idx, #stack do
-						stack[i].Position = UDim2.new(0.5, 0, 1, -BASE_OFFSET - (i - 1) * ENTRY_STEP)
+						stack[i].Position = positions[i]
 					end
 				end)
 			end))
 
 			KillNotifications:Clean(function()
-				if killfeedGui then
-					killfeedGui:Destroy()
-					killfeedGui = nil
+				if feed then
+					feed:Destroy()
+					feed = nil
 				end
 				table.clear(stack)
 			end)
@@ -210,7 +193,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 	Tooltip = 'Shows a killfeed of who killed who at the bottom of the screen.'
 })
 
-KNHeight = KillNotifications:CreateSlider({
+height = KillNotifications:CreateSlider({
 	Name = 'Height',
 	Min = 0,
 	Max = 300,
@@ -218,7 +201,10 @@ KNHeight = KillNotifications:CreateSlider({
 	Suffix = 'px',
 	Tooltip = 'killfeed gui y axis',
 	Function = function(value)
-		BASE_OFFSET = value
+		offset = value
+		for i = 1, MAX_STACK do
+			positions[i] = UDim2.new(0.5, 0, 1, -value - (i - 1) * ENTRY_STEP)
+		end
 	end
 })
-BASE_OFFSET = KNHeight.Value
+offset = height.Value

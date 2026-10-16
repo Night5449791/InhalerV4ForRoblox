@@ -381,10 +381,17 @@ From `CONTRIBUTING.md` plus observed style:
 4. Once any inhaler file has been changed, write the changes into `UPDATES.md`:
 ```md
 [%GAMENAME%]
-- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
-- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
+```diff
++ [%CHANGEDFILENAME%] %UPDATE MESSAGE_MODULE/FUNCTIONS/OPTIONS ADDED%
+- [%CHANGEDFILENAME%] %UPDATE MESSAGE_MODULE/FUNCTIONS/OPTIONS REMOVED%
+~ [%CHANGEDFILENAME%] %UPDATE MESSAGE_MODULE/FUNCTIONS/OPTIONS CHANGED%
+```
 [%GAMENAME%]
-- [%CHANGEDFILENAME%] %UPDATE MESSAGE%
+```diff
++ [%CHANGEDFILENAME%] %UPDATE MESSAGE_MODULE/FUNCTIONS/OPTIONS ADDED%
+- [%CHANGEDFILENAME%] %UPDATE MESSAGE_MODULE/FUNCTIONS/OPTIONS REMOVED%
+~ [%CHANGEDFILENAME%] %UPDATE MESSAGE_MODULE/FUNCTIONS/OPTIONS CHANGED%
+```
 ```
    Entries are **short and meaningful** — one line per changed file saying what actually changed for the user; no long explanations, no restating error text or internal mechanics.
 5. If it is a Universal update, write it down as `[Universal]` and the update message.
