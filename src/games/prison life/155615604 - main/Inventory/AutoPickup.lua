@@ -62,16 +62,34 @@ local function grabEquipment(destination)
 		stash = getBackpackTool(backpack)
 	until held or stash or os.clock() > deadline or not entitylib.isAlive or not AutoPickup.Enabled
 
-	if not (AutoPickup.Enabled and entitylib.isAlive and entitylib.character == character) then
-		return
+	if root.Parent and lplr.Character == character.Character then
+		root.CFrame = origin
+		root.AssemblyLinearVelocity = Vector3.zero
 	end
 
-	root.CFrame = origin
-	root.AssemblyLinearVelocity = Vector3.zero
-
-	if stash and not held then
+	if AutoPickup.Enabled and entitylib.isAlive and entitylib.character == character and stash and not held then
 		humanoid:EquipTool(stash)
 	end
+end
+
+local function pickupAfterRespawn(char, destination)
+	task.spawn(function()
+		if not char or not char:WaitForChild('Humanoid', 5) then return end
+		task.wait(1)
+
+		repeat
+			task.wait()
+		until not AutoPickup.Enabled
+			or not AutoPickOnDied.Enabled
+			or lplr.Character ~= char
+			or (entitylib.isAlive and entitylib.character.Character == char)
+
+		if AutoPickup.Enabled and AutoPickOnDied.Enabled and lplr.Character == char
+			and entitylib.isAlive and entitylib.character.Character == char then
+			died = false
+			grabEquipment(destination)
+		end
+	end)
 end
 
 AutoPickup = vape.Categories.Inventory:CreateModule({
@@ -103,7 +121,7 @@ AutoPickup = vape.Categories.Inventory:CreateModule({
 				if AutoPickOnDied.Enabled then
 					local diedTP = vape.Modules.DiedTP
 					if not (diedTP and diedTP.Enabled) then
-						task.spawn(grabEquipment)
+						pickupAfterRespawn(entity and entity.Character)
 					end
 				end
 			end
@@ -180,17 +198,7 @@ AutoPickOnDied = AutoPickup:CreateToggle({
 function AutoPickup:OnDiedTPRespawn(char, destination)
 	if not (self.Enabled and AutoPickOnDied.Enabled) then return false end
 
-	task.spawn(function()
-		repeat
-			task.wait()
-		until not self.Enabled or not AutoPickOnDied.Enabled or (entitylib.isAlive and entitylib.character.Character == char)
-
-		if self.Enabled and AutoPickOnDied.Enabled and entitylib.isAlive and entitylib.character.Character == char then
-			died = false
-			grabEquipment(destination)
-		end
-	end)
-
+	pickupAfterRespawn(char, destination)
 	return true
 end
 
