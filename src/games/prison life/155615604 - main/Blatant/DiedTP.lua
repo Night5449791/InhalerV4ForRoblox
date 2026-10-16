@@ -6,22 +6,7 @@ local enabled = false
 local generation = 0
 
 local function isCriminalTeam()
-	return lplr and lplr.Team and teams and lplr.Team == teams.Criminals
-end
-
-local function disconnectConnections()
-	for _, conn in ipairs(connections) do
-		if conn then
-			conn:Disconnect()
-		end
-	end
-
-	table.clear(connections)
-	if characterConnection then
-		characterConnection:Disconnect()
-		characterConnection = nil
-	end
-	lastDeath = nil
+	return lplr.Team == teams.Criminals
 end
 
 local function getRoot(char)
@@ -30,7 +15,10 @@ local function getRoot(char)
 end
 
 local function captureDeathPosition(char)
-	if not char or isCriminalTeam() then return end
+	if isCriminalTeam() then
+		lastDeath = nil
+		return
+	end
 
 	local root = getRoot(char)
 	if root then
@@ -38,10 +26,21 @@ local function captureDeathPosition(char)
 	end
 end
 
-local function watchCharacter(char)
-	if not char or isCriminalTeam() then return end
+local function disconnectConnections()
+	for _, connection in ipairs(connections) do
+		connection:Disconnect()
+	end
+	table.clear(connections)
 
-	local humanoid = char:FindFirstChildOfClass('Humanoid')
+	if characterConnection then
+		characterConnection:Disconnect()
+		characterConnection = nil
+	end
+	lastDeath = nil
+end
+
+local function watchCharacter(char)
+	local humanoid = char and char:FindFirstChildOfClass('Humanoid')
 	if not humanoid then return end
 
 	if characterConnection then
@@ -54,11 +53,14 @@ local function watchCharacter(char)
 end
 
 local function returnToLastDeath(char, currentGeneration)
-	if isCriminalTeam() then return end
+	if isCriminalTeam() then
+		lastDeath = nil
+		return
+	end
 	if not enabled or currentGeneration ~= generation or not char or not lastDeath then return end
 
-	local root = getRoot(char)
-	if not root then return end
+	local root = getRoot(char) or char:WaitForChild('HumanoidRootPart', 5) or char:FindFirstChild('RootPart')
+	if not root or not lastDeath or not enabled or currentGeneration ~= generation or isCriminalTeam() then return end
 
 	local humanoid = char:FindFirstChildOfClass('Humanoid')
 	if humanoid and humanoid.SeatPart then
@@ -66,7 +68,7 @@ local function returnToLastDeath(char, currentGeneration)
 		task.wait(0.1)
 	end
 
-	if enabled and currentGeneration == generation and root.Parent then
+	if enabled and currentGeneration == generation and root.Parent and not isCriminalTeam() then
 		root.CFrame = lastDeath
 		lastDeath = nil
 	end
@@ -75,52 +77,36 @@ end
 DiedTP = vape.Categories.Blatant:CreateModule({
 	Name = 'DiedTP',
 	Function = function(callback)
-		if isCriminalTeam() then
-			enabled = false
-			generation = generation + 1
-			disconnectConnections()
-			return
-		end
-
 		enabled = callback
 		generation = generation + 1
 		local currentGeneration = generation
-
-		if not callback then
-			disconnectConnections()
-			return
-		end
-
 		disconnectConnections()
 
+		if not callback then return end
+
 		local addedConnection = entitylib.Events.LocalAdded:Connect(function(entity)
-			if isCriminalTeam() then return end
 			if not enabled or currentGeneration ~= generation then return end
 			local char = entity and entity.Character
 			watchCharacter(char)
-			task.defer(returnToLastDeath, char, currentGeneration)
+			task.spawn(returnToLastDeath, char, currentGeneration)
 		end)
-		connections[#connections + 1] = addedConnection
+		table.insert(connections, addedConnection)
 		DiedTP:Clean(addedConnection)
 
 		local removedConnection = entitylib.Events.LocalRemoved:Connect(function(entity)
-			if isCriminalTeam() then return end
-			if not enabled or currentGeneration ~= generation then return end
-			if entity and entity.Character and not lastDeath then
+			if enabled and currentGeneration == generation and entity and entity.Character and not lastDeath then
 				captureDeathPosition(entity.Character)
 			end
 		end)
-		connections[#connections + 1] = removedConnection
+		table.insert(connections, removedConnection)
 		DiedTP:Clean(removedConnection)
 
 		local teamConnection = lplr:GetPropertyChangedSignal('Team'):Connect(function()
 			if isCriminalTeam() then
-				enabled = false
-				generation = generation + 1
-				disconnectConnections()
+				lastDeath = nil
 			end
 		end)
-		connections[#connections + 1] = teamConnection
+		table.insert(connections, teamConnection)
 		DiedTP:Clean(teamConnection)
 
 		if entitylib.isAlive and entitylib.character then
