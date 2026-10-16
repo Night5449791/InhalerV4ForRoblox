@@ -1,5 +1,6 @@
 local CheaterDetector
 local webhookUrl
+local whitelist = vape.Libraries.whitelist
 local DB_VERSION = 3
 local cheaterOptions = {}
 local filePath = 'newvape/cheaters.json'
@@ -26,6 +27,10 @@ end
 
 local function trimText(text)
 	return text and text:match('^%s*(.-)%s*$') or nil
+end
+
+local function isWhitelisted(plr)
+	return whitelist:get(plr) ~= 0
 end
 
 -- vape.Notifications only exists once the gui is loaded, this file runs before that
@@ -313,7 +318,7 @@ local function editCheater(text, reason, remove)
 end
 
 local function playerAdded(plr)
-	if plr == lplr then return end
+	if plr == lplr or isWhitelisted(plr) then return end
 
 	local reason = getCheaterReason(plr)
 	if reason then
@@ -326,7 +331,7 @@ local function autoAddCheater(plr, flagType)
 	if flagType ~= 'invalid animation' and flagType:find('invalid state') ~= 1
 		and not (flagType == 'teleport' and cheaterOptions.Teleports.Enabled)
 		and not (flagType == 'speed' and cheaterOptions.Speed.Enabled) then return end
-	if plr == lplr or getCheaterReason(plr) then return end
+	if plr == lplr or isWhitelisted(plr) or getCheaterReason(plr) then return end
 
 	if cheaterOptions.KXAutoAdd.Value == 'KX compatible' then
 		local message = '.addskid '..plr.DisplayName..' exploits/'..flagType..'(inhalerautoaddskid)'

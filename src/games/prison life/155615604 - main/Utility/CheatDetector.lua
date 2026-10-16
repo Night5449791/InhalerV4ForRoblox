@@ -12,6 +12,7 @@ carOverlap.FilterDescendantsInstances = {workspace.CarContainer}
 carOverlap.FilterType = Enum.RaycastFilterType.Include
 carOverlap.MaxParts = 1
 
+local whitelist = vape.Libraries.whitelist
 local stats = cloneref(game:GetService('Stats'))
 local pingItem = stats.Network.ServerStatsItem['Data Ping']
 
@@ -51,6 +52,8 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 	Function = function(callback)
 		if callback then
 			CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagType)
+				if whitelist:get(plr) ~= 0 then return end
+
 				notif('CheatDetector', 'This player may be cheating! ('..flagType..'): '..plr.Name, 15, 'warning')
 				if AddTarget.Enabled then
 					tempTargets[plr.Name] = true
@@ -77,7 +80,7 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 				local movement = getPing() <= PingLimit.Value
 
 				for _, entity in entitylib.List do
-					if entity.Health > 0 and entity.Player and not Cheats.Flagged[entity.Player.UserId] then
+					if entity.Health > 0 and entity.Player and whitelist:get(entity.Player) == 0 and not Cheats.Flagged[entity.Player.UserId] then
 						local root = entity.RootPart
 						local humanoid = entity.Humanoid
 						local playerPos = root.Position

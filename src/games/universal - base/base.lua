@@ -451,6 +451,13 @@ run(function()
 			return true
 		end
 
+		if arg and arg:find('*', 1, true) then
+			local pattern = '^'..arg:lower():gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
+			if lplr.DisplayName:lower():match(pattern) then
+				return true
+			end
+		end
+
 		if arg and lplr.Name:lower():sub(1, arg:len()) == arg:lower() then
 			return true
 		end
