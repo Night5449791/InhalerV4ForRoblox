@@ -194,8 +194,14 @@ do
 	end
 
 	local function readURLAndConfig(code)
-		local scriptUrl = code:match('(https://[^"]*/build/web%-player/web%-player%.[%w]+%.js)')
-		local appCfg = code:match('<script[^>]-id="appServerConfig"[^>]*>(.-)</script>')
+		local normalizedCode = code:gsub('\\/', '/'):gsub('\\u002[fF]', '/')
+		local scriptUrl = normalizedCode:match('(https://[^"\'%s<>]+/build/web%-player/web%-player%.[%w_%-]+%.js)')
+			or normalizedCode:match('(//[^"\'%s<>]+/build/web%-player/web%-player%.[%w_%-]+%.js)')
+		if scriptUrl and scriptUrl:sub(1, 2) == '//' then
+			scriptUrl = 'https:'..scriptUrl
+		end
+
+		local appCfg = normalizedCode:match([=[<script[^>]-id=["']appServerConfig["'][^>]*>(.-)</script>]=])
 		return scriptUrl, appCfg and httpService:JSONDecode(base64decode(appCfg)) or nil
 	end
 
@@ -322,8 +328,10 @@ do
 				else
 					error('Failed to get script data: '..scriptCode.Body)
 				end
+			elseif not scriptUrl then
+				error('Failed to find Spotify web player script URL in the main page.')
 			else
-				error('Failed to get script url or app config.')
+				error('Failed to find Spotify app config in the main page.')
 			end
 		else
 			error('Failed to get main page: '..mainPage.Body)
