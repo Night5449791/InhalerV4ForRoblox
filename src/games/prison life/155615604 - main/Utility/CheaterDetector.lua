@@ -356,10 +356,37 @@ local function isExploitFlag(flagType)
 	return flagType == 'speed' and cheaterOptions.Speed.Enabled
 end
 
+local function sendKXAutoAdd(message)
+	local sent, err = pcall(function()
+		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
+			if not channel then
+				error('No active text chat channel.')
+			end
+			if not textChatService:CanUserChatAsync(lplr.UserId) then
+				error('Chat is not available for this account.')
+			end
+
+			channel:SendAsync(message)
+		else
+			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+		end
+	end)
+
+	if not sent then
+		notify('KX-compatible chat add failed: '..tostring(err), 10, 'warning')
+	end
+end
+
 local function autoAddCheater(plr, flagType)
 	if not cheaterOptions.AutomaticAdd.Enabled then return end
 	if not isExploitFlag(flagType) then return end
 	if plr == lplr or getCheaterReason(plr) then return end
+
+	if cheaterOptions.KXAutoAdd.Value == 'KX compatible' then
+		sendKXAutoAdd('.addskid '..plr.DisplayName..' exploits/'..flagType..'(inhalerautoaddskid)')
+		return
+	end
 
 	CheaterDetector:AddCheater(plr.Name, 'exploits/'..flagType)
 end
@@ -414,6 +441,12 @@ cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
 	Default = false,
 	Function = syncAutoAddOptions,
 	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation; the two options below add the movement flags as well.\nThe reason is logged as exploits/<flag>.'
+})
+
+cheaterOptions.KXAutoAdd = KickExploit:CreateDropdown({
+	Name = 'AutoAddMode',
+	List = {'Inhaler only', 'KX compatible'},
+	Tooltip = 'KX compatible sends the .addskid command in public chat.'
 })
 
 -- the movement flags are the ones a laggy connection can fake, so they are opt in
