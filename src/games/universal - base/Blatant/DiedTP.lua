@@ -17,6 +17,7 @@ local function disconnectConnections()
 		characterConnection:Disconnect()
 		characterConnection = nil
 	end
+	lastDeath = nil
 end
 
 local function getRoot(char)
@@ -62,6 +63,7 @@ local function returnToLastDeath(char, currentGeneration)
 
 	if enabled and currentGeneration == generation and root.Parent then
 		root.CFrame = lastDeath
+		lastDeath = nil
 	end
 end
 
