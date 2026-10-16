@@ -132,9 +132,13 @@ end
 -- Player lookup
 
 -- entries are either entities, which expose their player, or plain players.
--- filter drops entries, an exact match wins over the first prefix match
+-- filter drops entries; exact matches win over wildcard and prefix matches.
 local function search(list, lowered, filter)
-	local partial
+	local partial, wildcardMatch
+	local pattern
+	if lowered:find('*', 1, true) then
+		pattern = '^'..lowered:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
+	end
 
 	for _, entry in list do
 		if filter and not filter(entry) then continue end
@@ -145,12 +149,16 @@ local function search(list, lowered, filter)
 			return entry
 		end
 
+		if pattern and not wildcardMatch and (name:match(pattern) or display:match(pattern)) then
+			wildcardMatch = entry
+		end
+
 		if not partial and (name:sub(1, #lowered) == lowered or display:sub(1, #lowered) == lowered) then
 			partial = entry
 		end
 	end
 
-	return partial
+	return wildcardMatch or partial
 end
 
 local function findEntity(prefix, includeDead)

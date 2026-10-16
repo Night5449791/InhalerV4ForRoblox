@@ -30,7 +30,7 @@ local function trimText(text)
 end
 
 local function isWhitelisted(plr)
-	return whitelist:get(plr) ~= 0
+	return not select(2, whitelist:get(plr))
 end
 
 -- vape.Notifications only exists once the gui is loaded, this file runs before that
