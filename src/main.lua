@@ -1,5 +1,8 @@
 repeat task.wait() until game:IsLoaded()
-if shared.vape then shared.vape:Uninject() end
+if shared.vape then
+	if shared.vape.Loaded == false then return end
+	shared.vape:Uninject()
+end
 
 local vape
 local loadstring = function(...)
