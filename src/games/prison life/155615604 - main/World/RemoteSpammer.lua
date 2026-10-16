@@ -1,5 +1,4 @@
 local RemoteSpammer
-local Threshold
 local Payload
 local payload
 local payloadSize
@@ -28,14 +27,11 @@ RemoteSpammer = vape.Categories.World:CreateModule({
 	Name = 'RemoteSpammer',
 	Function = function(callback)
 		if callback then
-			local fireDelay = os.clock()
 			notif('RemoteSpammer', 'Spamming the block list remote.', 5)
 
 			repeat
 				local remote = getRemote()
-				local now = os.clock()
-				if remote and fireDelay < now then
-					fireDelay = now + Threshold.Value
+				if remote then
 					-- a payload this large can be rejected, which must not kill the spam
 					pcall(remote.FireServer, remote, getPayload())
 				end
@@ -47,14 +43,6 @@ RemoteSpammer = vape.Categories.World:CreateModule({
 		end
 	end,
 	Tooltip = 'Spams the UpdatePlayerBlockList remote with a huge payload to lag the server.'
-})
-Threshold = RemoteSpammer:CreateSlider({
-	Name = 'Threshold',
-	Min = 0,
-	Max = 1,
-	Default = 0.1,
-	Decimal = 100,
-	Tooltip = 'Seconds between each fire, 0 fires as fast as the loop runs.'
 })
 Payload = RemoteSpammer:CreateSlider({
 	Name = 'Payload',
