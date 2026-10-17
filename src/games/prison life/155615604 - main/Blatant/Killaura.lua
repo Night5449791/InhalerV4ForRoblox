@@ -34,7 +34,7 @@ local function getEntities()
 	local localTeam = lplr.Team
 	local teamFiltering = SkipTeam.Enabled and (
 		localTeam == teams.Guards
-		or localTeam == teams.Prisoners
+		or localTeam == teams.Inmates
 		or localTeam == teams.Criminals
 	)
 
@@ -64,10 +64,13 @@ local function getEntities()
 		if not players and entity.Player then continue end
 		if not npcs and entity.NPC then continue end
 		if entity.Player then
+			-- friends and whitelisted players stay protected, only the team gate is skipped
+			if isFriend(entity.Player) or not select(2, whitelist:get(entity.Player)) then continue end
+
 			local targetTeam = entity.Player.Team
 			if localTeam == teams.Guards then
-				if targetTeam ~= teams.Prisoners and targetTeam ~= teams.Criminals then continue end
-			elseif targetTeam ~= teams.Guards and targetTeam ~= teams.Prisoners and targetTeam ~= teams.Criminals then
+				if targetTeam ~= teams.Inmates and targetTeam ~= teams.Criminals then continue end
+			elseif targetTeam ~= teams.Guards and targetTeam ~= teams.Inmates and targetTeam ~= teams.Criminals then
 				continue
 			end
 		elseif not entity.Targetable then
@@ -75,7 +78,8 @@ local function getEntities()
 		end
 
 		local distance = (entity.RootPart.Position - localPosition).Magnitude
-		if distance > range or not entitylib.isVulnerable(entity) then continue end
+		-- skipCheck drops the inmate/innocent protection this option is meant to bypass
+		if distance > range or not entitylib.isVulnerable(entity, true, true) then continue end
 
 		skipTeamDistances[entity] = entity.Target and -1 or distance
 		table.insert(skipTeamTargets, entity)
