@@ -604,13 +604,11 @@ run(function()
 	end
 
 	function whitelist:announce(text)
-		local playerGui = lplr:FindFirstChildOfClass('PlayerGui')
-		if playerGui and playerGui:FindFirstChild('TouchGui') then
-			notif('Inhaler Annoucement', text, 20)
+		if inputService.TouchEnabled then
+			notif('Inhaler Announcement', text, 20)
 			return
 		end
 
-		local toastRoot
 		local success, sendToast = pcall(function()
 			local getAppIdHook = getrenv().require(game:GetService('CorePackages').Workspace.Packages._Workspace.AppCommonLib.AppCommonLib.Release.getNumericalApplicationId)
 			local messageBusHook = getrenv().require(game:GetService('CorePackages').Workspace.Packages._Workspace.MessageBus.MessageBus.MessageBus)
@@ -656,7 +654,6 @@ run(function()
 					local folder = Instance.new('Folder')
 					folder.Name = 'UIBloxToast'
 					folder.Parent = game:GetService('CoreGui')
-					toastRoot = folder
 					folder.ChildRemoved:Once(function()
 						folder:Destroy()
 						renderGui = nil
@@ -670,28 +667,16 @@ run(function()
 		end)
 
 		if success then
-			success = pcall(function()
-				sendToast({
-					toastTitle = text,
-					iconImage = getvapeasset('newvape/assets/new/vape.png'),
-					swipeUpDismiss = true,
-					onActivated = function() end
-				})
-
-				local deadline = os.clock() + 1
-				repeat
-					if toastRoot and toastRoot:IsDescendantOf(coreGui) and toastRoot:FindFirstChildWhichIsA('ScreenGui', true) then
-						return
-					end
-					task.wait()
-				until os.clock() >= deadline
-				error('ReactBlox toast did not mount')
-			end)
+			local displayed = pcall(sendToast, {
+				toastTitle = text,
+				iconImage = getvapeasset('newvape/assets/new/vape.png'),
+				swipeUpDismiss = true,
+				onActivated = function() end
+			})
+			if displayed then return end
 		end
 
-		if not success then
-			notif('Inhaler Annoucement', text, 20)
-		end
+		notif('Inhaler', text, 20)
 	end
 
 	function whitelist:update(first)
