@@ -1,0 +1,2 @@
+-- Girls&Boys vs ZOMBIES: the introduction place runs the same game as the main place
+-- (796267492), the universal modules cover it. The main place base is the one to extend.

@@ -1,3 +1,0 @@
--- FT: TEST SERVER: the same hub as the lobby (5169051062), kept as its own entry so test
--- builds of the hub load the script too. The universal modules cover it, the lobby base
--- is the one to extend when a hook is added.
