@@ -12,22 +12,14 @@ local ParticleColor2
 local ParticleSize
 local Face
 local SkipTeam
-local Overlay = OverlapParams.new()
-Overlay.FilterType = Enum.RaycastFilterType.Include
-local Particles, Boxes, AttackDelay = {}, {}, tick()
+local Particles, Boxes = {}, {}
+local MARKERS = 10
+local HIDDEN = Vector3.new(math.huge, math.huge, math.huge)
 local skipTeamTargets = {}
 local skipTeamDistances = {}
 
 local function compareSkipTeamTargets(a, b)
 	return skipTeamDistances[a] < skipTeamDistances[b]
-end
-
-local function getAttackData()
-	if Mouse.Enabled then
-		if not inputService:IsMouseButtonPressed(0) then return false end
-	end
-
-	return true
 end
 
 local function getEntities()
@@ -42,8 +34,6 @@ local function getEntities()
 	)
 
 	if not teamFiltering then
-		table.clear(skipTeamTargets)
-		table.clear(skipTeamDistances)
 		return entitylib.AllPosition({
 			Range = AttackRange.Value,
 			Wallcheck = Targets.Walls.Enabled or nil,
@@ -113,16 +103,19 @@ Killaura = vape.Categories.Blatant:CreateModule({
 	Name = 'Killaura',
 	Function = function(callback)
 		if callback then
-			repeat
-				local canAttack = getAttackData()
-				local attacked = {}
+			-- reused every tick, the list only lives until the markers are updated
+			local attacked = {}
 
-				if canAttack then
+			repeat
+				table.clear(attacked)
+
+				if not Mouse.Enabled or inputService:IsMouseButtonPressed(0) then
 					local entities = getEntities()
 
-					if #entities > 0 then
-						local selfpos = entitylib.character.RootPart.Position
-						local localfacing = entitylib.character.RootPart.CFrame.LookVector * flatMask
+					if entities[1] then
+						local root = entitylib.character.RootPart
+						local selfpos = root.Position
+						local localfacing = root.CFrame.LookVector * flatMask
 						local maxAngle = math.rad(AngleSlider.Value) / 2
 
 						for _, entity in entities do
@@ -130,32 +123,33 @@ Killaura = vape.Categories.Blatant:CreateModule({
 							if math.acos(localfacing:Dot(delta.Unit)) > maxAngle then continue end
 
 							targetinfo.Targets[entity] = os.clock() + 1
-							table.insert(attacked, {
-								Entity = entity,
-								Check = BoxAttackColor
-							})
+							table.insert(attacked, entity)
 
 							replicatedStorage.meleeEvent:FireServer(entity.Player, 1, 1)
 						end
 					end
 				end
 
+				local color = Color3.fromHSV(BoxAttackColor.Hue, BoxAttackColor.Sat, BoxAttackColor.Value)
+				local transparency = 1 - BoxAttackColor.Opacity
+
 				for index, box in Boxes do
-					box.Adornee = attacked[index] and attacked[index].Entity.RootPart or nil
+					box.Adornee = attacked[index] and attacked[index].RootPart or nil
 					if box.Adornee then
-						box.Color3 = Color3.fromHSV(attacked[index].Check.Hue, attacked[index].Check.Sat, attacked[index].Check.Value)
-						box.Transparency = 1 - attacked[index].Check.Opacity
+						box.Color3 = color
+						box.Transparency = transparency
 					end
 				end
 
 				for index, particle in Particles do
-					particle.Position = attacked[index] and attacked[index].Entity.RootPart.Position or Vector3.new(math.huge, math.huge, math.huge)
 					particle.Parent = attacked[index] and gameCamera or nil
+					particle.Position = attacked[index] and attacked[index].RootPart.Position or HIDDEN
 				end
 
 				if Face.Enabled and attacked[1] then
-					local vec = attacked[1].Entity.RootPart.Position * flatMask
-					entitylib.character.RootPart.CFrame = CFrame.lookAt(entitylib.character.RootPart.Position, Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z))
+					local root = entitylib.character.RootPart
+					local vec = attacked[1].RootPart.Position * flatMask
+					root.CFrame = CFrame.lookAt(root.Position, Vector3.new(vec.X, root.Position.Y + 0.01, vec.Z))
 				end
 
 				task.wait(0.05)
@@ -208,7 +202,7 @@ Killaura:CreateToggle({
 		BoxSwingColor.Object.Visible = callback
 		BoxAttackColor.Object.Visible = callback
 		if callback then
-			for i = 1, 10 do
+			for i = 1, MARKERS do
 				local box = Instance.new('BoxHandleAdornment')
 				box.Adornee = nil
 				box.AlwaysOnTop = true
@@ -248,7 +242,7 @@ Killaura:CreateToggle({
 		ParticleSize.Object.Visible = callback
 
 		if callback then
-			for i = 1, 10 do
+			for i = 1, MARKERS do
 				local part = Instance.new('Part')
 				part.Size = Vector3.new(2, 4, 2)
 				part.Anchored = true
