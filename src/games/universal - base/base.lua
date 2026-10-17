@@ -604,6 +604,7 @@ run(function()
 	end
 
 	function whitelist:announce(text)
+		local toastRoot
 		local success, sendToast = pcall(function()
 			local getAppIdHook = getrenv().require(game:GetService('CorePackages').Workspace.Packages._Workspace.AppCommonLib.AppCommonLib.Release.getNumericalApplicationId)
 			local messageBusHook = getrenv().require(game:GetService('CorePackages').Workspace.Packages._Workspace.MessageBus.MessageBus.MessageBus)
@@ -649,6 +650,7 @@ run(function()
 					local folder = Instance.new('Folder')
 					folder.Name = 'UIBloxToast'
 					folder.Parent = game:GetService('CoreGui')
+					toastRoot = folder
 					folder.ChildRemoved:Once(function()
 						folder:Destroy()
 						renderGui = nil
@@ -669,6 +671,15 @@ run(function()
 					swipeUpDismiss = true,
 					onActivated = function() end
 				})
+
+				local deadline = os.clock() + 1
+				repeat
+					if toastRoot and toastRoot:IsDescendantOf(coreGui) and toastRoot:FindFirstChildWhichIsA('ScreenGui', true) then
+						return
+					end
+					task.wait()
+				until os.clock() >= deadline
+				error('ReactBlox toast did not mount')
 			end)
 		end
 
