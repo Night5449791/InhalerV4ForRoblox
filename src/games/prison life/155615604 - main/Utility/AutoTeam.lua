@@ -1,17 +1,13 @@
 local AutoTeam
 local AutoOnDied
 
-local function openTeamMenu()
-	local home = lplr.PlayerGui:FindFirstChild('Home', true)
-	local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
-	if switch then
-		firesignal(switch.MouseButton1Click)
-	end
-end
-
-local function joinFirstTeam()
-	while lplr.Neutral and AutoTeam.Enabled do
+-- the picker only exists while its menu is open and a single click can silently fail
+-- (dead, menu closed, team list not replicated yet), so both are retried until the game
+-- actually puts the player on a team
+local function joinTeam()
+	while AutoTeam.Enabled and (not lplr.Team or lplr.Team == teams.Neutral) do
 		local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+
 		if teamGui then
 			for _, holder in teamGui:GetChildren() do
 				local button = holder:FindFirstChild('Button')
@@ -20,9 +16,17 @@ local function joinFirstTeam()
 					break
 				end
 			end
-		end
 
-		task.wait(0.1)
+			task.wait(0.5)
+		else
+			local home = lplr.PlayerGui:FindFirstChild('Home', true)
+			local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
+			if switch then
+				firesignal(switch.MouseButton1Click)
+			end
+
+			task.wait(1)
+		end
 	end
 end
 
@@ -30,14 +34,6 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 	Name = 'AutoTeam',
 	Function = function(callback)
 		local diedConnection
-
-		local function onDeath()
-			if not AutoOnDied.Enabled then return end
-
-			openTeamMenu()
-			task.wait(1.25)
-			joinFirstTeam()
-		end
 
 		local function connectDeath(entity)
 			local humanoid = entity and entity.Humanoid
@@ -47,16 +43,21 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 				diedConnection:Disconnect()
 			end
 
-			diedConnection = humanoid.Died:Connect(onDeath)
+			diedConnection = humanoid.Died:Connect(function()
+				if AutoOnDied.Enabled then
+					task.wait(1.25)
+					joinTeam()
+				end
+			end)
 		end
 
 		if callback then
-			joinFirstTeam()
-
 			AutoTeam:Clean(entitylib.Events.LocalAdded:Connect(connectDeath))
 			if entitylib.isAlive then
 				connectDeath(entitylib.character)
 			end
+
+			joinTeam()
 		else
 			if diedConnection then
 				diedConnection:Disconnect()
@@ -66,7 +67,6 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 	end,
 	Tooltip = 'Automatically join a team when joining the server'
 })
-
 AutoOnDied = AutoTeam:CreateToggle({
 	Name = 'OnDied',
 	Default = false,
