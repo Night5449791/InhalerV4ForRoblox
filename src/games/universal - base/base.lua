@@ -605,7 +605,7 @@ run(function()
 
 	function whitelist:announce(text)
 		if inputService.TouchEnabled then
-			notif('Inhaler', text, 20)
+			notif('Inhaler Annoucement', text, 20)
 			return
 		end
 
