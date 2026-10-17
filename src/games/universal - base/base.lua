@@ -693,6 +693,8 @@ run(function()
 			commit = commit and #commit == 40 and commit or 'main'
 			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/Night5449791/whitelists/'..commit..'/PlayerWhitelist.json', true)
 		end)
+		if vape.Loaded == nil then return true end
+
 		-- Always install the chat hook so ;cmd triggers even when the whitelist
 		-- failed to load or the local player isn't matched in it. Without this,
 		-- whitelist:hook() is only reached from playeradded (which only fires when
