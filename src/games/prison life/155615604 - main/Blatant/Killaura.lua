@@ -11,7 +11,6 @@ local ParticleColor1
 local ParticleColor2
 local ParticleSize
 local Face
-local TeamAttack
 local Overlay = OverlapParams.new()
 Overlay.FilterType = Enum.RaycastFilterType.Include
 local Particles, Boxes, AttackDelay = {}, {}, tick()
@@ -40,8 +39,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 						Players = Targets.Players.Enabled,
 						NPCs = Targets.NPCs.Enabled,
 						Limit = Max.Value,
-						AttackCheck = true,
-						KillauraTeamAttack = TeamAttack.Enabled
+						AttackCheck = true
 					})
 
 					if #entities > 0 then
@@ -98,11 +96,6 @@ Killaura = vape.Categories.Blatant:CreateModule({
 })
 Targets = Killaura:CreateTargets({
 	Players = true
-})
-TeamAttack = Killaura:CreateToggle({
-	Name = 'Team Attack',
-	Default = false,
-	Tooltip = 'Lets you hit innocent inmates'
 })
 AttackRange = Killaura:CreateSlider({
 	Name = 'Attack range',

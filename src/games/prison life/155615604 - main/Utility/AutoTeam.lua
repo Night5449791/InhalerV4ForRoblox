@@ -10,13 +10,19 @@ local function openTeamMenu()
 end
 
 local function joinFirstTeam()
-	local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
-	if not teamGui then return end
-	for _, holder in teamGui:GetChildren() do
-		if holder.Button.AutoButtonColor then
-			firesignal(holder.Button.MouseButton1Click)
-			return
+	while lplr.Neutral and AutoTeam.Enabled do
+		local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+		if teamGui then
+			for _, holder in teamGui:GetChildren() do
+				local button = holder:FindFirstChild('Button')
+				if button and button.AutoButtonColor then
+					firesignal(button.MouseButton1Click)
+					break
+				end
+			end
 		end
+
+		task.wait(0.1)
 	end
 end
 
