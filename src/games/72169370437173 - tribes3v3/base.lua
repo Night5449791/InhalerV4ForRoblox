@@ -1,0 +1,134 @@
+local run = function(func)
+	func()
+end
+local cloneref = cloneref or function(obj)
+	return obj
+end
+
+local vapeEvents = setmetatable({}, {
+	__index = function(self, index)
+		self[index] = Instance.new('BindableEvent')
+		return self[index]
+	end
+})
+
+local playersService = cloneref(game:GetService('Players'))
+local inputService = cloneref(game:GetService('UserInputService'))
+local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
+local collectionService = cloneref(game:GetService('CollectionService'))
+local textChatService = cloneref(game:GetService('TextChatService'))
+local runService = cloneref(game:GetService('RunService'))
+local guiService = cloneref(game:GetService('GuiService'))
+local coreGui = cloneref(game:GetService('CoreGui'))
+
+local gameCamera = workspace.CurrentCamera
+local lplr = playersService.LocalPlayer
+local vape = shared.vape
+local entitylib = vape.Libraries.entity
+local whitelist = vape.Libraries.whitelist
+local prediction = vape.Libraries.prediction
+local targetinfo = vape.Libraries.targetinfo
+local sessioninfo = vape.Libraries.sessioninfo
+
+local tribes = {}
+
+local function isFriend(plr, recolor)
+	if vape.Categories.Friends.Options['Use friends'].Enabled then
+		local friend = table.find(vape.Categories.Friends.ListEnabled, plr.Name) and true
+		if recolor then
+			friend = friend and vape.Categories.Friends.Options['Recolor visuals'].Enabled
+		end
+		return friend
+	end
+	return nil
+end
+
+local function isTarget(plr)
+	return table.find(vape.Categories.Targets.ListEnabled, plr.Name) and true
+end
+
+run(function()
+	entitylib.targetCheck = function(entity)
+		if entity.TeamCheck then
+			return entity:TeamCheck()
+		end
+		if entity.NPC then return true end
+		if isFriend(entity.Player) then return false end
+		if not select(2, whitelist:get(entity.Player)) then return false end
+		return lplr:GetAttribute('Team') ~= entity.Player:GetAttribute('Team')
+	end
+
+	entitylib.addPlayer = function(plr)
+
+	end
+
+	local oldstart = entitylib.start
+	local function customEntity(entity)
+		local plr = playersService:GetPlayerFromCharacter(entity)
+		entitylib.addEntity(entity, plr, not plr and function(self)
+			return lplr:GetAttribute('Team') ~= self.Character:GetAttribute('Team')
+		end or nil)
+	end
+
+	entitylib.start = function()
+		oldstart()
+		if entitylib.Running then
+			for _, ent in collectionService:GetTagged('Combatant') do
+				customEntity(ent)
+			end
+
+			table.insert(entitylib.Connections, collectionService:GetInstanceAddedSignal('Combatant'):Connect(customEntity))
+			table.insert(entitylib.Connections, collectionService:GetInstanceRemovedSignal('Combatant'):Connect(function(ent)
+				entitylib.removeEntity(ent)
+			end))
+		end
+	end
+end)
+entitylib.start()
+
+run(function()
+	tribes = {
+		Combat = require(replicatedStorage.Shared.Combat),
+		CombatController = require(lplr.PlayerScripts.Combat.Controller),
+		Economy = require(lplr.PlayerScripts.UI.Economy),
+		Weapons = require(replicatedStorage.Shared.Weapons),
+		Util = require(lplr.PlayerScripts.Combat.Util)
+	}
+
+	tribes.State = debug.getupvalue(tribes.CombatController.State, 2)
+	tribes.SetSpeed = debug.getupvalue(debug.getupvalue(tribes.CombatController.Equip, 11), 15)
+
+	local kills = sessioninfo:AddItem('Kills')
+	local deaths = sessioninfo:AddItem('Deaths')
+	local games = sessioninfo:AddItem('Games')
+	local wins = sessioninfo:AddItem('Wins')
+
+	if not workspace:FindFirstChild('Lobby') then
+		task.delay(1, function()
+			games:Increment()
+		end)
+	end
+
+	vape:Clean(replicatedStorage.Remotes.HitConfirm.OnClientEvent:Connect(function(data)
+		if data and data.killed then
+			kills:Increment()
+		end
+	end))
+
+	vape:Clean(replicatedStorage.Remotes.MatchEvent.OnClientEvent:Connect(function(event, data)
+		if event == 'MatchEnd' then
+			local didWin = data and data.winnerTeam == lplr:GetAttribute('Team')
+			if didWin then
+				wins:Increment()
+			end
+
+			vapeEvents.MatchEnded:Fire(didWin)
+		elseif event == 'Elimination' and data and data.victimId == 'p'..lplr.UserId then
+			deaths:Increment()
+		end
+	end))
+end)
+
+for _, v in {'Reach', 'TriggerBot', 'Jesus', 'AutoRejoin', 'Disabler', 'MurderMystery', 'Parkour', 'Wallhop'} do
+	vape:Remove(v)
+end
