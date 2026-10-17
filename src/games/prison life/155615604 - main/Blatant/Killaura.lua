@@ -11,9 +11,16 @@ local ParticleColor1
 local ParticleColor2
 local ParticleSize
 local Face
+local SkipTeam
 local Overlay = OverlapParams.new()
 Overlay.FilterType = Enum.RaycastFilterType.Include
 local Particles, Boxes, AttackDelay = {}, {}, tick()
+local skipTeamTargets = {}
+local skipTeamDistances = {}
+
+local function compareSkipTeamTargets(a, b)
+	return skipTeamDistances[a] < skipTeamDistances[b]
+end
 
 local function getAttackData()
 	if Mouse.Enabled then
@@ -21,6 +28,66 @@ local function getAttackData()
 	end
 
 	return true
+end
+
+local function getEntities()
+	if not SkipTeam.Enabled or lplr.Team ~= teams.Guards then
+		table.clear(skipTeamTargets)
+		table.clear(skipTeamDistances)
+		return entitylib.AllPosition({
+			Range = AttackRange.Value,
+			Wallcheck = Targets.Walls.Enabled or nil,
+			Part = 'RootPart',
+			Players = Targets.Players.Enabled,
+			NPCs = Targets.NPCs.Enabled,
+			Limit = Max.Value,
+			AttackCheck = true
+		})
+	end
+
+	local localPosition = entitylib.character.RootPart.Position
+	local range = AttackRange.Value
+	local players = Targets.Players.Enabled
+	local npcs = Targets.NPCs.Enabled
+	local wallcheck = Targets.Walls.Enabled or nil
+	local maxTargets = Max.Value
+
+	table.clear(skipTeamTargets)
+	for _, entity in entitylib.List do
+		if not players and entity.Player then continue end
+		if not npcs and entity.NPC then continue end
+		if entity.Player then
+			if entity.Player.Team == teams.Guards then continue end
+			if entity.Player.Team ~= teams.Prisoners and not entity.Targetable then continue end
+		elseif not entity.Targetable then
+			continue
+		end
+
+		local distance = (entity.RootPart.Position - localPosition).Magnitude
+		if distance > range or not entitylib.isVulnerable(entity) then continue end
+
+		skipTeamDistances[entity] = entity.Target and -1 or distance
+		table.insert(skipTeamTargets, entity)
+	end
+
+	table.sort(skipTeamTargets, compareSkipTeamTargets)
+
+	local targetCount = 0
+	for _, entity in skipTeamTargets do
+		if wallcheck and entitylib.Wallcheck(localPosition, entity.RootPart.Position, wallcheck) then
+			continue
+		end
+		targetCount += 1
+		skipTeamTargets[targetCount] = entity
+		if targetCount >= maxTargets then break end
+	end
+
+	for index = #skipTeamTargets, targetCount + 1, -1 do
+		skipTeamTargets[index] = nil
+	end
+	table.clear(skipTeamDistances)
+
+	return skipTeamTargets
 end
 
 Killaura = vape.Categories.Blatant:CreateModule({
@@ -32,15 +99,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 				local attacked = {}
 
 				if canAttack then
-					local entities = entitylib.AllPosition({
-						Range = AttackRange.Value,
-						Wallcheck = Targets.Walls.Enabled or nil,
-						Part = 'RootPart',
-						Players = Targets.Players.Enabled,
-						NPCs = Targets.NPCs.Enabled,
-						Limit = Max.Value,
-						AttackCheck = true
-					})
+					local entities = getEntities()
 
 					if #entities > 0 then
 						local selfpos = entitylib.character.RootPart.Position
@@ -96,6 +155,11 @@ Killaura = vape.Categories.Blatant:CreateModule({
 })
 Targets = Killaura:CreateTargets({
 	Players = true
+})
+SkipTeam = Killaura:CreateToggle({
+	Name = 'SkipTeam',
+	Default = false,
+	Tooltip = 'Allows Guards to target non-Guard players, but never other Guards.'
 })
 AttackRange = Killaura:CreateSlider({
 	Name = 'Attack range',
