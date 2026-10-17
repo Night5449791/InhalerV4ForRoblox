@@ -650,6 +650,10 @@ run(function()
 			end
 
 			return function(content)
+				if vape.ThreadFix then
+					setthreadidentity(8)
+				end
+
 				if not renderGui then
 					local folder = Instance.new('Folder')
 					folder.Name = 'UIBloxToast'
