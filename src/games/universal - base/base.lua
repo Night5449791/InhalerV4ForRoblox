@@ -662,98 +662,19 @@ run(function()
 		end)
 
 		if success then
-			return sendToast({
-				toastTitle = text,
-				iconImage = getvapeasset('newvape/assets/new/vape.png'),
-				swipeUpDismiss = true,
-				onActivated = function() end
-			})
+			success = pcall(function()
+				sendToast({
+					toastTitle = text,
+					iconImage = getvapeasset('newvape/assets/new/vape.png'),
+					swipeUpDismiss = true,
+					onActivated = function() end
+				})
+			end)
 		end
 
-		local container = Instance.new('TextButton')
-		container.Size = UDim2.new(1, -24, 0, 60)
-		container.Position = UDim2.new(0.5, 0, 0, -60)
-		container.AnchorPoint = Vector2.new(0.5, 0)
-		container.BackgroundTransparency = 1
-		container.Text = ''
-		container.Parent = vape.gui
-		local constraint = Instance.new('UISizeConstraint')
-		constraint.MinSize = Vector2.new(24, 60)
-		constraint.MaxSize = Vector2.new(600, math.huge)
-		constraint.Parent = container
-		local bkg = Instance.new('ImageLabel')
-		bkg.Size = UDim2.fromScale(1, 1)
-		bkg.Position = UDim2.fromScale(0.5, 0.5)
-		bkg.AnchorPoint = Vector2.new(0.5, 0.5)
-		bkg.BackgroundTransparency = 1
-		bkg.Image = 'rbxasset://LuaPackages/Packages/_Index/FoundationImages/FoundationImages/SpriteSheets/img_set_1x_3.png'
-		bkg.ImageRectOffset = Vector2.new(490, 196)
-		bkg.ImageRectSize = Vector2.new(21, 21)
-		bkg.ScaleType = Enum.ScaleType.Slice
-		bkg.SliceCenter = Rect.new(10, 10, 11, 11)
-		bkg.ImageColor3 = Color3.fromRGB(39, 41, 48)
-		bkg.Parent = container
-		local holder = Instance.new('Frame')
-		holder.Size = UDim2.fromScale(1, 1)
-		holder.BackgroundTransparency = 1
-		holder.ClipsDescendants = true
-		holder.Parent = bkg
-		local listlayout = Instance.new('UIListLayout')
-		listlayout.Padding = UDim.new(0, 12)
-		listlayout.FillDirection = Enum.FillDirection.Horizontal
-		listlayout.VerticalAlignment = Enum.VerticalAlignment.Center
-		listlayout.SortOrder = Enum.SortOrder.LayoutOrder
-		listlayout.Parent = holder
-		local padding = Instance.new('UIPadding')
-		padding.PaddingBottom = UDim.new(0, 12)
-		padding.PaddingLeft = UDim.new(0, 12)
-		padding.PaddingRight = UDim.new(0, 12)
-		padding.PaddingTop = UDim.new(0, 12)
-		padding.Parent = holder
-		local mainframe = Instance.fromExisting(holder)
-		mainframe.ClipsDescendants = false
-		mainframe.Parent = holder
-		local listlayout2 = Instance.fromExisting(listlayout)
-		listlayout2.Parent = mainframe
-		local textframe = Instance.new('Frame')
-		textframe.Size = UDim2.new(1, -48, 0, 22)
-		textframe.BackgroundTransparency = 1
-		textframe.LayoutOrder = 2
-		textframe.Parent = mainframe
-		local textlabel = Instance.new('TextLabel')
-		textlabel.Size = UDim2.new(1, 0, 0, 22)
-		textlabel.BackgroundTransparency = 1
-		textlabel.Text = text
-		textlabel.TextSize = 20
-		textlabel.TextColor3 = Color3.fromRGB(247, 247, 248)
-		textlabel.TextXAlignment = Enum.TextXAlignment.Left
-		textlabel.FontFace = Font.fromName('BuilderSans', Enum.FontWeight.Bold)
-		textlabel.Parent = textframe
-		local iconframe = Instance.new('Frame')
-		iconframe.Size = UDim2.fromOffset(36, 36)
-		iconframe.BackgroundTransparency = 1
-		iconframe.Parent = mainframe
-		local icon = Instance.new('ImageLabel')
-		icon.Size = UDim2.fromOffset(36, 36)
-		icon.Image = getvapeasset('newvape/assets/new/vape.png')
-		icon.BackgroundTransparency = 1
-		icon.Parent = iconframe
-		constraint.MaxSize = Vector2.new(math.max(getfontbounds(text, 20, textlabel.FontFace).X + 80, 600), math.huge)
-
-		tween:Tween(container, TweenInfo.new(0.3), {
-			Position = UDim2.new(0.5, 0, 0, 20)
-		})
-
-		task.delay(20, function()
-			if vape.Loaded ~= nil then
-				tween:Tween(container, TweenInfo.new(0.3), {
-					Position = UDim2.new(0.5, 0, 0, -60)
-				})
-
-				task.wait(0.3)
-				container:Destroy()
-			end
-		end)
+		if not success then
+			notif('Inhaler Annoucement', text, 20)
+		end
 	end
 
 	function whitelist:update(first)
