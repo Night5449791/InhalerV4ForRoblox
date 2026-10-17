@@ -16,9 +16,16 @@ local cloneref = cloneref or function(obj)
 end
 local httpService = cloneref(game:GetService('HttpService'))
 
--- the chunk env is not always the executor env, these live on the real global
--- table, so getgenv has to be tried before the plain globals.
--- resolved once, an executor never swaps this out while running
+local webhook = {}
+
+-- discord.com, canary.discord.com and the older discordapp.com are all valid
+function webhook.validate(url)
+	local host = type(url) == 'string' and url:match('^https://([%w%.%-]+)/api/webhooks/%d+/%S+$')
+	return host ~= nil and (host:match('discord%.com$') or host:match('discordapp%.com$')) ~= nil
+end
+
+-- the chunk env is not always the executor env, so getgenv is tried before the plain
+-- globals; an executor never swaps these out while running, so it is resolved once
 local requestFunction
 local requestResolved = false
 
@@ -27,72 +34,41 @@ local function getRequestFunction()
 	requestResolved = true
 
 	local genv = (getgenv and getgenv()) or _G
+	for _, env in {genv, {request = request, http_request = http_request, syn = syn}} do
+		if typeof(env) == 'table' then
+			requestFunction = (typeof(env.request) == 'function' and env.request)
+				or (typeof(env.http_request) == 'function' and env.http_request)
+				or (typeof(env.syn) == 'table' and typeof(env.syn.request) == 'function' and env.syn.request)
 
-	if genv then
-		requestFunction = typeof(genv.request) == 'function' and genv.request
-			or typeof(genv.http_request) == 'function' and genv.http_request
-			or (typeof(genv.syn) == 'table' and typeof(genv.syn.request) == 'function' and genv.syn.request)
-			or nil
-	end
-
-	if not requestFunction then
-		-- every executor names this differently, request is the common one
-		requestFunction = typeof(request) == 'function' and request
-			or typeof(http_request) == 'function' and http_request
-			or (typeof(syn) == 'table' and typeof(syn.request) == 'function' and syn.request)
-			or nil
+			if requestFunction then break end
+		end
 	end
 
 	return requestFunction
 end
 
-local webhook = {}
-
--- discord.com, canary.discord.com and the older discordapp.com are all valid
-function webhook.validate(url)
-	if type(url) ~= 'string' then return false end
-
-	local host = url:match('^https://([%w%.%-]+)/api/webhooks/%d+/%S+$')
-	if not host then return false end
-
-	return host:match('discord%.com$') ~= nil or host:match('discordapp%.com$') ~= nil
-end
-
--- payload is the raw table the discord api expects
--- returns true when discord took it, false plus a reason otherwise
+-- payload is the raw table the discord api expects, true when discord took it
 function webhook.send(url, payload)
-	if not webhook.validate(url) then
-		return false, 'Invalid webhook url'
-	end
+	if not webhook.validate(url) then return false, 'Invalid webhook url' end
 
-	local requestFunction = getRequestFunction()
-	if not requestFunction then
-		return false, 'No http request function available'
-	end
+	local post = getRequestFunction()
+	if not post then return false, 'No http request function available' end
 
-	local encoded, body = pcall(function()
-		return httpService:JSONEncode(payload)
-	end)
+	local encoded, body = pcall(httpService.JSONEncode, httpService, payload)
+	if not encoded then return false, 'Failed to encode: '..tostring(body) end
 
-	if not encoded then
-		return false, 'Failed to encode: '..tostring(body)
-	end
-
-	local sent, response = pcall(requestFunction, {
+	local sent, response = pcall(post, {
 		Method = 'POST',
 		Url = url,
+		Body = body,
 		Headers = {
 			['Content-Type'] = 'application/json',
 			-- discord turns away some of the default executor user agents
 			['User-Agent'] = 'Mozilla/5.0'
-		},
-		Body = body
+		}
 	})
 
-	if not sent then
-		return false, 'Request failed: '..tostring(response)
-	end
-
+	if not sent then return false, 'Request failed: '..tostring(response) end
 	if not response or response.Success == false then
 		return false, 'Discord refused: '..tostring(response and (response.StatusMessage or response.Body) or 'no response')
 	end
@@ -110,8 +86,9 @@ end
 -- every field is {name = text, value = text, inline = bool}
 function webhook.sendEmbed(url, embed, username)
 	local fields = {}
+	local source = type(embed.fields) == 'table' and embed.fields or {}
 
-	for index, field in type(embed.fields) == 'table' and embed.fields or {} do
+	for index, field in source do
 		if index > 25 then break end
 
 		table.insert(fields, {
@@ -128,14 +105,9 @@ function webhook.sendEmbed(url, embed, username)
 	}
 
 	-- an empty array makes discord reject the payload, leave the key out
-	if next(fields) then
-		built.fields = fields
-	end
+	if fields[1] then built.fields = fields end
 
-	return webhook.send(url, {
-		username = username,
-		embeds = {built}
-	})
+	return webhook.send(url, {username = username, embeds = {built}})
 end
 
 return webhook
