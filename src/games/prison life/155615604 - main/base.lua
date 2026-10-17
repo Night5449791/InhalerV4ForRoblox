@@ -14,7 +14,6 @@ local vapeEvents = setmetatable({}, {
 local playersService = cloneref(game:GetService('Players'))
 local inputService = cloneref(game:GetService('UserInputService'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
-local replicatedFirst = cloneref(game:GetService('ReplicatedFirst'))
 local collectionService = cloneref(game:GetService('CollectionService'))
 local marketplaceService = cloneref(game:GetService('MarketplaceService'))
 local textChatService = cloneref(game:GetService('TextChatService'))
@@ -33,7 +32,6 @@ local entitylib = vape.Libraries.entity
 local whitelist = vape.Libraries.whitelist
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
-local getfontbounds = vape.Libraries.getfontbounds
 
 local webhook = vape.Libraries.webhook
 
@@ -47,7 +45,6 @@ local arrestCooldown = os.clock()
 local tempTargets = {}
 local gamepasses = {}
 local flatMask = Vector3.new(1, 0, 1)
-local RemoteSpammer
 
 local function checkPoint(pos, params)
 	for _, part in workspace:GetPartBoundsInRadius(pos, 0, params) do
@@ -413,10 +410,10 @@ run(function()
 			for _, entity in entitylib.List do
 				if not entitysettings.Players and entity.Player then continue end
 				if not entitysettings.NPCs and entity.NPC then continue end
-				if not (entity.Targetable or entitysettings.KillauraTeamAttack and entitylib.targetCheck(entity, true)) then continue end
+				if not entity.Targetable then continue end
 				local mag = (entity[partName].Position - localPosition).Magnitude
 				if mag > entitysettings.Range then continue end
-				if entitylib.isVulnerable(entity, entitysettings.AttackCheck, entitysettings.KillauraTeamAttack) then
+				if entitylib.isVulnerable(entity, entitysettings.AttackCheck) then
 					table.insert(sortingTable, {
 						Entity = entity,
 						Magnitude = entity.Target and -1 or mag
@@ -810,61 +807,4 @@ end)
 
 for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health', 'GamingChair'} do
 	vape:Remove(v)
-end
-
-local Payload
-local payload
-local payloadSize
-
-local function getPayload()
-	if not payload or payloadSize ~= Payload.Value then
-		payloadSize = Payload.Value
-		payload = table.create(payloadSize)
-		for index = 1, payloadSize do
-			payload[index] = {id = index, v = index * 2}
-		end
-	end
-
-	return payload
-end
-
-local function getRemote()
-	local container = game:FindFirstChild('RobloxReplicatedStorage')
-	local remote = container and container:FindFirstChild('UpdatePlayerBlockList')
-	return remote and cloneref(remote)
-end
-
-RemoteSpammer = vape.Categories.World:CreateModule({
-	Name = 'RemoteSpammer',
-	Function = function(callback)
-		if callback then
-			notif('RemoteSpammer', 'Spamming the block list remote.', 5)
-
-			repeat
-				local remote = getRemote()
-				if remote then
-					pcall(remote.FireServer, remote, getPayload())
-				end
-
-				runService.Heartbeat:Wait()
-			until not RemoteSpammer.Enabled
-		else
-			payload = nil
-		end
-	end,
-	Tooltip = 'Spams the UpdatePlayerBlockList remote with a huge payload to lag the server.'
-})
-Payload = RemoteSpammer:CreateSlider({
-	Name = 'Payload',
-	Min = 1000,
-	Max = 300000,
-	Default = 150000,
-	Tooltip = 'Entries in each payload, bigger is heavier but more likely to be rejected.'
-})
-
-local remoteSpammerLoad = RemoteSpammer.Load
-function RemoteSpammer:Load(data)
-	local settings = table.clone(data)
-	settings.Enabled = false
-	return remoteSpammerLoad(self, settings)
 end
