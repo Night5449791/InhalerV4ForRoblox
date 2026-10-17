@@ -604,6 +604,12 @@ run(function()
 	end
 
 	function whitelist:announce(text)
+		local playerGui = lplr:FindFirstChildOfClass('PlayerGui')
+		if playerGui and playerGui:FindFirstChild('TouchGui') then
+			notif('Inhaler Annoucement', text, 20)
+			return
+		end
+
 		local toastRoot
 		local success, sendToast = pcall(function()
 			local getAppIdHook = getrenv().require(game:GetService('CorePackages').Workspace.Packages._Workspace.AppCommonLib.AppCommonLib.Release.getNumericalApplicationId)
