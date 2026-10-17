@@ -308,12 +308,6 @@ run(function()
 		if isFriend(entity.Player) then return false end
 		if not select(2, whitelist:get(entity.Player)) then return false end
 		if vape.Settings.Modules.Options['Teams by server'].Enabled and (not skip or lplr.Team == teams.Guards) then
-			-- criminals are not a real team in prison life: they spawn together but fight
-			-- each other, so the teammate gate does not apply to them
-			if lplr.Team == teams.Criminals then
-				return entity.Player.Team ~= teams.Neutral
-			end
-
 			return lplr.Team ~= entity.Player.Team and entity.Player.Team ~= teams.Neutral
 		end
 		return true

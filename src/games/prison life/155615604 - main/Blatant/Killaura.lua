@@ -32,7 +32,10 @@ end
 
 local function getEntities()
 	local localTeam = lplr.Team
-	local teamFiltering = SkipTeam.Enabled and (
+	-- criminals are not a real team in prison life, but the shared targetCheck treats
+	-- them as one, so they always go through the manual pass below where team mates are
+	-- allowed; guards and inmates only do so when SkipTeam is on
+	local teamFiltering = (SkipTeam.Enabled or localTeam == teams.Criminals) and (
 		localTeam == teams.Guards
 		or localTeam == teams.Inmates
 		or localTeam == teams.Criminals
@@ -78,8 +81,9 @@ local function getEntities()
 		end
 
 		local distance = (entity.RootPart.Position - localPosition).Magnitude
-		-- skipCheck drops the inmate/innocent protection this option is meant to bypass
-		if distance > range or not entitylib.isVulnerable(entity, true, true) then continue end
+		-- skipCheck follows the option: a criminal without SkipTeam keeps the same
+		-- innocent inmate protection AllPosition gave them, only team mates are added
+		if distance > range or not entitylib.isVulnerable(entity, true, SkipTeam.Enabled) then continue end
 
 		skipTeamDistances[entity] = entity.Target and -1 or distance
 		table.insert(skipTeamTargets, entity)
