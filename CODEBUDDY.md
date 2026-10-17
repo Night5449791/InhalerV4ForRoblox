@@ -393,7 +393,7 @@ From `CONTRIBUTING.md` plus observed style:
 ~ [%CHANGEDFILENAME%] %UPDATE MESSAGE_MODULE/FUNCTIONS/OPTIONS CHANGED%
 ```
 ```
-   Entries are **short and meaningful** — one line per changed file saying what actually changed for the user; no long explanations, no restating error text or internal mechanics.
+   Entries are **short and meaningful** — one line per changed file saying what actually changed for the user; no long explanations, no restating error text or internal mechanics, no multiple lines per file, get them into 1 line.
 5. If it is a Universal update, write it down as `[Universal]` and the update message.
 6. If anything is overridden, override the old update message (if there is one) and write the final update message.
 

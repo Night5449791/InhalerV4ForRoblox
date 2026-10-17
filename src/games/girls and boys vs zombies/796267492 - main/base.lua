@@ -60,24 +60,51 @@ end
 -- hooks on the way out, so no hook is used: the reporter itself is a plain table in a
 -- closure and its trip() returns early while webhookTripped is set, so that flag is kept
 -- pinned. startForCharacter clears the flag on every respawn, hence the loop.
-run(function()
-	if typeof(getgc) ~= 'function' then return end
+-- filtergc filters in the executor instead of walking the whole gc in lua, which on a
+-- heavy game took long enough to look like the client froze while loading
+local function gcTables(keys)
+	if typeof(filtergc) == 'function' then
+		return filtergc('table', {Keys = keys}, false)
+	end
 
-	local reporter
+	local found = {}
+	if typeof(getgc) ~= 'function' then return found end
+
 	for _, object in getgc(true) do
-		if type(object) == 'table' and rawget(object, 'webhookTripped') ~= nil and rawget(object, 'whitelisted') ~= nil and rawget(object, 'running') ~= nil then
-			reporter = object
-			break
+		if type(object) ~= 'table' then continue end
+
+		local matches = true
+		for _, key in keys do
+			if rawget(object, key) == nil then
+				matches = false
+				break
+			end
+		end
+
+		if matches then
+			table.insert(found, object)
 		end
 	end
 
-	if not reporter then return end
+	return found
+end
 
-	task.spawn(function()
-		while shared.vape and shared.vape.Loaded do
-			reporter.webhookTripped = true
-			task.wait(1)
+run(function()
+	task.delay(3, function()
+		local reporter
+		for _, object in gcTables({'webhookTripped', 'whitelisted', 'running'}) do
+			reporter = object
+			break
 		end
+
+		if not reporter then return end
+
+		task.spawn(function()
+			while shared.vape and shared.vape.Loaded do
+				reporter.webhookTripped = true
+				task.wait(1)
+			end
+		end)
 	end)
 end)
 
@@ -85,31 +112,13 @@ end)
 -- AddDetector, Detectors and Launch, which every check reports through. This is the same
 -- handle Cobalt (gitlab.com/upio/cobalt) uses for its Adonis bypass: hang those functions
 -- and no check can finish, so nothing gets kicked or reported from there either.
-run(function()
-	if typeof(getgc) ~= 'function' or typeof(hookfunction) ~= 'function' or typeof(isfunctionhooked) ~= 'function' then
-		return
-	end
-
-	local core
-	for _, object in getgc(true) do
-		if type(object) ~= 'table' or typeof(rawget(object, 'Detected')) ~= 'function' then continue end
-		if not rawget(object, 'RLocked') then continue end
-
-		core = object
-		break
-	end
-
-	if not core then return end
-
-	for _, detection in core do
-		if typeof(detection) ~= 'function' or isfunctionhooked(detection) then continue end
-
-		hookfunction(detection, function()
-			coroutine.yield()
-			return task.wait(9e9)
-		end)
-	end
-end)
+-- deferred on purpose: hooking their core in the same tick as the injection was the prime
+-- suspect for the crash on load, and by the time this runs the game is already settled
+-- the Adonis core is deliberately not hooked: hanging Detected/Launch makes the game run its
+-- own .Client.Core.Anti past 30 seconds and print "Script timeout: exhausted allowed
+-- execution time" over and over, which is what made loading take minutes. The report flag
+-- above already keeps the reporter quiet, and the game's own movement report is silenced
+-- below, so nothing has to be hung to stay quiet.
 
 -- the game measures movement from the character itself: its State Handler runs a loop that
 -- reads the root part velocity (95 and 170 are treated as falls) and reports it, so flight,
@@ -140,6 +149,8 @@ run(function()
 	end
 
 	task.spawn(function()
+		task.wait(5) -- let the character and its scripts exist before touching connections
+
 		while shared.vape and shared.vape.Loaded do
 			silence()
 			task.wait(2)
@@ -179,7 +190,8 @@ run(function()
 			if playersService:GetPlayerFromCharacter(child) then continue end
 
 			local humanoid = child:FindFirstChildWhichIsA('Humanoid')
-			if humanoid and humanoid.Health > 0 and not entitylib.getEntity(child) then
+			local root = child:FindFirstChild('HumanoidRootPart')
+			if root and humanoid and humanoid.Health > 0 and humanoid.Health < 1e9 and not entitylib.getEntity(child) then
 				entitylib.addEntity(child, nil)
 			end
 		end
@@ -197,6 +209,79 @@ run(function()
 
 			task.wait(1)
 		end
+	end)
+end)
+
+-- the anti cheat strips RaycastParams.new once it notices the executor, which makes the
+-- blaster's castRays throw on every shot and stops it from ever reaching the server. The
+-- same raycast is done here without RaycastParams so the gun keeps working normally.
+run(function()
+	if typeof(hookfunction) ~= 'function' then return end
+
+	local blaster = replicatedStorage:FindFirstChild('Blaster')
+	local utility = blaster and blaster:FindFirstChild('Utility')
+	local castRays = utility and utility:FindFirstChild('castRays')
+	if not castRays then return end
+
+	local constantsTable = {}
+	local constantsModule = blaster and blaster:FindFirstChild('Constants')
+	if constantsModule then
+		local ok, value = pcall(require, constantsModule)
+		if ok then constantsTable = value end
+	end
+
+	local canDamage
+	local canDamageModule = utility and utility:FindFirstChild('canPlayerDamageHumanoid')
+	if canDamageModule then
+		local ok, fn = pcall(require, canDamageModule)
+		canDamage = ok and fn or nil
+	end
+
+	local collectionService = game:GetService('CollectionService')
+
+	local function cast(origin, radius, direction, player, nonStatic)
+		local hit = workspace:Spherecast(origin, radius, direction)
+		if not hit then return nil end
+
+		local character = player and player.Character
+		if character and hit.Instance:IsDescendantOf(character) then return nil end
+
+		local excludeTag = constantsTable.RAY_EXCLUDE_TAG
+		if excludeTag and collectionService:HasTag(hit.Instance, excludeTag) then return nil end
+
+		if nonStatic then
+			local nonStaticTag = constantsTable.NON_STATIC_TAG
+			if nonStaticTag and collectionService:HasTag(hit.Instance, nonStaticTag) then return nil end
+		end
+
+		return hit
+	end
+
+	hookfunction(require(castRays), function(player, origin, directions, radius, nonStatic)
+		local results = {}
+		for _, direction in directions do
+			local entry = {
+				position = origin + direction,
+				normal = direction.Unit
+			}
+
+			local hit = cast(origin, radius, direction, player, nonStatic)
+			if hit then
+				entry.position = hit.Position
+				entry.normal = hit.Normal
+				entry.instance = hit.Instance
+
+				local parent = hit.Instance.Parent
+				local humanoid = parent and parent:FindFirstChildOfClass('Humanoid')
+				if humanoid and (not canDamage or canDamage(player, humanoid)) then
+					entry.taggedHumanoid = humanoid
+				end
+			end
+
+			table.insert(results, entry)
+		end
+
+		return results
 	end)
 end)
 
