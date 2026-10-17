@@ -17,8 +17,6 @@ local teamsService = cloneref(game:GetService('Teams'))
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 local danceTrack
-local kickTeams = {}
-local kickTeamMembers = {}
 
 -- ============================================================================
 -- functions
@@ -72,44 +70,7 @@ local function clearListValues(list)
 	return count
 end
 
--- KickExploit bridge
-
-local function kickModule()
-	return getModule('KickExploit')
-end
-
-local function kickOption(name)
-	local module = kickModule()
-	if not module then return end
-
-	return (module.Options and module.Options[name]) or module[name]
-end
-
-local function setKickMode(mode)
-	local option = kickOption('Mode')
-	if option and option.SetValue then
-		option:SetValue(mode)
-	end
-end
-
-local function setKickMethod(method)
-	local option = kickOption('Kick Mode')
-	if option and option.SetValue then
-		option:SetValue(method)
-	end
-
-	-- both part flings only run while Equipment is on, it supplies the gun that
-	-- kills the target before the corpse gets flung
-	if method ~= 'Normal' then
-		local equipment = kickOption('Equipment')
-		if equipment and not equipment.Enabled then
-			equipment:Toggle()
-		end
-	end
-end
-
 local function addTarget(name, enabled)
-	setListValue(kickOption('Targets'), name, enabled)
 	setListValue(vape.Categories.Targets, name, enabled)
 
 	if enabled then
@@ -120,15 +81,6 @@ local function addTarget(name, enabled)
 		tempTargets[name] = nil
 	end
 end
-
-local function addKickTeamMember(plr)
-	if not plr or not next(kickTeams) or not plr.Team or not table.find(kickTeams, plr.Team) then return end
-	if table.find(kickTeamMembers, plr.Name) then return end
-
-	table.insert(kickTeamMembers, plr.Name)
-	addTarget(plr.Name, true)
-end
-
 -- Player lookup
 
 -- entries are either entities, which expose their player, or plain players.
@@ -379,7 +331,7 @@ local function handleWhitelist(args, remove)
 end
 
 local function clearAllTargets()
-	local count = clearListValues(vape.Categories.Targets) + clearListValues(kickOption('Targets'))
+	local count = clearListValues(vape.Categories.Targets)
 	notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
 end
 
@@ -420,184 +372,6 @@ local function handleCheater(args, remove)
 	else
 		module:AddCheater(args)
 	end
-end
-
--- Kick commands
-
-local function stopKickTeam()
-	table.clear(kickTeams)
-
-	for _, name in kickTeamMembers do
-		addTarget(name, false)
-	end
-
-	table.clear(kickTeamMembers)
-end
-
-local function startKick(mode, text)
-	local module = kickModule()
-	if not module then return end
-
-	setKickMode(mode)
-	if not module.Enabled then
-		module:Toggle()
-	end
-
-	if module.Enabled then
-		notif('KickExploit', text, 5)
-	else
-		notif('KickExploit', 'KickExploit failed to enable.', 5, 'warning')
-	end
-end
-
-local function stopKick()
-	stopKickTeam()
-
-	local module = kickModule()
-	if module and module.Enabled then
-		module:Toggle()
-	end
-
-	notif('KickExploit', 'Kick disabled.', 5)
-end
-
-local function handleKick(args)
-	if not options.Kick.Enabled then return end
-
-	if not kickModule() then
-		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
-		return
-	end
-
-	local name = argument((args or ''):match('^target%s+(.+)$') or args)
-	if not name then return end
-
-	local lowered = name:lower()
-	if lowered == 'all' then
-		stopKickTeam()
-		startKick('All', 'Flinging all players.')
-		return
-	end
-
-	if lowered == 'none' or lowered == 'off' or lowered == 'stop' then
-		stopKick()
-		return
-	end
-
-	local player = findPlayer(name, true)
-	if not player then
-		notif('KickExploit', 'No player found.', 5, 'warning')
-		return
-	end
-
-	addTarget(player.Name, true)
-	startKick('Individual', 'Flinging '..player.Name..'.')
-end
-
--- short names for the Kick Mode values the command accepts: normal or killfling
-local kickMethods = {
-	normal = 'Normal',
-	n = 'Normal',
-	killfling = 'Killfling',
-	kill = 'Killfling',
-	k = 'Killfling'
-}
-
-local function handleKickMethod(args)
-	if not options.Kick.Enabled then return end
-
-	local option = kickOption('Kick Mode')
-	if not option then
-		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
-		return
-	end
-
-	args = argument(args)
-	if not args then
-		notif('KickExploit', 'Current kick method: '..tostring(option.Value), 5)
-		return
-	end
-
-	local method = kickMethods[args:lower():match('^%S+$')]
-	if not method then
-		notif('KickExploit', 'Unknown kick method. (normal/killfling)', 5, 'warning')
-		return
-	end
-
-	setKickMethod(method)
-	-- both part flings only work on a corpse, which is what the note says
-	notif('KickExploit', 'Kick method set to '..method..(method == 'Normal' and '.' or ', dead targets only.'), 5)
-end
-
-local function handleKickTeam(args)
-	if not options.Kick.Enabled then return end
-
-	if not kickModule() then
-		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
-		return
-	end
-
-	local wanted = {}
-	for token in (args or ''):gmatch('%S+') do
-		local team = findTeam(token)
-		if team and not table.find(wanted, team) then
-			table.insert(wanted, team)
-		end
-	end
-
-	if not next(wanted) then
-		notif('KickExploit', 'No team found. (c/i/g, criminals/inmates/guards)', 5, 'warning')
-		return
-	end
-
-	stopKickTeam()
-	local names = {}
-	for _, team in wanted do
-		table.insert(kickTeams, team)
-		table.insert(names, team.Name)
-
-		for _, plr in team:GetPlayers() do
-			addKickTeamMember(plr)
-		end
-	end
-
-	startKick('Individual', 'Flinging '..table.concat(names, ', ')..'.')
-end
-
--- flags the player as a skid and flings them in one go
-local function handleKickSkid(args)
-	if not (options.Kick.Enabled and options.Cheater.Enabled) then
-		notif('ChatCommand', 'Kick and Cheater are both needed for .kickskid.', 5, 'warning')
-		return
-	end
-
-	local cheater = getModule('CheaterDetector')
-	if not (cheater and cheater.AddCheater) then
-		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
-		return
-	end
-
-	if not kickModule() then
-		notif('ChatCommand', 'KickExploit is not available in this game.', 5, 'warning')
-		return
-	end
-
-	args = argument(args)
-	if not args then
-		notif('ChatCommand', 'No player given. (.kickskid <plr> <reason>)', 5, 'warning')
-		return
-	end
-
-	local plr, reason = cheater:FindCheater(args)
-	if not plr then
-		notif('KickExploit', 'No player found.', 5, 'warning')
-		return
-	end
-
-	-- the name is passed instead of the raw text, the split already resolved it
-	cheater:AddCheater(plr.Name, argument(reason))
-	addTarget(plr.Name, true)
-	startKick('Individual', 'Flinging '..plr.Name..'.')
 end
 
 -- Movement / camera commands
@@ -669,8 +443,7 @@ local toggles = {
 	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>\n.kickskid <plr> <reason>'},
-	{Name = 'Kick', Tooltip = '.kick <plr>\n.kick all\n.kick none\n.kickteam <c/i/g, criminals/inmates/guards>\n.kickmethod <normal/killfling>'},
+	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
 	{Name = 'Dance', Tooltip = '.dance\n.undance'}
 }
 
@@ -698,10 +471,6 @@ local commands = {
 	delskid = function(args)
 		handleCheater(args, true)
 	end,
-	kick = handleKick,
-	kickteam = handleKickTeam,
-	kickmethod = handleKickMethod,
-	kickskid = handleKickSkid,
 	team = handleTeam,
 	hop = handleHop,
 	rj = handleRejoin,
@@ -765,9 +534,7 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 				gameCamera.CameraSubject = entity.Humanoid
 			end
 
-			addKickTeamMember(entity.Player)
 		end))
-		ChatCommand:Clean(stopKickTeam)
 		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
 	end,
 	Tooltip = 'Chat commands, every command is a toggleable option'
