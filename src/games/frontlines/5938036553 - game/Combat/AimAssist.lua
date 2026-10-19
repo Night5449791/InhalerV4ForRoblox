@@ -1,10 +1,12 @@
 local AimAssist
+local AimAssistMethod
 local FOV
 local Speed
 local CircleColor
 local CircleTransparency
 local CircleFilled
 local CircleObject
+local headChain = {'Root_M', 'Spine1_M', 'Spine2_M', 'Chest_M', 'Neck_M', 'Head_M'}
 local rayCheck = RaycastParams.new()
 rayCheck.RespectCanCollide = true
 
@@ -14,42 +16,87 @@ AimAssist = vape.Categories.Combat:CreateModule({
 		if CircleObject then
 			CircleObject.Visible = callback
 		end
-		if callback then 
+
+		if not callback then return end
+
+		local cameraMode = AimAssistMethod.Value == 'Camera'
+		local touch = inputService.TouchEnabled
+
+		local function step(dt)
+			if CircleObject then
+				CircleObject.Position = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
+			end
+
+			if not cameraMode and not inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
+
+			local main = frontlines and frontlines.Main
+			local globals = main and main.globals
+			if not globals then return end
+
+			local instances = globals.fpv_sol_instances
+			local bone = instances and instances.camera_bone
+			local origin = bone and bone.WorldPosition or gameCamera.CFrame.Position
+
+			local ent = entitylib.EntityMouse({
+				Range = FOV.Value,
+				Players = true,
+				Wallcheck = true,
+				Part = 'RootPart',
+				Origin = origin
+			})
+
+			if not ent then return end
+
+			local equipment = globals.fpv_sol_equipment
+			local gun = equipment and equipment.curr_equipment
+			if not gun or not gun.fire_params then return end
+
+			local node = ent.RootPart
+			for _, name in headChain do
+				node = node and node[name]
+			end
+
+			local targetpos = node and node.WorldCFrame.Position
+			if not targetpos then return end
+
+			rayCheck.FilterDescendantsInstances = {gameCamera, ent.Character}
+			rayCheck.CollisionGroup = ent.RootPart.CollisionGroup
+			local calc = prediction.SolveTrajectory(origin, gun.fire_params.muzzle_velocity, workspace.Gravity, targetpos, Vector3.zero, workspace.Gravity, ent.HipHeight, nil, rayCheck)
+			if not calc then return end
+
+			targetinfo.Targets[ent] = os.clock() + 1
+
+			if cameraMode then
+				-- mobile method - only the local camera CFrame is written, no game aim state or mouse input
+				local camCF = gameCamera.CFrame
+				local blended = camCF.LookVector:Lerp((calc - camCF.Position).Unit, math.min(Speed.Value * dt, 1))
+				local magnitude = blended.Magnitude
+				if magnitude < 0.01 then return end
+
+				gameCamera.CFrame = CFrame.lookAt(camCF.Position, camCF.Position + blended / magnitude)
+			else
+				if not main.exe_set or not main.exe_set_t then return end
+
+				local pos = gameCamera:WorldToViewportPoint(calc)
+				local cursor = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
+				local localmouse = (cursor - Vector2.new(pos.X, pos.Y)) * dt * (Speed.Value / 10000)
+
+				main.exe_set(main.exe_set_t.CTRL_SOL_ATT_ROT, localmouse.Y, localmouse.X)
+			end
+		end
+
+		if cameraMode then
+			-- the default camera scripts write at RenderPriority.Camera, so step right after them
+			runService:BindToRenderStep('InhalerAimAssist', Enum.RenderPriority.Camera.Value + 1, step)
+			AimAssist:Clean(function()
+				runService:UnbindFromRenderStep('InhalerAimAssist')
+			end)
+		else
+			-- kept on the scheduler thread, exe_set is a game function that expects it
 			repeat
 				local dt = task.wait()
 				if not AimAssist.Enabled then break end
-				if CircleObject then 
-					CircleObject.Position = inputService:GetMouseLocation() 
-				end
-
-				if inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then 
-					local origin = entitylib.isAlive and frontlines.Main.globals.fpv_sol_instances.camera_bone.WorldPosition or Vector3.zero
-					local ent = entitylib.EntityMouse({
-						Range = FOV.Value,
-						Players = true,
-						Wallcheck = true,
-						Part = 'RootPart',
-						Origin = origin
-					})
-
-					if ent then 
-						local gun = frontlines.Main.globals.fpv_sol_equipment.curr_equipment
-						if gun and gun.fire_params then
-							rayCheck.FilterDescendantsInstances = {gameCamera, ent.Character}
-							rayCheck.CollisionGroup = ent.RootPart.CollisionGroup
-							local velo = gun.fire_params.muzzle_velocity
-							local targetpos = ent.RootPart.Root_M.Spine1_M.Spine2_M.Chest_M.Neck_M.Head_M.WorldCFrame.Position
-							local calc = prediction.SolveTrajectory(origin, velo, workspace.Gravity, targetpos, Vector3.zero, workspace.Gravity, ent.HipHeight, nil, rayCheck)
-							
-							if calc then 
-								local pos = gameCamera:WorldToViewportPoint(calc)
-								local localmouse = (inputService:GetMouseLocation() - Vector2.new(pos.X, pos.Y)) * dt * (Speed.Value / 10000)
-								targetinfo.Targets[ent] = os.clock() + 1
-								frontlines.Main.exe_set(frontlines.Main.exe_set_t.CTRL_SOL_ATT_ROT, localmouse.Y, localmouse.X)
-							end
-						end
-					end
-				end
+				step(dt)
 			until not AimAssist.Enabled
 		end
 	end,
@@ -65,6 +112,17 @@ FOV = AimAssist:CreateSlider({
 			CircleObject.Radius = val
 		end
 	end
+})
+AimAssistMethod = AimAssist:CreateDropdown({
+	Name = 'Method',
+	List = {'Mouse', 'Camera'},
+	Function = function()
+		if AimAssist.Enabled then
+			AimAssist:Toggle()
+			AimAssist:Toggle()
+		end
+	end,
+	Tooltip = 'Mouse rotates through the game aim function.\nCamera only writes the camera CFrame, which works on mobile and sends no game aim state'
 })
 Speed = AimAssist:CreateSlider({
 	Name = 'Speed',
