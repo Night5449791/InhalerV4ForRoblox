@@ -390,10 +390,24 @@ run(function()
 end)
 
 run(function()
+	function whitelist:hashmatches(v, plrstr)
+		-- a whitelist entry carries either one `hash` or a `hashes` list, never both
+		if v.hash == plrstr then
+			return true
+		end
+
+		local list = v.hashes
+		if type(list) == 'table' then
+			return table.find(list, plrstr) ~= nil
+		end
+
+		return list == plrstr
+	end
+
 	function whitelist:get(plr)
 		local plrstr = self.hashes[plr.Name..plr.UserId]
 		for _, v in self.data.WhitelistedUsers do
-			if v.hash == plrstr then
+			if self:hashmatches(v, plrstr) then
 				return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
 			end
 		end
