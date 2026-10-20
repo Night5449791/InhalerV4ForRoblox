@@ -4,7 +4,7 @@ local Mode
 local Part
 local FOV
 local Range
-local Wallcheck
+local Wallbang
 local ShowTarget
 local OriginalCreate
 
@@ -47,7 +47,10 @@ run(function()
 		local entity, part = getTarget(origin)
 		if not part then return bullet end
 
-		if Wallcheck.Enabled and entitylib.Wallcheck(origin, part.Position, {entity.Character}) then
+		-- Wallbang only lets the shot through wood (penetrable) surfaces; metal/stone still
+		-- block, and with Wallbang off only a clear line of sight shoots
+		local hit = entitylib.Wallcheck(origin, part.Position, {entity.Character})
+		if hit and not (Wallbang.Enabled and (hit.Material == Enum.Material.Wood or hit.Material == Enum.Material.WoodPlanks)) then
 			return bullet
 		end
 
@@ -140,9 +143,10 @@ run(function()
 			return val == 1 and 'stud' or 'studs'
 		end
 	})
-	Wallcheck = SilentAim:CreateToggle({
-		Name = 'Wallcheck',
-		Tooltip = 'Only redirects the shot when the target is in sight'
+	Wallbang = SilentAim:CreateToggle({
+		Name = 'Wallbang',
+		Default = true,
+		Tooltip = 'Redirects the shot through wood walls only'
 	})
 	ShowTarget = SilentAim:CreateToggle({
 		Name = 'Show target info'
