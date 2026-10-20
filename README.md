@@ -60,7 +60,7 @@ If its not the supposed utility at fault, please try some troubleshooting steps.
 ## Developers & Credits
 [Nighthere123](https://github.com/Night5449791) - discord nightdiamond700 - Fork owner prolly lololololololol
 <br/>
-[7GrandDad](https://github.com/7GrandDadPGN) - Original Lead maintainer of the project - vaperoblox on Discord
+[7GrandDad](https://github.com/7GrandDadPGN) - Original Lead maintainer of Vape V4 - vaperoblox on Discord
 <br/>
 [rce-incorporated](https://github.com/rce-incorporated/Fiu) - Luau bytecode disassembly with modifications
 <br/>

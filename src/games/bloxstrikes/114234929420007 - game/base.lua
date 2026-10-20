@@ -29,7 +29,6 @@ local whitelist = vape.Libraries.whitelist
 -- both the team gate and the entity library have to read the attributes instead.
 local bloxstrike = {
 	CharacterRemote = nil,
-	FreshOnly = false, -- set by the 'Only fresh targets' module
 	Inventory = nil,
 	Melee = nil,
 	Proxy = nil,
@@ -163,14 +162,11 @@ end
 -- a parked character is one the game stopped simulating: its rig is anchored in the PVS pool and
 -- no new transform ever arrives, so drawing it would only paint a frozen corpse of a box. The
 -- entity is kept out of entitylib.List (esp, aura and aim stop seeing it) but stays alive with
--- its connections, so the same object is put back when the game loads that part of the map again
+-- its connections, so the same object is put back when the game loads that part of the map again.
+-- This is always on: culled characters are never drawn at their last known position.
 entitylib.Culled = {}
 
 local function park(char)
-	-- with the filter off a culled character stays in the list and is drawn at its last known
-	-- position, which is what the render modules did before the parking existed
-	if not bloxstrike.FreshOnly then return end
-
 	local entity, index = entitylib.getEntity(char)
 	if not entity or not index then return end
 
@@ -203,25 +199,6 @@ local function discard(char)
 	end
 
 	table.clear(entity.Connections)
-end
-
-function bloxstrike.parkStale()
-	for _, entity in table.clone(entitylib.List) do
-		if not rendered(entity.Character) then
-			park(entity.Character)
-		end
-	end
-end
-
-function bloxstrike.unparkAll()
-	local parked = {}
-	for char in entitylib.Culled do
-		table.insert(parked, char)
-	end
-
-	for _, char in parked do
-		unpark(char)
-	end
 end
 
 run(function()
@@ -469,10 +446,9 @@ entitylib.addEntity = function(char, plr, teamfunc, spawntime)
 				end
 			end
 
-			-- a character that enters the game outside of Workspace.Characters is already parked
-			-- by the game, so with the filter on it goes straight into the pool instead of the
-			-- drawable list
-			if rendered(char) or not bloxstrike.FreshOnly then
+			-- a character that enters the game outside of Workspace.Characters is already culled
+			-- by the game, so it goes straight into the parked pool instead of the drawable list
+			if rendered(char) then
 				table.insert(entitylib.List, entity)
 				entitylib.Events.EntityAdded:Fire(entity)
 			else
