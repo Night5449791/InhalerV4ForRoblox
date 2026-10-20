@@ -480,9 +480,18 @@ entitylib.targetCheck = function(entity)
 		if not select(2, whitelist:get(entity.Player)) then return false end
 	end
 
-	local myTeam = bloxstrike.team(lplr)
-	if myTeam and entity.Team and vape.Settings.Modules.Options['Teams by server'].Enabled then
-		return myTeam ~= entity.Team
+	-- mirror the game's own isEnemy (Controllers/ESPController): Deathmatch is free-for-all, and
+	-- a target whose team is neither Terrorists nor Counter-Terrorists (nil during warmup) is not
+	-- a valid enemy either
+	if vape.Settings.Modules.Options['Teams by server'].Enabled then
+		if workspace:GetAttribute('Gamemode') == 'Deathmatch' then return true end
+
+		local myTeam = bloxstrike.team(lplr)
+		if entity.Team == 'Terrorists' or entity.Team == 'Counter-Terrorists' then
+			return myTeam ~= entity.Team
+		end
+
+		return false
 	end
 
 	return true
@@ -601,5 +610,9 @@ vape:Clean(function()
 	vape.Libraries.bloxstrike = nil
 	table.clear(bloxstrike)
 end)
+
+-- the local rig is an anchored presentation model with no Humanoid, so the physics-based
+-- universal movement modules cannot drive it; drop the ones that would just error or no-op
+vape:Remove('Fly')
 
 entitylib.start()
