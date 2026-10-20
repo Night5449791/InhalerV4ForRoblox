@@ -3,7 +3,7 @@ local AutoPickOnDied
 local items = {}
 local PickupList = {}
 local died = false
--- the same spot KickExploit grabs its gun from, standing on it keeps us in the spawner's range
+-- the gun spawn spot; standing on it keeps us in the spawner's range
 local PICKUP_GUN_POSITION = Vector3.new(816, 98, 2225)
 local PICKUP_GUN_CFRAME = CFrame.new(PICKUP_GUN_POSITION)
 

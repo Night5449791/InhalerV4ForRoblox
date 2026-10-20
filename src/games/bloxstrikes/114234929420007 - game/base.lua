@@ -612,7 +612,10 @@ vape:Clean(function()
 end)
 
 -- the local rig is an anchored presentation model with no Humanoid, so the physics-based
--- universal movement modules cannot drive it; drop the ones that would just error or no-op
-vape:Remove('Fly')
+-- universal Blatant modules cannot drive it; drop every one of them, plus the inapplicable
+-- Combat/Utility modules
+for _, v in {'AntiFall', 'DiedTP', 'Fly', 'HighJump', 'HitBoxes', 'Invisible', 'Jesus', 'Killaura', 'LongJump', 'MouseTP', 'Phase', 'Speed', 'SpinBot', 'Spider', 'Swim', 'TargetStrafe', 'Timer', 'Reach', 'AntiRagdoll'} do
+	vape:Remove(v)
+end
 
 entitylib.start()

@@ -37,6 +37,9 @@ run(function()
 		return entity, entity and entity[Part.Value]
 	end
 
+	-- reused every shot so the wall check does not allocate a fresh ignore table
+	local ignore = {}
+
 	local function hookBullet(self, aimingOptions, isAiming)
 		local bullet = OriginalCreate(self, aimingOptions, isAiming)
 		if not SilentAim.Enabled or type(bullet) ~= 'table' then return bullet end
@@ -47,14 +50,17 @@ run(function()
 		local entity, part = getTarget(origin)
 		if not part then return bullet end
 
+		local position = part.Position
+		ignore[1] = entity.Character
+
 		-- Wallbang only lets the shot through wood (penetrable) surfaces; metal/stone still
 		-- block, and with Wallbang off only a clear line of sight shoots
-		local hit = entitylib.Wallcheck(origin, part.Position, {entity.Character})
+		local hit = entitylib.Wallcheck(origin, position, ignore)
 		if hit and not (Wallbang.Enabled and (hit.Material == Enum.Material.Wood or hit.Material == Enum.Material.WoodPlanks)) then
 			return bullet
 		end
 
-		bullet.Direction = (part.Position - origin).Unit
+		bullet.Direction = (position - origin).Unit
 		if ShowTarget.Enabled then
 			targetinfo.Targets[entity] = os.clock() + 1
 		end

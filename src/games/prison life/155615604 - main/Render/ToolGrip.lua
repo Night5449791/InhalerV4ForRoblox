@@ -47,7 +47,7 @@ local function EntityAdded()
 	end
 end
 
-ToolGrip = vape.Categories.Blatant:CreateModule({
+ToolGrip = vape.Categories.Render:CreateModule({
 	Name = 'ToolGrip',
 	Function = function(callback)
 		if callback then
