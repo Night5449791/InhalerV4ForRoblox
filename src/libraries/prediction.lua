@@ -260,18 +260,35 @@ function module.SolveTrajectory(origin, projectileSpeed, gravity, targetPos, tar
 		local estTime = (disp.Magnitude / projectileSpeed)
 		local origq = q
 		local origj = j
-		for i = 1, 100 do
-			q -= (.5 * playerGravity) * estTime
-			local velo = targetVelocity * 0.016
-			local ray = workspace.Raycast(workspace, Vector3.new(targetPos.X, targetPos.Y, targetPos.Z), Vector3.new(velo.X, (q * estTime) - playerHeight, velo.Z), params)
-			if ray then
-				local newTarget = ray.Position + Vector3.new(0, playerHeight, 0)
-				estTime -= math.sqrt(((targetPos - newTarget).Magnitude * 2) / playerGravity)
-				targetPos = newTarget
-				j = (targetPos - origin).Y
-				q = 0
-				break
+		local playerY = targetPos.Y
+
+		for i = 1, 2 do
+			if q > 0 then
+				local fallTime = q / playerGravity
+
+				if estTime > fallTime then
+					estTime -= fallTime
+					playerY += (q * q) / (playerGravity * 2)
+					q = 0
+				else
+					playerY += (q - (.5 * playerGravity) * estTime) * estTime
+					j = (playerY - origin.Y)
+					q = 0
+					break
+				end
 			else
+				q -= (.5 * playerGravity) * estTime
+				local ray = workspace.Raycast(workspace, Vector3.new(targetPos.X, playerY, targetPos.Z), Vector3.new(p, (q * estTime) - playerHeight, r), params)
+				if ray then
+					playerY = ray.Position.Y + playerHeight
+					j = (playerY - origin.Y)
+					q = 0
+				else
+					playerY += q * estTime
+					j = (playerY - origin.Y)
+					q = 0
+				end
+
 				break
 			end
 		end
@@ -284,25 +301,18 @@ function module.SolveTrajectory(origin, projectileSpeed, gravity, targetPos, tar
 		2*j*q + 2*h*p + 2*k*r,
 		j*j + h*h + k*k
 	)
+
+	local t = gravity < 20 and (disp.Magnitude / projectileSpeed) or nil
 	if solutions then
-		local posRoots = table.create(2)
 		for _, v in solutions do --filter out the negative roots
 			if v > 0 then
-				table.insert(posRoots, v)
+				t = v
+				break
 			end
 		end
+	end
 
-		posRoots[1] = posRoots[1]
-
-		if posRoots[1] then
-			local t = posRoots[1]
-			local d = (h + p*t)/t
-			local e = (j + q*t - l*t*t)/t
-			local f = (k + r*t)/t
-			return origin + Vector3.new(d, e, f)
-		end
-	elseif gravity == 0 then
-		local t = (disp.Magnitude / projectileSpeed)
+	if t then
 		local d = (h + p*t)/t
 		local e = (j + q*t - l*t*t)/t
 		local f = (k + r*t)/t

@@ -84,7 +84,7 @@ DamageIndicator = vape.Legit:CreateModule({
 	Function = function(callback)
 		if callback then
 			TracerHook:Add('DamageIndicator', function(...)
-				local part = debug.getstack(4, 17)
+				local part = debug.getstack(4, 13)
 				if typeof(part) == 'Instance' then
 					for _, v in entitylib.List do
 						if part:IsDescendantOf(v.Character) and entitylib.isVulnerable(v, true) then

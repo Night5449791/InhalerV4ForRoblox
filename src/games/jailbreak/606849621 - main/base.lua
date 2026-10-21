@@ -49,6 +49,7 @@ local whitelist = vape.Libraries.whitelist
 local prediction = vape.Libraries.prediction
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
+local getfontbounds = vape.Libraries.getfontbounds
 local vm = loadstring(downloadFile('newvape/libraries/vm.lua'), 'vm')()
 
 local jb = {}
@@ -633,6 +634,18 @@ run(function()
 		end
 	end
 
+	local function getTaseEvent()
+		for _, callback in debug.getupvalue(jb.TeamChooseController.Init, 2) do
+			if type(callback) == 'function' then
+				for _, const in debug.getconstants(callback) do
+					if tostring(const):find('Stunned') then
+						return callback
+					end
+				end
+			end
+		end
+	end
+
 	local function toMoney(num)
 		local one, two, three = string.match(tostring(num), '^([^%d]*%d)(%d*)(.-)$')
 		return one .. (two:reverse():gsub('(%d%d%d)', '%1,'):reverse() .. three)..'$'
@@ -752,6 +765,7 @@ run(function()
 		return text
 	end, false)
 
+	jb.StunFunction = getTaseEvent()
 	local awardCallback = getAwardEvent()
 	if awardCallback then
 		local hook

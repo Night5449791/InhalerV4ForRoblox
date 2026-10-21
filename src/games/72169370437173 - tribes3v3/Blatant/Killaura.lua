@@ -13,27 +13,7 @@ local ParticleTexture
 local ParticleColor1
 local ParticleColor2
 local ParticleSize
-local Particles, Boxes, AttackDelay, AnimDelay, BlockDelay = {}, {}, os.clock(), os.clock(), os.clock()
-
-local function block(didAttack, tool)
-	if not didAttack and BlockDelay > os.clock() then
-		return
-	end
-
-	BlockDelay = os.clock() + 0.05
-	local handler = tribes.State.handler
-	if handler.tuning.block then
-		if handler.blocking then
-			handler.ctx.send('Block', {tool = tool, on = true})
-		else
-			handler:SetBlock(true)
-		end
-
-		if vape.ThreadFix then
-			setthreadidentity(8)
-		end
-	end
-end
+local Particles, Boxes, AttackDelay = {}, {}, os.clock()
 
 local function getAttackData()
 	if Mouse.Enabled then
@@ -45,6 +25,11 @@ local function getAttackData()
 	end
 end
 
+local function sanitizeAngle(cf)
+	local y, x, z = cf:ToEulerAnglesYXZ()
+	return CFrame.Angles(math.clamp(y, -1.3962634015954636, 1.361356816555577), x, z).LookVector
+end
+
 Killaura = vape.Categories.Blatant:CreateModule({
 	Name = 'Killaura',
 	Function = function(callback)
@@ -54,7 +39,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 				local attacked = {}
 
 				if tool then
-					local didAttack = false
+					local handler = tribes.State.handler
 					local entities = entitylib.AllPosition({
 						Range = AttackRange.Value,
 						Wallcheck = Targets.Walls.Enabled or nil,
@@ -76,10 +61,12 @@ Killaura = vape.Categories.Blatant:CreateModule({
 							end
 
 							targetinfo.Targets[entity] = os.clock() + 1
-							table.insert(attacked, {
-								Entity = entity,
-								Check = BoxAttackColor
-							})
+							if #attacked < (handler.tuning.maxTargets or 1) then
+								table.insert(attacked, {
+									Entity = entity,
+									Check = BoxAttackColor
+								})
+							end
 						end
 
 						if #attacked > 0 then
@@ -91,45 +78,55 @@ Killaura = vape.Categories.Blatant:CreateModule({
 							end
 
 							if AttackDelay < os.clock() and (AutoBlock.Enabled or not tribes.State.handler.blocking) then
-								AttackDelay = os.clock() + 0.05
-
 								local targets = {}
-								local handler = tribes.State.handler
 								handler.lastSwing = os.clock()
+
+								AttackDelay = os.clock() + handler:Cooldown()
 								for _, data in attacked do
 									table.insert(targets, data.Entity.Character)
 								end
 
-								if AnimDelay < os.clock() then
-									AnimDelay = os.clock() + (handler.tuning.cooldown or 0.5)
-									local comboTable = handler.tuning.combo or {1}
-									local animTable = handler.preset.swings or {}
-
-									handler.combo = (handler.combo % #comboTable) + 1
-									tribes.Util.PlayAnim(handler.ctx.animator, animTable[((handler.combo - 1) % math.max(1, #animTable)) + 1], (handler.preset.swingSpeed or 1), 0.05)
-									handler.ctx.emit('Swing', {
-										step = handler.combo,
-										finisher = (#comboTable > 2) and (handler.tuning.combo == #comboTable),
-										hitDelay = handler.preset.hitDelay or 0.1
-									})
+								if AutoBlock.Enabled and handler.tuning.block then
+									tribes.State.handler:SetBlock(false)
 								end
 
-								didAttack = true
+								local oneHanded = handler:OneHanded()
+								local comboTable = oneHanded and (handler.tuning.oneHanded.combo or {1}) or (handler.tuning.combo or {1})
+								local animTable = oneHanded and handler.preset.oneSwings or handler.preset.swings or {}
+								handler.combo = (handler.combo % #comboTable) + 1
+								local finisher = (#comboTable > 2) and (handler.combo == #comboTable)
+								tribes.Util.PlayAnim(handler.ctx.animator, animTable[((handler.combo - 1) % math.max(1, #animTable)) + 1], (handler.preset.swingSpeed or 1) * (finisher and 0.95 or 1), 0.05)
+
+								handler.ctx.emit('Swing', {
+									step = handler.combo,
+									finisher = finisher,
+									hitDelay = handler.preset.hitDelay or 0.1,
+									oneHanded = oneHanded
+								})
+
 								handler.ctx.send('Swing', {
-									dir = CFrame.lookAt(localPos, attacked[1].Entity.RootPart.Position).LookVector,
+									dir = sanitizeAngle(CFrame.lookAt(localPos + Vector3.new(0, 1.5, 0), attacked[1].Entity.RootPart.Position)),
 									tool = tool,
 									hits = targets
 								})
+
+								if AutoBlock.Enabled and handler.tuning.block then
+									tribes.State.handler:SetBlock(true)
+								end
 
 								if vape.ThreadFix then
 									setthreadidentity(8)
 								end
 							end
 						end
-					end
+					elseif AutoBlock.Enabled and handler.tuning.block then
+						if tribes.Util.CanAct() then
+							tribes.State.handler:SetBlock(true)
+						end
 
-					if AutoBlock.Enabled then
-						block(didAttack, tool)
+						if vape.ThreadFix then
+							setthreadidentity(8)
+						end
 					end
 				end
 
