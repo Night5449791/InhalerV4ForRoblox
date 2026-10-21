@@ -1,6 +1,7 @@
 local Invisible
 local oldcf
 local animtrack
+local forcefield
 local proper = true
 
 local function animationTrickery()
@@ -24,6 +25,13 @@ Invisible = vape.Categories.Blatant:CreateModule({
 	Function = function(callback)
 		if callback then
 			animationTrickery()
+
+			if entitylib.isAlive then
+				local character = entitylib.character.Character
+				forcefield = character:FindFirstChild('InvisibleForcefield') or Instance.new('ForceField')
+				forcefield.Name = 'InvisibleForcefield'
+				forcefield.Parent = character
+			end
 
 			oldcf = nil
 			local bindKey = httpService:GenerateGUID(true)
@@ -62,6 +70,11 @@ Invisible = vape.Categories.Blatant:CreateModule({
 			if animtrack then
 				animtrack:Stop()
 				animtrack:Destroy()
+			end
+
+			if forcefield then
+				forcefield:Destroy()
+				forcefield = nil
 			end
 
 			if entitylib.isAlive and oldcf then
