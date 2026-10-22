@@ -57,7 +57,7 @@ Products and module counts:
 | `bridge duel/139566161526375 - game` | 13 |
 | `redliner/115875349872417 - game` | 12 · 2 redirects |
 | `132768098780837 - blockwars` | 11 |
-| `72169370437173 - tribes3v3` | 10 |
+| `72169370437173 - tribes3v3` | 12 |
 | `893973440 - flee the facility` | 7 |
 | `redwood prison/10456235914 - game` | 5 · 4 redirects |
 | `bloxstrikes/114234929420007 - game` | 1 |
