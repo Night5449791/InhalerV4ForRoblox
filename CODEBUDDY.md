@@ -62,7 +62,6 @@ Products and module counts:
 | `redwood prison/10456235914 - game` | 5 · 4 redirects |
 | `bloxstrikes/114234929420007 - game` | 1 |
 | `girls and boys vs zombies/796267492 - main` | 1 · 5 redirects |
-| `futuretops/5169051062 - lobby` | 0 (registers `sessioninfo` items only) |
 
 A redirect is a standalone `<PlaceId> - <desc>.lua` at the game-folder root: set `vape.Place` to the parent PlaceId, then `loadstring` that parent chunk (some forward `...`). `skywars voxel/8542259458 - skywars lobby.lua` is not a redirect — it is a mini-base that only registers `sessioninfo` items.
 
