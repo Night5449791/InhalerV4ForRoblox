@@ -2,35 +2,11 @@ local ChatCommand
 local TARGET_COLOR = Color3.new(1, 0, 0)
 
 local options = {}
-local teamAliases = {
-	g = 'Guards',
-	guard = 'Guards',
-	guards = 'Guards',
-	i = 'Inmates',
-	inmate = 'Inmates',
-	inmates = 'Inmates',
-	c = 'Criminals',
-	criminal = 'Criminals',
-	criminals = 'Criminals'
-}
-local teamsService = cloneref(game:GetService('Teams'))
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
-local danceTrack
-
--- ============================================================================
--- functions
--- helpers first, then one handler per command family; the commands that call them
--- are listed under the commands banner at the bottom
--- ============================================================================
 
 -- where .tp lands the local character (the flat mask itself comes from base.lua)
 local TP_OFFSET = Vector3.new(0, 2, 0)
--- animation ids per rig, so .dance stops rebuilding two lists every time
-local DANCE_IDS = {
-	R6 = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'},
-	R15 = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
-}
 
 -- nil when the text is missing or only whitespace
 local function argument(text)
@@ -44,47 +20,15 @@ local function getLocalHumanoid()
 	return humanoid or (entitylib.character and entitylib.character.Humanoid)
 end
 
--- vape.Modules is a flat list of every module by name
-local function getModule(name)
-	return vape.Modules and vape.Modules[name]
-end
-
--- Lists
-
+-- lists: toggles one entry, the update event only fires on an actual change
 local function setListValue(list, value, enabled)
 	if list and list.ListEnabled and enabled ~= (table.find(list.ListEnabled, value) ~= nil) then
 		list:ChangeValue(value)
 	end
 end
 
--- returns how many entries were dropped
-local function clearListValues(list)
-	if not list or not list.List then return 0 end
-
-	local count = #list.List + #list.ListEnabled
-	if count == 0 then return 0 end
-
-	table.clear(list.List)
-	table.clear(list.ListEnabled)
-	list:ChangeValue()
-	return count
-end
-
-local function addTarget(name, enabled)
-	setListValue(vape.Categories.Targets, name, enabled)
-
-	if enabled then
-		whitelist.customtags[name] = {{text = 'Exploiter', color = TARGET_COLOR}}
-		tempTargets[name] = true
-	else
-		whitelist.customtags[name] = nil
-		tempTargets[name] = nil
-	end
-end
--- Player lookup
-
--- entries are either entities, which expose their player, or plain players.
--- filter drops entries; exact matches win over wildcard and prefix matches.
+-- entries are either entities, which expose their player, or plain players; the
+-- filter drops entries and exact matches win over wildcard and prefix matches
 local function search(list, lowered, filter)
 	local partial, wildcardMatch
 	local pattern
@@ -113,11 +57,11 @@ local function search(list, lowered, filter)
 	return wildcardMatch or partial
 end
 
+-- npcs carry no player and dead characters only count when asked for
 local function findEntity(prefix, includeDead)
 	local text = argument(prefix)
 	if not text then return end
 
-	-- npcs carry no player and dead characters only count when asked for
 	return search(entitylib.List, text:lower(), function(entity)
 		return entity.Player and (includeDead or entity.Humanoid.Health > 0)
 	end)
@@ -136,8 +80,6 @@ local function findPlayer(prefix, allowLeft)
 	return search(playersService:GetPlayers(), text:lower())
 end
 
--- Camera
-
 local function restoreCamera()
 	viewPlayer = nil
 
@@ -147,8 +89,6 @@ local function restoreCamera()
 		gameCamera.CameraType = Enum.CameraType.Custom
 	end
 end
-
--- Follow
 
 local function stopFollow()
 	if followConnection then
@@ -214,43 +154,15 @@ local function startFollow(player)
 	end)
 end
 
--- Team switching
+-- hop, rj and fling only turn their module on, each gated by its own toggle
+local function enableModule(option, name)
+	if not options[option].Enabled then return end
 
-local function findTeam(name)
-	name = argument(name)
-	if not name then return end
-
-	local lowered = name:lower()
-	local team = teamsService:FindFirstChild(teamAliases[lowered] or name)
-	if team then
-		return team
+	local module = vape.Modules and vape.Modules[name]
+	if module and not module.Enabled then
+		module:Toggle()
 	end
-
-	for _, child in teamsService:GetChildren() do
-		if child.Name:lower():sub(1, #lowered) == lowered then
-			return child
-		end
-	end
-
-	return nil
 end
-
-local function handleTeam(args)
-	if not options.ChangeTeam.Enabled then return end
-
-	local targetTeam = findTeam(args and args:match('^%S+$'))
-	if not targetTeam then return end
-
-	local autoTeam = vape.Modules.AutoTeam
-	if autoTeam and autoTeam.Join then
-		autoTeam:Join(targetTeam.Name)
-		return
-	end
-
-	notif('ChatCommand', 'AutoTeam is not available in this game.', 5, 'warning')
-end
-
--- Reload / servers
 
 local function handleReload()
 	if not options.ReloadVape.Enabled then return end
@@ -270,62 +182,6 @@ local function handleReload()
 	end
 end
 
-local function handleHop()
-	if not options.ServerHop.Enabled then return end
-
-	local serverHop = vape.Modules.ServerHop
-	if serverHop and not serverHop.Enabled then
-		serverHop:Toggle()
-	end
-end
-
-local function handleRejoin()
-	if not options.Rejoin.Enabled then return end
-
-	local rejoin = vape.Modules.Rejoin
-	if rejoin and not rejoin.Enabled then
-		rejoin:Toggle()
-	end
-end
-
-local function handleFling()
-	if not options.Fling.Enabled then return end
-
-	local flingExploit = vape.Modules.FlingExploit
-	if flingExploit and not flingExploit.Enabled then
-		flingExploit:Toggle()
-	end
-end
-
-local function handleUndance()
-	if danceTrack then
-		danceTrack:Stop()
-		danceTrack:Destroy()
-		danceTrack = nil
-	end
-end
-
-local function handleDance()
-	if not options.Dance.Enabled then return end
-
-	local humanoid = getLocalHumanoid()
-	if not humanoid then
-		notif('ChatCommand', 'You have no character.', 5, 'warning')
-		return
-	end
-
-	handleUndance()
-
-	local dances = humanoid.RigType == Enum.HumanoidRigType.R15 and DANCE_IDS.R15 or DANCE_IDS.R6
-	local animation = Instance.new('Animation')
-	animation.AnimationId = 'rbxassetid://'..dances[math.random(1, #dances)]
-	danceTrack = humanoid:LoadAnimation(animation)
-	danceTrack.Looped = true
-	danceTrack:Play()
-end
-
--- Whitelist / target lists
-
 local function handleWhitelist(args, remove)
 	if not options.Whitelist.Enabled then return end
 
@@ -339,19 +195,19 @@ local function handleWhitelist(args, remove)
 	notif('Whitelist', player.DisplayName..' has been '..(remove and 'unwhitelisted.' or 'whitelisted.'), 5)
 end
 
-local function clearAllTargets()
-	local count = clearListValues(vape.Categories.Targets)
-	notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
-end
-
 local function handleTargets(args, remove)
 	if not options.Blacklist.Enabled then return end
 
 	args = argument(args)
 	if not args then return end
 
+	local list = vape.Categories.Targets
 	if args:lower() == 'all' then
-		clearAllTargets()
+		local count = #list.List + #list.ListEnabled
+		table.clear(list.List)
+		table.clear(list.ListEnabled)
+		list:ChangeValue()
+		notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
 		return
 	end
 
@@ -361,16 +217,18 @@ local function handleTargets(args, remove)
 		return
 	end
 
-	addTarget(player.Name, not remove)
+	-- the tag and the temporary target live exactly as long as the target entry
+	local name = player.Name
+	setListValue(list, name, not remove)
+	whitelist.customtags[name] = not remove and {{text = 'Exploiter', color = TARGET_COLOR}} or nil
+	tempTargets[name] = not remove or nil
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
-
--- CheaterDetector bridge
 
 local function handleCheater(args, remove)
 	if not options.Cheater.Enabled then return end
 
-	local module = getModule('CheaterDetector')
+	local module = vape.Modules and vape.Modules.CheaterDetector
 	if not (module and module.AddCheater) then
 		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
 		return
@@ -382,8 +240,6 @@ local function handleCheater(args, remove)
 		module:AddCheater(args)
 	end
 end
-
--- Movement / camera commands
 
 local function handleTP(args)
 	if not options.PlayerTP.Enabled then return end
@@ -432,13 +288,10 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
--- ============================================================================
--- commands
--- one toggle per command family, then the dispatch table; the short names are the
--- real handlers and the long names are aliased onto them right after
--- ============================================================================
-
+-- one toggle per command family, then the dispatch table; the long names are
+-- aliased onto the short ones right after
 local toggles = {
+	{Name = 'ShareCommand', Tooltip = 'Allows whitelisted users to directly access chat commands.\nPrivate members always have access.'},
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
 		if not enabled then stopFollow() end
@@ -450,11 +303,9 @@ local toggles = {
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
 	{Name = 'Fling', Tooltip = '.fling'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
-	{Name = 'ChangeTeam', Tooltip = '.team <name>'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
-	{Name = 'Dance', Tooltip = '.dance\n.undance'}
+	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'}
 }
 
 local commands = {
@@ -481,13 +332,16 @@ local commands = {
 	delskid = function(args)
 		handleCheater(args, true)
 	end,
-	team = handleTeam,
-	hop = handleHop,
-	rj = handleRejoin,
-	fling = handleFling,
-	reload = handleReload,
-	dance = handleDance,
-	undance = handleUndance
+	hop = function()
+		enableModule('ServerHop', 'ServerHop')
+	end,
+	rj = function()
+		enableModule('Rejoin', 'Rejoin')
+	end,
+	fling = function()
+		enableModule('Fling', 'FlingExploit')
+	end,
+	reload = handleReload
 }
 
 -- long forms point at the same handler as the short ones
@@ -502,9 +356,25 @@ for alias, name in {
 	commands[alias] = commands[name]
 end
 
-local function onChatted(message)
+-- the .wl command fills the Friends list, so that list is the whitelist for sharing;
+-- a whitelist entry above level 0 is a private member and always keeps control
+local function canShare(plr)
+	if options.ShareCommand.Enabled and table.find(vape.Categories.Friends.ListEnabled, plr.Name) then
+		return true
+	end
+
+	local success, level = pcall(function()
+		return select(1, vape.Libraries.whitelist:get(plr))
+	end)
+
+	return success and level ~= 0
+end
+
+-- a message from someone else only runs when the sharing rules allow it
+local function onChatted(message, plr)
 	message = argument(message)
 	if not message or message:sub(1, 1) ~= '.' then return end
+	if plr and not canShare(plr) then return end
 
 	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
 	command = command and command:lower()
@@ -519,6 +389,25 @@ local function onChatted(message)
 	return false
 end
 
+-- one connection per player, dropped again on PlayerRemoving
+local sharedConnections = {}
+
+local function trackPlayer(plr)
+	if plr == lplr or sharedConnections[plr] then return end
+
+	sharedConnections[plr] = plr.Chatted:Connect(function(message)
+		onChatted(message, plr)
+	end)
+end
+
+local function untrackPlayer(plr)
+	local connection = sharedConnections[plr]
+	if not connection then return end
+
+	connection:Disconnect()
+	sharedConnections[plr] = nil
+end
+
 -- module registration: the toggles above are the options the handlers check
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
@@ -527,9 +416,9 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 
 		ChatCommand:Clean(restoreCamera)
 		ChatCommand:Clean(stopFollow)
-		ChatCommand:Clean(handleUndance)
-		ChatCommand:Clean(lplr.CharacterAdded:Connect(handleUndance))
 		ChatCommand:Clean(playersService.PlayerRemoving:Connect(function(plr)
+			untrackPlayer(plr)
+
 			if plr == viewPlayer then
 				restoreCamera()
 			end
@@ -539,14 +428,27 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 			end
 		end))
 		ChatCommand:Clean(entitylib.Events.EntityAdded:Connect(function(entity)
-			if not entity.Player then return end
-
-			if entity.Player == viewPlayer then
+			if entity.Player and entity.Player == viewPlayer then
 				gameCamera.CameraSubject = entity.Humanoid
 			end
-
 		end))
-		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
+		-- chatted also hands over the whisper recipient, so the local path passes no player
+		ChatCommand:Clean(lplr.Chatted:Connect(function(message)
+			onChatted(message)
+		end))
+
+		for _, plr in playersService:GetPlayers() do
+			trackPlayer(plr)
+		end
+
+		ChatCommand:Clean(playersService.PlayerAdded:Connect(trackPlayer))
+		ChatCommand:Clean(function()
+			for _, connection in sharedConnections do
+				connection:Disconnect()
+			end
+
+			table.clear(sharedConnections)
+		end)
 	end,
 	Tooltip = 'Chat commands, every command is a toggleable option'
 })
@@ -555,17 +457,18 @@ local CommandBox
 CommandBox = ChatCommand:CreateTextBox({
 	Name = 'Command',
 	Placeholder = 'Type a command (.tp player)',
-	Tooltip = 'Runs a chat command without opening the chat. Press Enter to execute.',
+	Tooltip = 'Runs a chat command without opening the chat. Press Enter to execute.\nThe leading dot is optional.',
 	Function = function(enter)
-		if enter and CommandBox and CommandBox.Value ~= '' then
-			local command = CommandBox.Value
-			if command:sub(1, 1) ~= '.' then
-				command = '.'..command
-			end
-			-- the command never reaches the chat, so the box is emptied to show it ran
-			if onChatted(command) then
-				CommandBox:SetValue('')
-			end
+		if not enter then return end
+
+		-- the dot is optional, so ".tp player" and "tp player" run the same command
+		local command = argument(CommandBox.Value)
+		command = command and argument((command:gsub('^%.', '')))
+		if not command then return end
+
+		-- the command never reaches the chat, so the box is emptied to show it ran
+		if onChatted('.'..command) then
+			CommandBox:SetValue('')
 		end
 	end
 })

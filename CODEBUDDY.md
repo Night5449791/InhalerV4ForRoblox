@@ -110,7 +110,7 @@ Options, `<Module>:CreateXxx({...})`, are stored in `module.Options[Name]` and s
 
 Overridable hooks: `targetCheck`, `getUpdateConnections`, `getEntityColor`, `isVulnerable`. Selectors `EntityMouse`, `EntityPosition`, `AllPosition` take a settings table that the library `table.clear`s before returning — pass a fresh table every call. `Wallcheck(origin, position, ignore)` is non-nil when blocked. The library calls `entitylib.start()` on load, so after overriding hooks call `start()` again (every game base ends that way); `Targetable` is computed once per spawn and stays stale until `refreshEntity`.
 
-Universal registers `vape.Libraries.entity/whitelist/prediction/hash/webhook/auraanims`; `overlays/TargetInfo.lua:254` registers `targetinfo`; `Render/SessionInfo.lua` registers `sessioninfo`. GUI libraries (`tween`, `uipallet`, `color`, `getfontbounds`, `getvapeasset`) are globals from `--Libraries`. `prediction.SolveTrajectory(...)` returns an aim point or nil. `whitelist:get(plr)` returns `(level, attackable, tags)`; the second value is what `targetCheck` reads. `getvapeasset` caches downloads on desktop and otherwise falls back to an inline `rbxassetid://` table, returning `''` on a miss.
+Universal registers `vape.Libraries.entity/whitelist/prediction/hash/webhook/auraanims`; `overlays/TargetInfo.lua:254` registers `targetinfo`; `Render/SessionInfo.lua` registers `sessioninfo`. GUI libraries (`tween`, `uipallet`, `color`, `getfontbounds`, `getvapeasset`) are globals from `--Libraries`. `prediction.SolveTrajectory(...)` returns an aim point or nil. `whitelist:get(plr)` returns `(level, attackable, tags)`; the second value is what `targetCheck` reads, level 0 is the public tier, `whitelist.localprio` holds the local player's own level, and the whitelist JSON is fetched after injection, so `get` reads 0 until `whitelist.loaded` becomes true. `getvapeasset` caches downloads on desktop and otherwise falls back to an inline `rbxassetid://` table, returning `''` on a miss.
 
 ## 8. Authoring a game module
 
@@ -136,6 +136,8 @@ Targets = Reach:CreateTargets({Players = true})
 ```
 
 Each file re-declares the shims it uses (`isfile`, `cloneref`, `queue_on_teleport`, notifying `loadstring`) because chunks load alone. Universal's base also provides shared helpers (`isFriend`, `isTarget`, `canClick`, `getTool`, `notif`, `serverHop`, `updateVelocity`, `motorMove`), the `SpeedMethods` table, and the whitelist command set (`kill`, `kick`, `chat`, `toggle`, `uninject`, …).
+
+Prison Life's `Utility/ChatCommand.lua` keeps a shared path next to the local `lplr.Chatted` one: names in the `.wl` list (`vape.Categories.Friends.ListEnabled`) may run dot commands on the client while `ShareCommand` is enabled, and any whitelist level above 0 (private members) may always. Its CommandBox accepts a command with or without the leading dot. The prison life base ends with a watcher that polls up to 60s for `whitelist.loaded` before connecting `PlayerAdded` and rescanning `GetPlayers()`, then queues `MEMBER_LINES` chat lines for every private member that joins; a single worker drains the queue a second apart, and the block stays silent when `whitelist.localprio ~= 0`, when the player is `lplr`, or when the `UserId` was already announced.
 
 ## 9. Known pitfalls
 

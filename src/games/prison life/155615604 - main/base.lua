@@ -805,6 +805,60 @@ run(function()
 	end
 end)
 
+-- private members get named in chat, unless the local player already sits on that tier
+local announcedMembers = {}
+
+-- every line names the member, they go out one by one so chat does not drop them
+local MEMBER_LINES = {
+	'I use the script Inhaler V4, <member>',
+	'<member> Inhaler Private User has joined the game.'
+}
+
+local function sayMessage(message)
+	pcall(function()
+		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
+			if not channel or not textChatService:CanUserChatAsync(lplr.UserId) then return end
+
+			channel:SendAsync(message)
+		else
+			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+		end
+	end)
+end
+
+local function announceMember(plr)
+	if plr == lplr or whitelist.localprio ~= 0 or announcedMembers[plr.UserId] or whitelist:get(plr) == 0 then return end
+
+	announcedMembers[plr.UserId] = true
+	local name = plr.DisplayName
+
+	task.spawn(function()
+		for index, line in MEMBER_LINES do
+			if index > 1 then
+				task.wait(1)
+			end
+
+			sayMessage((line:gsub('<member>', name)))
+		end
+	end)
+end
+
+task.spawn(function()
+	-- the whitelist is fetched after injection, levels mean nothing until then
+	for _ = 1, 60 do
+		if whitelist.loaded or vape.Loaded == nil then break end
+		task.wait(1)
+	end
+
+	if not whitelist.loaded then return end
+
+	vape:Clean(playersService.PlayerAdded:Connect(announceMember))
+	for _, plr in playersService:GetPlayers() do
+		announceMember(plr)
+	end
+end)
+
 for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health', 'GamingChair'} do
 	vape:Remove(v)
 end
