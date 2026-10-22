@@ -810,8 +810,8 @@ local announcedMembers = {}
 
 -- every line names the member, they go out one by one so chat does not drop them
 local MEMBER_LINES = {
-	'I use the script Inhaler V4, <member>',
-	'<member> Inhaler Private User has joined the game.'
+	'I use the script Inhaler V4',
+	'<member> Inhaler Private User is in the game'
 }
 
 local function sayMessage(message)
