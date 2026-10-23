@@ -1,12 +1,13 @@
 local SilentAim
 local Targets
 local Mode
-local Part
-local FOV
+local HitChance
+local HeadshotChance
 local Range
 local Wallbang
 local ShowTarget
 local OriginalCreate
+local rand = Random.new()
 
 run(function()
 	local components = replicatedStorage:FindFirstChild('Components')
@@ -24,17 +25,22 @@ run(function()
 	-- bullet object is returned is therefore enough to move the real shot, without touching
 	-- the packet layout or the sequence counters the server checks.
 	local function getTarget(origin)
+		-- a failed roll leaves the shot untouched, so the aim lands as often as the chance
+		-- allows and the misses look like ordinary bad aim
+		if rand:NextNumber(0, 100) > HitChance.Value then return end
+
+		local targetPart = rand:NextNumber(0, 100) < HeadshotChance.Value and 'Head' or 'RootPart'
 		local fromMouse = Mode.Value == 'Mouse'
 		local entity = entitylib[fromMouse and 'EntityMouse' or 'EntityPosition']({
-			Part = Part.Value,
-			Range = fromMouse and FOV.Value or Range.Value,
+			Part = targetPart,
+			Range = Range.Value,
 			MouseOrigin = fromMouse and gameCamera.ViewportSize / 2 or nil,
 			Origin = fromMouse and nil or origin,
 			Players = Targets.Players.Enabled,
 			NPCs = Targets.NPCs.Enabled
 		})
 
-		return entity, entity and entity[Part.Value]
+		return entity, entity and entity[targetPart]
 	end
 
 	-- reused every shot so the wall check does not allocate a fresh ignore table
@@ -120,32 +126,36 @@ run(function()
 	Mode = SilentAim:CreateDropdown({
 		Name = 'Mode',
 		List = {'Mouse', 'Position'},
-		Function = function(val)
-			FOV.Object.Visible = val == 'Mouse'
-			Range.Object.Visible = val == 'Position'
-		end,
 		Tooltip = 'Mouse - looks for targets near the crosshair\nPosition - looks for the closest target around you'
 	})
-	Part = SilentAim:CreateDropdown({
-		Name = 'Part',
-		List = {'Head', 'RootPart'}
-	})
-	FOV = SilentAim:CreateSlider({
-		Name = 'FOV',
+	HitChance = SilentAim:CreateSlider({
+		Name = 'Hit Chance',
 		Min = 0,
-		Max = 1000,
-		Default = 200,
-		Suffix = function(val)
-			return val == 1 and 'pixel' or 'pixels'
-		end
+		Max = 100,
+		Default = 100,
+		Suffix = '%',
+		Tooltip = 'Chance that the shot is redirected onto the target'
+	})
+	HeadshotChance = SilentAim:CreateSlider({
+		Name = 'Headshot Chance',
+		Min = 0,
+		Max = 100,
+		Default = 65,
+		Suffix = '%',
+		Tooltip = 'Chance that the shot is aimed at the head instead of the body'
 	})
 	Range = SilentAim:CreateSlider({
 		Name = 'Range',
 		Min = 1,
 		Max = 1000,
 		Default = 300,
-		Visible = false,
 		Suffix = function(val)
+			-- the same slider drives the entity lookup: pixels around the crosshair in
+			-- Mouse mode, studs around the character in Position mode
+			if Mode.Value == 'Mouse' then
+				return val == 1 and 'pixel' or 'pixels'
+			end
+
 			return val == 1 and 'stud' or 'studs'
 		end
 	})
