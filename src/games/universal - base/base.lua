@@ -755,14 +755,15 @@ run(function()
 
 	function whitelist:update(first)
 		local suc = pcall(function()
-			local _, subbed = pcall(function()
-				return game:HttpGet('https://github.com/Night5449791/whitelists')
-			end)
-			local commit = subbed:find('currentOid')
-			commit = commit and subbed:sub(commit + 13, commit + 52) or nil
-			commit = commit and #commit == 40 and commit or 'main'
-			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/Night5449791/whitelists/'..commit..'/PlayerWhitelist.json', true)
+			whitelist.textdata = game:HttpGet('https://inhalerbackendworker.itsrealnight1983.workers.dev/PlayerWhitelist.json', true)
 		end)
+
+		if not suc then
+			-- keep working when the worker is down
+			suc = pcall(function()
+				whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/Night5449791/whitelists/main/PlayerWhitelist.json', true)
+			end)
+		end
 		-- Always install the chat hook so ;cmd triggers even when the whitelist
 		-- failed to load or the local player isn't matched in it. Without this,
 		-- whitelist:hook() is only reached from playeradded (which only fires when
