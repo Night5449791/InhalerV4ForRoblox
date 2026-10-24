@@ -948,14 +948,26 @@ run(function()
 	}
 
 	-- activity: the panel sees who is online and can queue whitelist commands.
-	-- a websocket when the executor has one, the http beacon otherwise; the
-	-- worker reads the executor off the request so the client never names it
+	-- a websocket when the executor has one, the http beacon otherwise
 	local lastbeat = 0
+	local reported = false
 	local socket
 	local wsok, wsconnect = pcall(function()
 		return WebSocket.connect
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
+
+	-- the executor's own name, when it exposes one; the worker falls back to the
+	-- request user-agent otherwise
+	local function executorName()
+		local ok, name = pcall(function()
+			return typeof(identifyexecutor) == 'function' and identifyexecutor() or nil
+		end)
+		if ok and type(name) == 'string' and name:gsub('%s', '') ~= '' then
+			return name:sub(1, 32)
+		end
+		return nil
+	end
 
 	local function runRemote(data)
 		if type(data) ~= 'table' or type(data.commands) ~= 'table' then return end
@@ -982,7 +994,8 @@ run(function()
 				username = lplr.Name,
 				userId = tostring(lplr.UserId),
 				jobId = game.JobId,
-				placeId = tostring(game.PlaceId)
+				placeId = tostring(game.PlaceId),
+				executor = executorName()
 			})
 		})
 
@@ -1000,10 +1013,12 @@ run(function()
 		if socket or not haswebsockets then return end
 
 		task.spawn(function()
+			local exec = executorName()
 			local ok, connection = pcall(wsconnect, 'https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/ws?userId='..lplr.UserId
 				..'&username='..httpService:UrlEncode(lplr.Name)
 				..'&jobId='..httpService:UrlEncode(game.JobId)
-				..'&placeId='..game.PlaceId)
+				..'&placeId='..game.PlaceId
+				..(exec and '&executor='..httpService:UrlEncode(exec) or ''))
 			if not ok or not connection then return end
 
 			socket = connection
@@ -1027,6 +1042,13 @@ run(function()
 		repeat
 			if whitelist:update(whitelist.loaded) then
 				return
+			end
+
+			if whitelist.loaded and not reported then
+				reported = true
+				-- one http beacon on load: the request user-agent is what names
+				-- the executor on the worker, the websocket only carries its library
+				task.spawn(beat)
 			end
 
 			if whitelist.loaded and os.time() - lastbeat >= 60 then
