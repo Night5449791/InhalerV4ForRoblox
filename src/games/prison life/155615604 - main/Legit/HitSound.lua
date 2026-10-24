@@ -1,35 +1,39 @@
 local HitSound
-local Value
 local Volume
 local PitchShift
-local old, sounds = nil, {}
+local sounds = {}
 
 HitSound = vape.Legit:CreateModule({
 	Name = 'HitSound',
 	Function = function(callback)
 		if callback then
 			local played
-			TracerHook:Add('HitSound', function(...)
+
+			TracerHook:Add('HitSound', function()
+				if played or #sounds == 0 then
+					return
+				end
+
 				local part = debug.getstack(4, 13)
-				if typeof(part) == 'Instance' then
-					for _, v in entitylib.List do
-						if part:IsDescendantOf(v.Character) and entitylib.isVulnerable(v, true) then
-							if #sounds > 0 and not played then
-								local sound = Instance.new('Sound')
-								sound.SoundId = sounds[math.random(1, #sounds)]
-								sound.PlayOnRemove = true
-								sound.PlaybackSpeed = PitchShift.Enabled and 1 + ((0.5 - math.random()) / 10) or 1
-								sound.Volume = Volume.Value
-								sound.Parent = workspace
-								sound:Destroy()
+				if typeof(part) ~= 'Instance' then
+					return
+				end
 
-								played = task.defer(function()
-									played = nil
-								end)
-							end
+				for _, v in entitylib.List do
+					if part:IsDescendantOf(v.Character) and entitylib.isVulnerable(v, true) then
+						local sound = Instance.new('Sound')
+						sound.SoundId = sounds[math.random(#sounds)]
+						sound.PlaybackSpeed = PitchShift.Enabled and 1 + ((0.5 - math.random()) / 10) or 1
+						sound.Volume = Volume.Value
+						sound.PlayOnRemove = true
+						sound.Parent = workspace
+						sound:Destroy()
 
-							break
-						end
+						played = task.defer(function()
+							played = nil
+						end)
+
+						break
 					end
 				end
 			end)
@@ -39,13 +43,25 @@ HitSound = vape.Legit:CreateModule({
 	end,
 	Tooltip = 'Custom hit sound'
 })
-Value = HitSound:CreateTextList({
+HitSound:CreateTextList({
 	Name = 'Sounds',
 	Placeholder = 'sound id (roblox or file path)',
 	Function = function(list)
 		table.clear(sounds)
-		for index, sound in list or {} do
-			sounds[index] = sound:find('rbxasset') and sound or isfile(sound) and getcustomasset(sound) or nil
+
+		for _, sound in list or {} do
+			local asset
+
+			if sound:find('rbxasset', 1, true) then
+				asset = sound
+			elseif isfile(sound) then
+				local success, path = pcall(getcustomasset, sound)
+				asset = success and path or nil
+			end
+
+			if asset then
+				table.insert(sounds, asset)
+			end
 		end
 	end
 })

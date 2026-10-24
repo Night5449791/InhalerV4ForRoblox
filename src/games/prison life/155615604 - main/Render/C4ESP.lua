@@ -4,10 +4,29 @@ local OutlineColor
 local FillTransparency
 local OutlineTransparency
 local Reference = {}
+local lastFill, lastOutline
 local Folder = Instance.new('Folder')
 Folder.Parent = vape.holder
 
+local function Removed(c4)
+	local cham = Reference[c4]
+	if not cham then
+		return
+	end
+
+	if vape.ThreadFix then
+		setthreadidentity(8)
+	end
+
+	cham:Destroy()
+	Reference[c4] = nil
+end
+
 local function Added(c4)
+	if Reference[c4] then
+		return
+	end
+
 	local cham = Instance.new('Highlight')
 	cham.Adornee = c4
 	cham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -18,17 +37,13 @@ local function Added(c4)
 	cham.Parent = Folder
 
 	Reference[c4] = cham
-end
 
-local function Removed(c4)
-	if Reference[c4] then
-		if vape.ThreadFix then
-			setthreadidentity(8)
-		end
-
-		Reference[c4]:Destroy()
-		Reference[c4] = nil
-	end
+	-- the model gets destroyed when the c4 blows up but keeps its tag, so the removed
+	-- signal alone would leave the highlight and its reference behind for the rest of
+	-- the session
+	c4.Destroying:Connect(function()
+		Removed(c4)
+	end)
 end
 
 C4ESP = vape.Categories.Render:CreateModule({
@@ -39,12 +54,13 @@ C4ESP = vape.Categories.Render:CreateModule({
 			C4ESP:Clean(collectionService:GetInstanceRemovedSignal('C4'):Connect(Removed))
 
 			for _, c4 in collectionService:GetTagged('C4') do
-				task.spawn(Added, c4)
+				Added(c4)
 			end
 		else
 			for _, cham in Reference do
 				cham:Destroy()
 			end
+
 			table.clear(Reference)
 		end
 	end,
@@ -53,8 +69,15 @@ C4ESP = vape.Categories.Render:CreateModule({
 FillColor = C4ESP:CreateColorSlider({
 	Name = 'Color',
 	Function = function(hue, sat, val)
+		local color = Color3.fromHSV(hue, sat, val)
+		if color == lastFill then
+			return
+		end
+
+		lastFill = color
+
 		for _, cham in Reference do
-			cham.FillColor = Color3.fromHSV(hue, sat, val)
+			cham.FillColor = color
 		end
 	end
 })
@@ -62,8 +85,15 @@ OutlineColor = C4ESP:CreateColorSlider({
 	Name = 'Outline Color',
 	DefaultSat = 0,
 	Function = function(hue, sat, val)
+		local color = Color3.fromHSV(hue, sat, val)
+		if color == lastOutline then
+			return
+		end
+
+		lastOutline = color
+
 		for _, cham in Reference do
-			cham.OutlineColor = Color3.fromHSV(hue, sat, val)
+			cham.OutlineColor = color
 		end
 	end
 })

@@ -1,35 +1,52 @@
 local DamageIndicator
 local FontOption
 local ColorV
-local Size
 local tentity, lentity
 local thealth, ttimer = 0, 0
 local indi, indipart, indithread
 
--- completely skidded from RIVALS
 local function renderStepForLoop(startVal, endVal, increment, callback)
 	while true do
-		if endVal >= startVal then
-			if callback(startVal) then
-				return
-			else
-				local diff = tick()
-				runService.RenderStepped:Wait()
-				startVal = startVal + increment * (tick() - diff) * 60
-			end
-		else
+		if startVal >= endVal then
 			callback(endVal)
 			return
 		end
+
+		if callback(startVal) then
+			return
+		end
+
+		-- RenderStepped:Wait() returns the frame delta, so the step stays time based
+		startVal += increment * runService.RenderStepped:Wait() * 60
 	end
 end
 
-local function createIndicator(damage, pos)
+local function clearIndicator()
 	if indithread then
 		task.cancel(indithread)
-		indi.Text = math.ceil(tonumber(indi.Text) + damage)
+		indithread = nil
+	end
+
+	if indipart then
+		indipart:Destroy()
+		indipart = nil
+	end
+
+	indi = nil
+end
+
+local function createIndicator(damage, pos)
+	if indi and indipart then
+		if indithread then
+			task.cancel(indithread)
+			indithread = nil
+		end
+
+		indi.Text = math.ceil((tonumber(indi.Text) or 0) + damage)
 		indipart.Position = pos
 	else
+		clearIndicator()
+
 		indipart = Instance.new('Part')
 		indipart.Size = Vector3.zero
 		indipart.Position = pos
@@ -37,11 +54,13 @@ local function createIndicator(damage, pos)
 		indipart.CanQuery = false
 		indipart.Anchored = true
 		indipart.Parent = workspace
+
 		local billboard = Instance.new('BillboardGui')
 		billboard.Adornee = indipart
 		billboard.Size = UDim2.new(15, 250, 15, 250)
 		billboard.AlwaysOnTop = true
 		billboard.Parent = indipart
+
 		indi = Instance.new('TextLabel')
 		indi.BackgroundTransparency = 1
 		indi.TextStrokeTransparency = 0
@@ -55,26 +74,22 @@ local function createIndicator(damage, pos)
 		indi.Parent = billboard
 	end
 
-	if indithread then
-		task.cancel(indithread)
-		indithread = nil
-	end
-
 	-- completely skidded from RIVALS
 	indithread = task.spawn(function()
-		local sign = math.sign(math.random() - 0.5)
+		local sign = math.random() < 0.5 and -1 or 1
 		renderStepForLoop(0, 100, 3, function(value)
 			local percent = value / 100
 			local val0 = tweenService:GetValue(percent, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
 			local val1 = tweenService:GetValue(percent, Enum.EasingStyle.Back, Enum.EasingDirection.In)
 			local scale = 1 - 0.5 * val1
 			indi.Position = UDim2.new(0.5 + 0.125 * val0 * sign, 0, 0.5 + 0.125 * val1, 0)
-			indi.Size = UDim2.new(1 * scale, 0, 0.075 * scale * (v197 and 1 or 0.75), 0)
+			indi.Size = UDim2.new(scale, 0, 0.075 * scale * 0.75, 0)
 			indi.Rotation = percent ^ 4 * 260 * sign
 		end)
 
 		indipart:Destroy()
 		indipart = nil
+		indi = nil
 		indithread = nil
 	end)
 end
@@ -83,41 +98,52 @@ DamageIndicator = vape.Legit:CreateModule({
 	Name = 'DamageIndicator',
 	Function = function(callback)
 		if callback then
-			TracerHook:Add('DamageIndicator', function(...)
+			TracerHook:Add('DamageIndicator', function()
 				local part = debug.getstack(4, 13)
-				if typeof(part) == 'Instance' then
-					for _, v in entitylib.List do
-						if part:IsDescendantOf(v.Character) and entitylib.isVulnerable(v, true) then
-							if ttimer <= os.clock() or v ~= tentity then
-								thealth = v.Health
-							end
+				if typeof(part) ~= 'Instance' then
+					return
+				end
 
-							tentity = v
-							ttimer = os.clock() + 0.5
-							break
+				local clock = os.clock()
+
+				for _, v in entitylib.List do
+					if part:IsDescendantOf(v.Character) and entitylib.isVulnerable(v, true) then
+						if ttimer <= clock or v ~= tentity then
+							thealth = v.Health
 						end
+
+						tentity = v
+						ttimer = clock + 0.5
+						break
 					end
 				end
 			end)
 
 			DamageIndicator:Clean(entitylib.Events.EntityUpdated:Connect(function(entity)
-				if entity == tentity and ttimer > os.clock() then
-					if entity ~= lentity then
-						if indi then
-							indi.Text = '0'
-						end
+				if entity ~= tentity or ttimer <= os.clock() then
+					return
+				end
 
-						lentity = entity
+				if entity ~= lentity then
+					if indi then
+						indi.Text = '0'
 					end
 
-					if thealth > entity.Health then
-						createIndicator(thealth - entity.Health, entity.Head.Position + Vector3.new(0, 2, 0))
-						thealth = entity.Health
-					end
+					lentity = entity
+				end
+
+				local head = entity.Head
+				if head and thealth > entity.Health then
+					createIndicator(thealth - entity.Health, head.Position + Vector3.new(0, 2, 0))
+					thealth = entity.Health
 				end
 			end))
 		else
 			TracerHook:Remove('DamageIndicator')
+			clearIndicator()
+
+			tentity, lentity = nil, nil
+			thealth, ttimer = 0, 0
 		end
 	end,
 	Tooltip = 'Add custom damage indicators for gun damage.'
@@ -142,7 +168,7 @@ ColorV = DamageIndicator:CreateColorSlider({
 	DefaultHue = 0,
 	Function = function(hue, sat, val)
 		if indi then
-			indi.Color = Color3.fromHSV(hue, sat, val)
+			indi.TextColor3 = Color3.fromHSV(hue, sat, val)
 		end
 	end
 })

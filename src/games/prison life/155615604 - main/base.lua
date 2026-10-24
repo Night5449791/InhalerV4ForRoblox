@@ -859,6 +859,6 @@ task.spawn(function()
 	end
 end)
 
-for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health', 'GamingChair'} do
+for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health'} do
 	vape:Remove(v)
 end
