@@ -288,6 +288,52 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
+-- same invite and same rpc trick as the gui's discord button
+local DISCORD_CODE = 'YSzD7f9neR'
+local DISCORD_INVITE = 'https://discord.gg/'..DISCORD_CODE
+
+-- the desktop client listens on 127.0.0.1 and falls back downwards through this
+-- range; every port is asked, only the one that answers opens the invite
+local function openDiscordInvite(code)
+	if typeof(request) ~= 'function' then return false end
+
+	local body = httpService:JSONEncode({
+		nonce = httpService:GenerateGUID(false),
+		args = {
+			invite = {code = code},
+			code = code
+		},
+		cmd = 'INVITE_BROWSER'
+	})
+
+	for port = 6453, 6467 do
+		task.spawn(pcall, request, {
+			Method = 'POST',
+			Url = 'http://127.0.0.1:'..port..'/rpc?v=1',
+			Headers = {
+				['Content-Type'] = 'application/json',
+				Origin = 'https://discord.com'
+			},
+			Body = body
+		})
+	end
+
+	return true
+end
+
+local function handleCopyServer()
+	if not options.CopyServer.Enabled then return end
+
+	if not setclipboard then
+		notif('ChatCommand', 'Your executor does not support clipboard.', 5, 'warning')
+		return
+	end
+
+	setclipboard(DISCORD_INVITE)
+	openDiscordInvite(DISCORD_CODE)
+	notif('ChatCommand', 'Copied the discord invite.', 5)
+end
+
 -- one toggle per command family, then the dispatch table; the long names are
 -- aliased onto the short ones right after
 local toggles = {
@@ -305,7 +351,8 @@ local toggles = {
 	{Name = 'ReloadVape', Tooltip = '.reload'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'}
+	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
+	{Name = 'CopyServer', Tooltip = '.copyserver\nCopies the discord invite and opens discord over rpc'}
 }
 
 local commands = {
@@ -341,7 +388,8 @@ local commands = {
 	fling = function()
 		enableModule('Fling', 'FlingExploit')
 	end,
-	reload = handleReload
+	reload = handleReload,
+	copyserver = handleCopyServer
 }
 
 -- long forms point at the same handler as the short ones
