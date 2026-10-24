@@ -3,7 +3,6 @@ local Spread
 local FireRate
 local Automatic
 local olddata, old = {}
-local oldhook
 local hookedequip
 
 local function Modify()
