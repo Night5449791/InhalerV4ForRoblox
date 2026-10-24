@@ -155,13 +155,20 @@ run(function()
 			end
 
 			if OriginScanner.Cache[targetPart] or ray or workspace:Raycast(origin, (aimPosition - origin), OriginScanner.Ray) then
-				local newOrigin, hit = OriginScanner:Scan(
+				local newOrigin, hit, fake = OriginScanner:Scan(
 					entitylib.character.RootPart.Position,
 					aimPosition,
 					ray and ray.Position + ray.Normal * 0.01 or nil,
 					targetPart,
 					entity
 				)
+
+				-- the part sits inside geometry, so no bullet can travel there from any origin:
+				-- report the hit directly instead of firing one into the wall. nothing is
+				-- rewritten on the stack here because no shot is going out
+				if fake then
+					return targetPart, hit
+				end
 
 				if newOrigin then
 					replaceOriginOnStack(origin, newOrigin)
@@ -336,7 +343,7 @@ run(function()
 	})
 	Wallbang = SilentAim:CreateToggle({
 		Name = 'Wallbang',
-		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed or if the shoot position can be moved past walls (eg hugging walls))'
+		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls (eg hugging walls) or if the target is stuck inside geometry)'
 	})
 	SilentAim:CreateToggle({
 		Name = 'Range Circle',

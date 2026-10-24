@@ -40,7 +40,7 @@ Three layers, each loaded as an independent chunk; `require` appears only on gam
 
 `src/guis/new/` — the only GUI. `base.lua` defines `vape` and every `vape:*` method but is not self-contained: the bundler inlines files at three markers — `--Libraries` (:67, `guis/new/libraries/*` as globals), `--Init` (:574, the body of `vape:LoadGUI()`, i.e. `init.lua`), `--Components` (:772, `components/*` plus `overlays/*` wrapped as `components.<Name> = function(props, children, api)`). It ends with `return vape`. `init.lua` builds the ScreenGui, the six categories, Friends/Targets/Profiles lists, `LegitWindow`, `SearchBar`, `OverlayBar`, and the General/Modules/GUI/Notifications panes.
 
-`src/games/<game>/<PlaceId> - <desc>/` compiles to `newvape/games/<PlaceId>.lua`; the text before the first ` - ` is the filename. A product is `base.lua` plus category folders (`Combat/`, `Blatant/`, `Render/`, `Utility/`, `World/`, `Legit/`, `Inventory/`), concatenated into one chunk with `base.lua` first. Module files therefore have no `require` and no `local vape =`; they reuse the base's locals, and every top-level name must be unique across the product or it silently shadows another file (§9).
+`src/games/<game>/<PlaceId> - <desc>/` compiles to `newvape/games/<PlaceId>.lua`; the text before the first ` - ` is the filename. A product is `base.lua` plus category folders (`Combat/`, `Blatant/`, `Render/`, `Utility/`, `World/`, `Legit/`, `Inventory/`), concatenated into one chunk with `base.lua` first, and `processGame.js` appends every category file **wrapped in `run(function() ... end)` unless the file text contains the literal `run(`**. Scope is therefore per file: a wrapped module's top-level locals are private and it only reaches out for the base's locals (`vape`, `entitylib`, …), while an unwrapped file — `Blatant/Fly.lua` in most products, `Combat/SilentAim.lua` in a few — is spliced into the chunk scope next to `base.lua` and can shadow it (§9). Either way module files have no `require` and no `local vape =`.
 
 Products and module counts:
 
@@ -135,7 +135,7 @@ Reach = vape.Categories.Combat:CreateModule({
 Targets = Reach:CreateTargets({Players = true})
 ```
 
-Each file re-declares the shims it uses (`isfile`, `cloneref`, `queue_on_teleport`, notifying `loadstring`) because chunks load alone. Universal's base also provides shared helpers (`isFriend`, `isTarget`, `canClick`, `getTool`, `notif`, `serverHop`, `updateVelocity`, `motorMove`), the `SpeedMethods` table, and the whitelist command set (`kill`, `kick`, `chat`, `toggle`, `uninject`, …).
+`base.lua` and the root `<PlaceId> - <desc>.lua` files re-declare the shims they use (`isfile`, `cloneref`, `queue_on_teleport`, notifying `loadstring`) because each can run as its own chunk (`main.lua` loads a redirect through `loadstring`); category module files inherit them as upvalues and declare nothing. Universal's base also provides shared helpers (`isFriend`, `isTarget`, `canClick`, `getTool`, `notif`, `serverHop`, `updateVelocity`, `motorMove`), the `SpeedMethods` table, and the whitelist command set (`kill`, `kick`, `chat`, `toggle`, `uninject`, …).
 
 Prison Life's `Utility/ChatCommand.lua` keeps a shared path next to the local `lplr.Chatted` one: names in the `.wl` list (`vape.Categories.Friends.ListEnabled`) may run dot commands on the client while `ShareCommand` is enabled, and any whitelist level above 0 (private members) may always. Its CommandBox accepts a command with or without the leading dot. The prison life base ends with a watcher that polls up to 60s for `whitelist.loaded` before connecting `PlayerAdded` and rescanning `GetPlayers()`, then queues `MEMBER_LINES` chat lines for every private member that joins; a single worker drains the queue a second apart, and the block stays silent when `whitelist.localprio ~= 0`, when the player is `lplr`, or when the `UserId` was already announced.
 
@@ -149,14 +149,14 @@ Prison Life's `Utility/ChatCommand.lua` keeps a shared path next to the local `l
 - `vape:Remove` only affects modules that already exist: a product base runs before its own category files, so it can only drop universal's modules there. Remove a product's own module from that module file.
 - `Dropdown:SetValue` silently falls back to `List[1]` when the value is missing, so a renamed value or stale profile quietly becomes the first entry.
 - `Enabled and nil or true` is always `true`; pass booleans through unchanged.
-- One product equals one scope: a duplicated top-level local silently overwrites another file's, and an assignment without `local` writes the base's variable (some pairs rely on that).
+- Two scopes per product: `base.lua` shares one with the unwrapped files (any file whose text contains `run(`), where a duplicated top-level local silently overwrites the other's; wrapped files are isolated. An assignment without `local` reaches the base's variable or a global from either scope (some pairs rely on that), and a top-level `return` is only legal in a wrapped module, where it just ends that file.
 - `bedwars/6872274481 - game/base.lua:33` kicks the player — BedWars is retired.
 
 ## 10. Conventions
 
 1. Tabs, no semicolons; don't collapse multi-argument calls onto one line (`CONTRIBUTING.md`).
 2. Localize aggressively — never index a field or call a function twice in a loop; hoist per-frame constants.
-3. New modules go in `src/games/<game>/<PlaceId> - <desc>/<Category>/<Name>.lua` with no `require`, unique top-level names and the base's locals.
+3. New modules go in `src/games/<game>/<PlaceId> - <desc>/<Category>/<Name>.lua` with no `require` and the base's locals; top-level names only have to be unique against `base.lua` and the other unwrapped files, since a wrapped file keeps its own scope (§9).
 4. Route all cleanup through `vape:Clean(...)` / `<Module>:Clean(...)`; raw `:Connect()` leaks across reinjection.
 5. Module loops: `repeat ... task.wait() until not Module.Enabled`; the framework already spawns `Function`.
 6. Cross-file forward declarations: the base declares `local Reach = {}`, the module assigns without `local`.

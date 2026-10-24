@@ -21,9 +21,9 @@ Fork of Vape V4: a Roblox executor script written in **Luau**, not standard Lua 
 
 - `src/loader.lua` is byte-identical to root `NewMainScript.lua`; root `loadstring` is the one-line user entry. Change both together or they diverge.
 - `src/main.lua` loads `newvape/guis/new.lua` (GUI name hardcoded `'new'`), then `games/universal.lua` always, then `games/<PlaceId>.lua` if present, then `finishLoading()`.
-- Product folder `src/games/<game>/<PlaceId> - <desc>/` compiles to `newvape/games/<PlaceId>.lua`; the text before the first ` - ` is the filename. `base.lua` plus its category files are **concatenated into one chunk** — the biggest footgun:
+- Product folder `src/games/<game>/<PlaceId> - <desc>/` compiles to `newvape/games/<PlaceId>.lua`; the text before the first ` - ` is the filename. `base.lua` plus its category files are **concatenated into one chunk**, and the scope depends on the file — the biggest footgun:
   - no `require` of repo files (only game-owned ModuleScripts), and no `local vape =` in module files; reuse the base's locals (`vape`, `entitylib`, `lplr`, `store`, `notif`, …)
-  - every top-level local/function name must be unique across the whole product, or it silently shadows another file's
+  - the bundler wraps each category file in `run(function() ... end)` unless its text contains `run(`; a wrapped file's top-level locals are private to it, while a file that contains `run(` (`Blatant/Fly.lua` is the usual one) is spliced into `base.lua`'s scope, where its top-level names must stay unique
   - `Reach = ...` without `local` links to `local Reach = {}` in the base; don't add `local`
 - A product's `base.lua` top-level runs before its own category files exist, so `vape:Remove` there only drops modules loaded earlier (universal, for game products). Remove a product's own module from that module file.
 - Subplace files (`<game>/<PlaceId> - <desc>.lua`) are standalone redirects: set `vape.Place` to the parent PlaceId, then loadstring the parent product. Some forward varargs.
@@ -38,7 +38,7 @@ Fork of Vape V4: a Roblox executor script written in **Luau**, not standard Lua 
 - Clean up through `vape:Clean(...)` / `<Module>:Clean(...)`; raw `:Connect()` leaks across reinjection.
 - `entitylib` selectors `table.clear` the settings table before returning — pass a fresh table per call. `entity.Targetable` is cached at spawn; call `entitylib.start()` again after overriding hooks.
 - Chat commands go into **both** `universal - base/Utility/ChatCommand.lua` and `prison life/155615604 - main/Utility/ChatCommand.lua`, unless the command is game-specific.
-- When optimizing, touch only code the assistant wrote in that file; leave upstream/maintainer code alone unless explicitly asked (`CODEBUDDY.md` §10.12).
+- When optimizing, touch only code the assistant wrote in that file; leave upstream/maintainer code alone unless explicitly asked (`CODEBUDDY.md` §10.9).
 
 ## Changelog
 
