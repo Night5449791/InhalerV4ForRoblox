@@ -11,6 +11,7 @@ run(function()
 	local AutoFireSwitch
 	local Wallbang
 	local WallbangDistance
+	local UseHBE
 	local CircleColor
 	local CircleTransparency
 	local CircleFilled
@@ -137,12 +138,39 @@ run(function()
 		end
 	end
 
+	-- stretching the aimed part is the only wallbang that keeps the shot itself valid: the bullet
+	-- really hits the part from the true origin, so the hit position it reports ends up in front
+	-- of the wall instead of behind it. the box has to stop short of the origin because a ray
+	-- that starts inside a part does not report it, and the game casts the bullet synchronously
+	-- inside old(), so the box only has to survive this call
+	local function expandAndFire(origin, part, rest)
+		local center = part.Position
+		local delta = origin - center
+		local distance = delta.Magnitude
+
+		if distance < 4 then
+			return
+		end
+
+		local originalSize, originalCFrame = part.Size, part.CFrame
+		local span = distance - 2
+		local width = math.max(originalSize.X, originalSize.Y, 3)
+
+		part.Size = Vector3.new(width, width, span)
+		part.CFrame = CFrame.lookAt(center + delta.Unit * (span / 2), origin)
+
+		local results = table.pack(old(origin, center, table.unpack(rest, 1, rest.n)))
+		part.Size, part.CFrame = originalSize, originalCFrame
+		return results
+	end
+
 	local function Hook(origin, direction, ...)
+		local rest = table.pack(...)
 		local gundata = debug.getupvalue(oldshoot or pl.Shoot, 10)
 		local entity, targetPart = getTarget(origin, gundata and gundata.Range or 1000, not gundata or gundata.Behavior ~= 'Taser')
 
 		if not entity then
-			return old(origin, direction, ...)
+			return old(origin, direction, table.unpack(rest, 1, rest.n))
 		end
 
 		local aimPosition = targetPart.Position
@@ -164,9 +192,16 @@ run(function()
 					entity
 				)
 
-				-- the part sits inside geometry, so no bullet can travel there from any origin:
-				-- report the hit directly instead of firing one into the wall. nothing is
-				-- rewritten on the stack here because no shot is going out
+				-- the part cannot be reached from any valid origin: HBE fires for real through an
+				-- expanded part, otherwise the hit is only reported and the wall still eats it
+				if (fake or (hit and hit ~= aimPosition)) and UseHBE.Enabled then
+					local results = expandAndFire(origin, targetPart, rest)
+					if results then
+						return table.unpack(results, 1, results.n)
+					end
+				end
+
+				-- nothing on this side reaches the part at all, so the hit is reported directly
 				if fake then
 					return targetPart, hit
 				end
@@ -186,7 +221,7 @@ run(function()
 			end
 		end
 
-		return old(origin, aimPosition, ...)
+		return old(origin, aimPosition, table.unpack(rest, 1, rest.n))
 	end
 
 	SilentAim = vape.Categories.Combat:CreateModule({
@@ -346,6 +381,7 @@ run(function()
 		Name = 'Wallbang',
 		Function = function(callback)
 			WallbangDistance.Object.Visible = callback
+			UseHBE.Object.Visible = callback
 		end,
 		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls, or if the target is stuck inside geometry)\nA wall too far for the shot position to move is reported as a hit instead of being fired as an invalid bullet.'
 	})
@@ -360,6 +396,12 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
+		Darker = true,
+		Visible = false
+	})
+	UseHBE = SilentAim:CreateToggle({
+		Name = 'Use HBE',
+		Tooltip = 'Stretch the aimed hitbox towards you so the real bullet reaches through the wall.\nSlower than faking the hit, but the shot stays valid and the damage lands.',
 		Darker = true,
 		Visible = false
 	})
