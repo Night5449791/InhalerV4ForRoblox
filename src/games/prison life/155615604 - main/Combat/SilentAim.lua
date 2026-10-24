@@ -10,7 +10,6 @@ run(function()
 	local AutoFireTaser
 	local AutoFireSwitch
 	local Wallbang
-	local UseHBE
 	local CircleColor
 	local CircleTransparency
 	local CircleFilled
@@ -137,92 +136,6 @@ run(function()
 		end
 	end
 
-	-- stretching the aimed part is the only wallbang that keeps the shot itself valid: the bullet
-	-- really hits the part from the true origin, so the hit position it reports ends up in front
-	-- of the wall instead of behind it. the box has to stop short of the origin because a ray
-	-- that starts inside a part does not report it, and the game casts the bullet synchronously
-	-- inside old(), so the box only has to survive this call
-	-- the game's own bullet params when it is there, otherwise the same group and filter it uses:
-	-- the probe has to see what the shot sees, and pl.ShootParams is not guaranteed to be filled
-	local probeParams
-	local function getProbeParams()
-		if pl.ShootParams then
-			return pl.ShootParams
-		end
-
-		if not probeParams then
-			probeParams = RaycastParams.new()
-			probeParams.CollisionGroup = 'ClientBullet'
-			probeParams.FilterType = Enum.RaycastFilterType.Exclude
-		end
-
-		probeParams.FilterDescendantsInstances = lplr.Character and {lplr.Character} or {}
-		return probeParams
-	end
-
-	local expandingHitbox = false
-
-	-- an instance handed back by a RaycastResult does not compare equal to the same instance held
-	-- in a table (the executor wraps them separately: == and rawequal both fail while the full name
-	-- matches), so every identity check here goes through the name
-	local function samePart(a, b)
-		if a == b then
-			return true
-		end
-
-		return a ~= nil and b ~= nil and a:GetFullName() == b:GetFullName()
-	end
-
-	local function expandAndFire(origin, part, rest)
-		-- a stacked Bullet hook makes old() another copy of this hook, which would stretch the same
-		-- part again and pull the box away from the origin until nothing is left. the inner call
-		-- just fires at the part as it already is, and the box sits on the line to the origin
-		if expandingHitbox then
-			local success, hitPart, hitPosition = pcall(old, origin, part.Position, table.unpack(rest, 1, rest.n))
-			return success and table.pack(hitPart, hitPosition) or nil
-		end
-
-		local center = part.Position
-		local delta = origin - center
-		local distance = delta.Magnitude
-
-		if distance < 4 then
-			return
-		end
-
-		local originalSize, originalCFrame = part.Size, part.CFrame
-		local span = distance - 2
-		local width = math.max(originalSize.X, originalSize.Y, 3)
-
-		part.Size = Vector3.new(width, width, span)
-		part.CFrame = CFrame.lookAt(center + delta.Unit * (span / 2), origin)
-
-		local probe = workspace:Raycast(origin, (center - origin), getProbeParams())
-		if not probe or not samePart(probe.Instance, part) then
-			part.Size, part.CFrame = originalSize, originalCFrame
-			return
-		end
-
-		-- the packet carries the origin the game captured on the stack, so it is moved to the near
-		-- end of the box: two studs in front of the player, inside the range a moved origin is
-		-- accepted at, and close enough to the reported hit position to look like a point blank
-		-- shot instead of a hit taken from the other side of a wall
-		replaceOriginOnStack(origin, center + delta.Unit * span)
-
-		expandingHitbox = true
-		local success, hitPart, hitPosition = pcall(old, origin, center, table.unpack(rest, 1, rest.n))
-		expandingHitbox = false
-		part.Size, part.CFrame = originalSize, originalCFrame
-
-		-- a stacked hook answers with a fabricated hit and the bullet carries spread, so neither
-		-- outcome proves the shot landed on the part
-		if not success or not samePart(hitPart, part) then
-			return
-		end
-
-		return table.pack(hitPart, hitPosition)
-	end
-
 	local function Hook(origin, direction, ...)
 		local rest = table.pack(...)
 		local gundata = debug.getupvalue(oldshoot or pl.Shoot, 10)
@@ -251,17 +164,8 @@ run(function()
 					entity
 				)
 
-				-- only the case with no reachable origin at all: HBE fires for real through an
-				-- expanded part instead of reporting a hit the wall would eat. every path that can
-				-- already fire or report a hit keeps doing what it did without HBE
-				if fake and UseHBE.Enabled then
-					local results = expandAndFire(origin, targetPart, rest)
-					if results then
-						return table.unpack(results, 1, results.n)
-					end
-				end
-
-				-- nothing on this side reaches the part at all, so the hit is reported directly
+				-- a part buried in geometry has no hitbox to shoot at all, so the hit is reported
+				-- directly instead of firing a bullet that cannot land
 				if fake then
 					return targetPart, hit
 				end
@@ -465,19 +369,7 @@ run(function()
 	})
 	Wallbang = SilentAim:CreateToggle({
 		Name = 'Wallbang',
-		Function = function(callback)
-			UseHBE.Object.Visible = callback
-		end,
 		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls (eg hugging walls) or if the target is stuck inside geometry)'
-	})
-	UseHBE = SilentAim:CreateToggle({
-		Name = 'Use HBE',
-		Function = function(callback)
-			OriginScanner.HBE = callback
-		end,
-		Tooltip = 'Stretch the aimed hitbox towards you so the real bullet reaches a target behind a wall the shot position cannot cross.\nSlower, but the shot stays valid and the damage lands.',
-		Darker = true,
-		Visible = false
 	})
 	SilentAim:CreateToggle({
 		Name = 'Range Circle',

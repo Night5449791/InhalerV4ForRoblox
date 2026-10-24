@@ -131,11 +131,9 @@ local function safeUnhook(target, original)
 	end
 end
 
--- SafeDistance is how far a shot origin can be moved and still be accepted as a real shot; past
--- it the game drops the bullet as invalid, which is what the hardcoded 7.5 used to be. HBE is set
--- by the SilentAim 'Use HBE' toggle: only then does the scan report a part behind an unreachable
--- wall, and HBE fires from the true origin so that wall does not have to be close
-local OriginScanner = {Cache = {}, SafeDistance = 7.5, HBE = false}
+-- how far a shot origin can be moved and still be accepted as a real shot; past it the game drops
+-- the bullet as invalid, which is what the hardcoded 7.5 used to be
+local OriginScanner = {Cache = {}, SafeDistance = 7.5}
 run(function()
 	local rayParams = RaycastParams.new()
 	local overlapParams = OverlapParams.new()
@@ -232,21 +230,16 @@ run(function()
 			end
 		end
 
-		-- a part buried in geometry has no hitbox to shoot: the hit is reported so the caller can
-		-- fire through an expanded part (HBE) or drop the shot, which is what this always did
+		-- a part buried in geometry has no hitbox to shoot at all, so the hit is reported instead of
+		-- firing a bullet that cannot land
 		if not exposed then
 			self.Cache[part] = {origin, target, true}
 			return origin, target, true
 		end
 
-		-- a part behind a wall the origin cannot reach is only worth reporting when HBE is going to
-		-- fire through it. HBE keeps the shot itself valid by expanding the part instead of moving
-		-- the origin, so the wall can be as far as the aim range allows. without HBE this stays the
-		-- old behaviour: the target is skipped instead of being hit through a wall
-		if self.HBE then
-			self.Cache[part] = {origin, target, true}
-			return origin, target, true
-		end
+		-- a part behind a wall the origin cannot reach is left alone: the game only accepts a hit
+		-- when the shot itself was legal, and an origin moved further than SafeDistance (or a part
+		-- stretched client side) never lands damage, so pretending it does only wastes a bullet
 	end
 
 	function OriginScanner:UpdateIgnore()
