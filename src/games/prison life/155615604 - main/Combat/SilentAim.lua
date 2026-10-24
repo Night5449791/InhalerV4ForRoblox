@@ -380,10 +380,20 @@ run(function()
 	Wallbang = SilentAim:CreateToggle({
 		Name = 'Wallbang',
 		Function = function(callback)
-			WallbangDistance.Object.Visible = callback
 			UseHBE.Object.Visible = callback
+			WallbangDistance.Object.Visible = callback and UseHBE.Enabled
 		end,
-		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls, or if the target is stuck inside geometry)\nA wall too far for the shot position to move is reported as a hit instead of being fired as an invalid bullet.'
+		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls (eg hugging walls) or if the target is stuck inside geometry)'
+	})
+	UseHBE = SilentAim:CreateToggle({
+		Name = 'Use HBE',
+		Function = function(callback)
+			OriginScanner.HBE = callback
+			WallbangDistance.Object.Visible = callback and Wallbang.Enabled
+		end,
+		Tooltip = 'Stretch the aimed hitbox towards you so the real bullet reaches a target behind a wall the shot position cannot cross.\nSlower, but the shot stays valid and the damage lands.',
+		Darker = true,
+		Visible = false
 	})
 	WallbangDistance = SilentAim:CreateSlider({
 		Name = 'Distance',
@@ -396,12 +406,6 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Darker = true,
-		Visible = false
-	})
-	UseHBE = SilentAim:CreateToggle({
-		Name = 'Use HBE',
-		Tooltip = 'Stretch the aimed hitbox towards you so the real bullet reaches through the wall.\nSlower than faking the hit, but the shot stays valid and the damage lands.',
 		Darker = true,
 		Visible = false
 	})
