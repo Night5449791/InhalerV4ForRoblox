@@ -159,6 +159,14 @@ run(function()
 		part.Size = Vector3.new(width, width, span)
 		part.CFrame = CFrame.lookAt(center + delta.Unit * (span / 2), origin)
 
+		-- the game's own bullet params, so this probe sees exactly what the shot will see. a miss
+		-- leaves the caller on its normal path instead of burning a bullet into the wall
+		local probe = pl.ShootParams and workspace:Raycast(origin, (center - origin), pl.ShootParams)
+		if not probe or probe.Instance ~= part then
+			part.Size, part.CFrame = originalSize, originalCFrame
+			return
+		end
+
 		local results = table.pack(old(origin, center, table.unpack(rest, 1, rest.n)))
 		part.Size, part.CFrame = originalSize, originalCFrame
 		return results
@@ -192,9 +200,10 @@ run(function()
 					entity
 				)
 
-				-- the part cannot be reached from any valid origin: HBE fires for real through an
-				-- expanded part, otherwise the hit is only reported and the wall still eats it
-				if (fake or (hit and hit ~= aimPosition)) and UseHBE.Enabled then
+				-- only the case with no reachable origin at all: HBE fires for real through an
+				-- expanded part instead of reporting a hit the wall would eat. every path that can
+				-- already fire or report a hit keeps doing what it did without HBE
+				if fake and UseHBE.Enabled then
 					local results = expandAndFire(origin, targetPart, rest)
 					if results then
 						return table.unpack(results, 1, results.n)
