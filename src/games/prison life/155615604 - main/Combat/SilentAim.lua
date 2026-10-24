@@ -12,7 +12,6 @@ run(function()
 	local Wallbang
 	local WallbangDistance
 	local UseHBE
-	local Debug
 	local CircleColor
 	local CircleTransparency
 	local CircleFilled
@@ -144,6 +143,24 @@ run(function()
 	-- of the wall instead of behind it. the box has to stop short of the origin because a ray
 	-- that starts inside a part does not report it, and the game casts the bullet synchronously
 	-- inside old(), so the box only has to survive this call
+	-- the game's own bullet params when it is there, otherwise the same group and filter it uses:
+	-- the probe has to see what the shot sees, and pl.ShootParams is not guaranteed to be filled
+	local probeParams
+	local function getProbeParams()
+		if pl.ShootParams then
+			return pl.ShootParams
+		end
+
+		if not probeParams then
+			probeParams = RaycastParams.new()
+			probeParams.CollisionGroup = 'ClientBullet'
+			probeParams.FilterType = Enum.RaycastFilterType.Exclude
+		end
+
+		probeParams.FilterDescendantsInstances = lplr.Character and {lplr.Character} or {}
+		return probeParams
+	end
+
 	local function expandAndFire(origin, part, rest)
 		local center = part.Position
 		local delta = origin - center
@@ -160,9 +177,7 @@ run(function()
 		part.Size = Vector3.new(width, width, span)
 		part.CFrame = CFrame.lookAt(center + delta.Unit * (span / 2), origin)
 
-		-- the game's own bullet params, so this probe sees exactly what the shot will see. a miss
-		-- leaves the caller on its normal path instead of burning a bullet into the wall
-		local probe = pl.ShootParams and workspace:Raycast(origin, (center - origin), pl.ShootParams)
+		local probe = workspace:Raycast(origin, (center - origin), getProbeParams())
 		if not probe or probe.Instance ~= part then
 			part.Size, part.CFrame = originalSize, originalCFrame
 			return
@@ -170,25 +185,13 @@ run(function()
 
 		local results = table.pack(old(origin, center, table.unpack(rest, 1, rest.n)))
 		part.Size, part.CFrame = originalSize, originalCFrame
-		return results
-	end
 
-	-- the shot path only pays for this while the option is on: with it off debugReport is nil, so
-	-- every call site is a single nil check and nothing else, and the closure itself only exists
-	-- while the toggle is enabled
-	local debugReport
-
-	local function makeDebugReport()
-		local lastState
-
-		return function(state, text, duration, kind)
-			if state == lastState then
-				return
-			end
-
-			lastState = state
-			notif('SilentAim', text, duration, kind)
+		-- the bullet carries spread, so a probe hit does not promise the shot landed on the part
+		if results[1] ~= part then
+			return
 		end
+
+		return results
 	end
 
 	local function Hook(origin, direction, ...)
@@ -197,10 +200,6 @@ run(function()
 		local entity, targetPart = getTarget(origin, gundata and gundata.Range or 1000, not gundata or gundata.Behavior ~= 'Taser')
 
 		if not entity then
-			if debugReport then
-				debugReport('miss', 'No target in range, shot left alone', 1, 'info')
-			end
-
 			return old(origin, direction, table.unpack(rest, 1, rest.n))
 		end
 
@@ -229,24 +228,12 @@ run(function()
 				if fake and UseHBE.Enabled then
 					local results = expandAndFire(origin, targetPart, rest)
 					if results then
-						if debugReport then
-							debugReport('hbe', 'Wallbang: hitbox expanded, bullet fired', 1, 'info')
-						end
-
 						return table.unpack(results, 1, results.n)
-					end
-
-					if debugReport then
-						debugReport('hbemiss', 'Wallbang failed: the expanded hitbox was not hit', 5, 'warning')
 					end
 				end
 
 				-- nothing on this side reaches the part at all, so the hit is reported directly
 				if fake then
-					if debugReport then
-						debugReport('fake', 'Wallbang failed: hit reported without a bullet', 5, 'warning')
-					end
-
 					return targetPart, hit
 				end
 
@@ -259,22 +246,10 @@ run(function()
 					-- bullet's own damage, which is why some wallbangs landed for nothing.
 					-- only the exposed-hitbox fallback (the part is unreachable) is faked
 					if hit and hit ~= aimPosition then
-						if debugReport then
-							debugReport('reported', 'Wallbang failed: hit reported from an exposed hitbox', 5, 'warning')
-						end
-
 						return targetPart, hit
-					end
-
-					if debugReport then
-						debugReport('shift', 'Wallbang: shot origin moved, bullet fired', 1, 'info')
 					end
 				end
 			end
-		end
-
-		if debugReport then
-			debugReport('clear', 'Clear shot, nothing blocked it', 1, 'info')
 		end
 
 		return old(origin, aimPosition, table.unpack(rest, 1, rest.n))
@@ -521,12 +496,5 @@ run(function()
 		end,
 		Darker = true,
 		Visible = false
-	})
-	Debug = SilentAim:CreateToggle({
-		Name = 'Debug',
-		Function = function(callback)
-			debugReport = callback and makeDebugReport() or nil
-		end,
-		Tooltip = 'Notify what every shot did.\nA short note for a clear shot or a working wallbang, a 5 second warning when the bullet could not be fired.'
 	})
 end)
