@@ -817,60 +817,43 @@ run(function()
 	end
 end)
 
--- private members get named in chat, unless the local player already sits on that tier
+-- private members get named in chat, TextChatService only
 local announcedMembers = {}
 
--- every line names the member, they go out one by one so chat does not drop them
-local MEMBER_LINES = {
-	'I use the script Inhaler V4',
-	'<member> Inhaler Private User is in the game'
-}
-
 local function sayMessage(message)
-	pcall(function()
-		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
-			if not channel or not textChatService:CanUserChatAsync(lplr.UserId) then return end
+	local config = textChatService:FindFirstChild('ChatInputBarConfiguration')
+	local channel = config and config.TargetTextChannel
+	local ok, canChat = pcall(textChatService.CanUserChatAsync, textChatService, lplr.UserId)
+	if not channel or not ok or not canChat then return end
 
-			channel:SendAsync(message)
-		else
-			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
-		end
-	end)
+	pcall(channel.SendAsync, channel, message)
 end
 
 local function announceMember(plr)
-	if plr == lplr or whitelist.localprio ~= 0 or announcedMembers[plr.UserId] or whitelist:get(plr) == 0 then return end
+	if not whitelist.loaded or plr == lplr or whitelist.localprio ~= 0 or announcedMembers[plr.UserId] or whitelist:get(plr) == 0 then return end
 
 	announcedMembers[plr.UserId] = true
-	local name = plr.DisplayName
-
-	task.spawn(function()
-		for index, line in MEMBER_LINES do
-			if index > 1 then
-				task.wait(1)
-			end
-
-			sayMessage((line:gsub('<member>', name)))
-		end
-	end)
+	sayMessage('I use the script Inhaler V4')
+	sayMessage(('<member> Inhaler Private User is in the game'):gsub('<member>', plr.DisplayName))
 end
 
+-- the whitelist library sets `loaded` itself once its fetch is done, so this loops until that flag
+-- is set instead of giving up on a timer; the check is one table read per frame and the loop ends
+-- on the frame the whitelist lands. players who join in the meantime are caught by the connection
+vape:Clean(playersService.PlayerAdded:Connect(announceMember))
+
 task.spawn(function()
-	-- the whitelist is fetched after injection, levels mean nothing until then
-	for _ = 1, 60 do
-		if whitelist.loaded or vape.Loaded == nil then break end
-		task.wait(1)
-	end
+	repeat
+		task.wait()
+	until whitelist.loaded or vape.Loaded == nil
 
 	if not whitelist.loaded then return end
 
-	vape:Clean(playersService.PlayerAdded:Connect(announceMember))
 	for _, plr in playersService:GetPlayers() do
 		announceMember(plr)
 	end
 end)
 
-for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health'} do
+for _, v in {'Reach', 'Jesus', 'MurderMystery', 'StaffDetector', 'FullBright', 'Health', 'FastProxPrompt'} do
 	vape:Remove(v)
 end
