@@ -12,6 +12,7 @@ run(function()
 	local Wallbang
 	local WallbangDistance
 	local UseHBE
+	local Debug
 	local CircleColor
 	local CircleTransparency
 	local CircleFilled
@@ -172,12 +173,34 @@ run(function()
 		return results
 	end
 
+	-- the shot path only pays for this while the option is on: with it off debugReport is nil, so
+	-- every call site is a single nil check and nothing else, and the closure itself only exists
+	-- while the toggle is enabled
+	local debugReport
+
+	local function makeDebugReport()
+		local lastState
+
+		return function(state, text, duration, kind)
+			if state == lastState then
+				return
+			end
+
+			lastState = state
+			notif('SilentAim', text, duration, kind)
+		end
+	end
+
 	local function Hook(origin, direction, ...)
 		local rest = table.pack(...)
 		local gundata = debug.getupvalue(oldshoot or pl.Shoot, 10)
 		local entity, targetPart = getTarget(origin, gundata and gundata.Range or 1000, not gundata or gundata.Behavior ~= 'Taser')
 
 		if not entity then
+			if debugReport then
+				debugReport('miss', 'No target in range, shot left alone', 1, 'info')
+			end
+
 			return old(origin, direction, table.unpack(rest, 1, rest.n))
 		end
 
@@ -206,12 +229,24 @@ run(function()
 				if fake and UseHBE.Enabled then
 					local results = expandAndFire(origin, targetPart, rest)
 					if results then
+						if debugReport then
+							debugReport('hbe', 'Wallbang: hitbox expanded, bullet fired', 1, 'info')
+						end
+
 						return table.unpack(results, 1, results.n)
+					end
+
+					if debugReport then
+						debugReport('hbemiss', 'Wallbang failed: the expanded hitbox was not hit', 5, 'warning')
 					end
 				end
 
 				-- nothing on this side reaches the part at all, so the hit is reported directly
 				if fake then
+					if debugReport then
+						debugReport('fake', 'Wallbang failed: hit reported without a bullet', 5, 'warning')
+					end
+
 					return targetPart, hit
 				end
 
@@ -224,10 +259,22 @@ run(function()
 					-- bullet's own damage, which is why some wallbangs landed for nothing.
 					-- only the exposed-hitbox fallback (the part is unreachable) is faked
 					if hit and hit ~= aimPosition then
+						if debugReport then
+							debugReport('reported', 'Wallbang failed: hit reported from an exposed hitbox', 5, 'warning')
+						end
+
 						return targetPart, hit
+					end
+
+					if debugReport then
+						debugReport('shift', 'Wallbang: shot origin moved, bullet fired', 1, 'info')
 					end
 				end
 			end
+		end
+
+		if debugReport then
+			debugReport('clear', 'Clear shot, nothing blocked it', 1, 'info')
 		end
 
 		return old(origin, aimPosition, table.unpack(rest, 1, rest.n))
@@ -474,5 +521,12 @@ run(function()
 		end,
 		Darker = true,
 		Visible = false
+	})
+	Debug = SilentAim:CreateToggle({
+		Name = 'Debug',
+		Function = function(callback)
+			debugReport = callback and makeDebugReport() or nil
+		end,
+		Tooltip = 'Notify what every shot did.\nA short note for a clear shot or a working wallbang, a 5 second warning when the bullet could not be fired.'
 	})
 end)
