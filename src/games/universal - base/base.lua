@@ -983,6 +983,9 @@ run(function()
 					userId = tostring(lplr.UserId),
 					jobId = game.JobId,
 					placeId = tostring(game.PlaceId),
+					-- the panel cannot look a place name up (roblox sends no cors headers),
+					-- so the client reports it with the rest of the session
+					placeName = tostring(game.Name),
 					executor = execname
 				})
 			})
@@ -1007,6 +1010,7 @@ run(function()
 					..'&username='..httpService:UrlEncode(lplr.Name)
 					..'&jobId='..httpService:UrlEncode(game.JobId)
 					..'&placeId='..game.PlaceId
+					..'&placeName='..httpService:UrlEncode(tostring(game.Name))
 					..(execname and '&executor='..httpService:UrlEncode(execname) or ''))
 			end)
 			if not ok or not connection then return end
