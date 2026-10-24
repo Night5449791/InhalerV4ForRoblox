@@ -203,6 +203,12 @@ run(function()
 			return
 		end
 
+		-- the packet carries the origin the game captured on the stack, so it is moved to the near
+		-- end of the box: two studs in front of the player, inside the range a moved origin is
+		-- accepted at, and close enough to the reported hit position to look like a point blank
+		-- shot instead of a hit taken from the other side of a wall
+		replaceOriginOnStack(origin, center + delta.Unit * span)
+
 		expandingHitbox = true
 		local success, hitPart, hitPosition = pcall(old, origin, center, table.unpack(rest, 1, rest.n))
 		expandingHitbox = false
