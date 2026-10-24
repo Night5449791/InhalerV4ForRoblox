@@ -947,10 +947,100 @@ run(function()
 		end
 	}
 
+	-- activity: the panel sees who is online and can queue whitelist commands.
+	-- a websocket when the executor has one, the http beacon otherwise; the
+	-- worker reads the executor off the request so the client never names it
+	local lastbeat = 0
+	local socket
+	local wsok, wsconnect = pcall(function()
+		return WebSocket.connect
+	end)
+	local haswebsockets = wsok and typeof(wsconnect) == 'function'
+
+	local function runRemote(data)
+		if type(data) ~= 'table' or type(data.commands) ~= 'table' then return end
+
+		for _, command in data.commands do
+			if type(command.command) == 'string' then
+				-- the target slot is the local player, exactly like an incoming ;command
+				whitelist:process(';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
+			end
+		end
+	end
+
+	local function beat()
+		if typeof(request) ~= 'function' then return end
+
+		local success, response = pcall(request, {
+			Method = 'POST',
+			Url = 'https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/beat',
+			Headers = {
+				['Content-Type'] = 'application/json',
+				['x-inhaler-request'] = '1'
+			},
+			Body = httpService:JSONEncode({
+				username = lplr.Name,
+				userId = tostring(lplr.UserId),
+				jobId = game.JobId,
+				placeId = tostring(game.PlaceId)
+			})
+		})
+
+		if not success or not response or response.Success == false or type(response.Body) ~= 'string' then
+			return
+		end
+
+		local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
+		if decoded then
+			runRemote(data)
+		end
+	end
+
+	local function connectActivity()
+		if socket or not haswebsockets then return end
+
+		task.spawn(function()
+			local ok, connection = pcall(wsconnect, 'https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/ws?userId='..lplr.UserId
+				..'&username='..httpService:UrlEncode(lplr.Name)
+				..'&jobId='..httpService:UrlEncode(game.JobId)
+				..'&placeId='..game.PlaceId)
+			if not ok or not connection then return end
+
+			socket = connection
+			pcall(function()
+				socket.OnMessage:Connect(function(message)
+					local decoded, data = pcall(httpService.JSONDecode, httpService, message)
+					if decoded then
+						runRemote(data)
+					end
+				end)
+			end)
+			pcall(function()
+				socket.OnClose:Connect(function()
+					socket = nil
+				end)
+			end)
+		end)
+	end
+
 	task.spawn(function()
 		repeat
 			if whitelist:update(whitelist.loaded) then
 				return
+			end
+
+			if whitelist.loaded and os.time() - lastbeat >= 60 then
+				lastbeat = os.time()
+
+				if socket then
+					task.spawn(function()
+						pcall(socket.Send, socket, 'ping')
+					end)
+				elseif haswebsockets then
+					connectActivity()
+				else
+					task.spawn(beat)
+				end
 			end
 
 			task.wait(10)
