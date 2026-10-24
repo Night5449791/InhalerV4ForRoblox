@@ -137,12 +137,11 @@ run(function()
 	end
 
 	local function Hook(origin, direction, ...)
-		local rest = table.pack(...)
 		local gundata = debug.getupvalue(oldshoot or pl.Shoot, 10)
 		local entity, targetPart = getTarget(origin, gundata and gundata.Range or 1000, not gundata or gundata.Behavior ~= 'Taser')
 
 		if not entity then
-			return old(origin, direction, table.unpack(rest, 1, rest.n))
+			return old(origin, direction, ...)
 		end
 
 		local aimPosition = targetPart.Position
@@ -164,8 +163,9 @@ run(function()
 					entity
 				)
 
-				-- a part buried in geometry has no hitbox to shoot at all, so the hit is reported
-				-- directly instead of firing a bullet that cannot land
+				-- the part sits inside geometry, so no bullet can travel there from any origin:
+				-- report the hit directly instead of firing one into the wall. nothing is
+				-- rewritten on the stack here because no shot is going out
 				if fake then
 					return targetPart, hit
 				end
@@ -185,7 +185,7 @@ run(function()
 			end
 		end
 
-		return old(origin, aimPosition, table.unpack(rest, 1, rest.n))
+		return old(origin, aimPosition, ...)
 	end
 
 	SilentAim = vape.Categories.Combat:CreateModule({
@@ -198,42 +198,16 @@ run(function()
 			if callback then
 				if old and hooked then
 					safeUnhook(hooked, old)
-					old, hooked = nil, nil
 				end
 
-				local function installHook()
-					-- the base resolves the gun controller in the background, so Bullet can still be
-					-- nil when the module is enabled from a saved profile. without this the module
-					-- looks enabled but nothing is hooked, and aiming only starts working after the
-					-- toggle is cycled by hand
-					if not SilentAim.Enabled or not pl.Bullet then
-						return false
-					end
-
-					if hooked == pl.Bullet and old then
-						return true
-					end
-
-					-- safeHook unwinds a wrapper left behind by a previous injection before
-					-- installing this one: two stacked Bullet hooks stop wallbang's
-					-- stack-origin replacement from finding the origin, so aim keeps
-					-- working while wallbang silently dies after a reload
-					hooked = pl.Bullet
-					old = safeHook(hooked, function(...)
-						return Hook(...)
-					end)
-
-					return old ~= nil
-				end
-
-				if not installHook() then
-					task.spawn(function()
-						while SilentAim.Enabled and not old do
-							task.wait(0.2)
-							installHook()
-						end
-					end)
-				end
+				-- safeHook unwinds a wrapper left behind by a previous injection before
+				-- installing this one: two stacked Bullet hooks stop wallbang's
+				-- stack-origin replacement from finding the origin, so aim keeps
+				-- working while wallbang silently dies after a reload
+				hooked = pl.Bullet
+				old = safeHook(hooked, function(...)
+					return Hook(...)
+				end)
 
 				local fireDelay = os.clock()
 				repeat

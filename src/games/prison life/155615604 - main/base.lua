@@ -131,9 +131,7 @@ local function safeUnhook(target, original)
 	end
 end
 
--- how far a shot origin can be moved and still be accepted as a real shot; past it the game drops
--- the bullet as invalid, which is what the hardcoded 7.5 used to be
-local OriginScanner = {Cache = {}, SafeDistance = 7.5}
+local OriginScanner = {Cache = {}}
 run(function()
 	local rayParams = RaycastParams.new()
 	local overlapParams = OverlapParams.new()
@@ -181,12 +179,9 @@ run(function()
 		-- an exposed part is one the scan can actually aim at; a part buried in geometry has no
 		-- hitbox to shoot and is only handled by the fallback below
 		local exposed = checkPoint(target, overlapParams)
-		-- the wall face the blocking ray stopped on is always visible from the part itself, so it
-		-- only has to be close enough to pass as a real origin; shift is how far that hop is
-		local shift = extra and (origin - extra).Magnitude or math.huge
 		local hitboxPositions = {}
 		if exposed then
-			if shift <= self.SafeDistance then
+			if extra and (origin - extra).Magnitude < 7.5 then
 				self.Cache[part] = {extra}
 				return extra
 			end
@@ -230,16 +225,14 @@ run(function()
 			end
 		end
 
-		-- a part buried in geometry has no hitbox to shoot at all, so the hit is reported instead of
-		-- firing a bullet that cannot land
+		-- the target is standing inside geometry (noclip, clipped into the floor, hugging a
+		-- ceiling): no bullet can reach the part from any origin on this side, so the last
+		-- wallbang left is a fabricated hit on the aimed part. range, team and vulnerability
+		-- already ran before the scan, so this cannot reach past the configured range
 		if not exposed then
 			self.Cache[part] = {origin, target, true}
 			return origin, target, true
 		end
-
-		-- a part behind a wall the origin cannot reach is left alone: the game only accepts a hit
-		-- when the shot itself was legal, and an origin moved further than SafeDistance (or a part
-		-- stretched client side) never lands damage, so pretending it does only wastes a bullet
 	end
 
 	function OriginScanner:UpdateIgnore()
