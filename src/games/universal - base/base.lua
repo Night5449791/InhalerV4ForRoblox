@@ -956,9 +956,11 @@ run(function()
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
 
-	-- the executor names itself; the worker falls back to the request user-agent
+	-- the executor names itself; the worker falls back to the request user-agent.
+	-- a non-string result (some executors return a userdata) must never reach the
+	-- native UrlEncode/JSONEncode calls below, or the client crashes natively
 	local execok, execname = pcall(identifyexecutor)
-	if not execok then execname = nil end
+	if not execok or type(execname) ~= 'string' then execname = nil end
 
 	local function runRemote(data)
 		if type(data) ~= 'table' or type(data.commands) ~= 'table' then return end
