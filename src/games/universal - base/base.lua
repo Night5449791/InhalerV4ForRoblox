@@ -950,56 +950,49 @@ run(function()
 	-- activity: the panel sees who is online and can queue whitelist commands.
 	-- a websocket when the executor has one, the http beacon otherwise
 	local lastbeat = 0
-	local reported = false
 	local socket
 	local wsok, wsconnect = pcall(function()
 		return WebSocket.connect
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
 
-	-- the executor's own name, when it exposes one; the worker falls back to the
-	-- request user-agent otherwise
-	local function executorName()
-		local ok, name = pcall(function()
-			return typeof(identifyexecutor) == 'function' and identifyexecutor() or nil
-		end)
-		if ok and type(name) == 'string' and name:gsub('%s', '') ~= '' then
-			return name:sub(1, 32)
-		end
-		return nil
-	end
+	-- the executor names itself; the worker falls back to the request user-agent
+	local execok, execname = pcall(identifyexecutor)
+	if not execok then execname = nil end
 
 	local function runRemote(data)
 		if type(data) ~= 'table' or type(data.commands) ~= 'table' then return end
 
 		for _, command in data.commands do
-			if type(command.command) == 'string' then
-				-- the target slot is the local player, exactly like an incoming ;command
-				whitelist:process(';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
-			end
+			if type(command) ~= 'table' or type(command.command) ~= 'string' then continue end
+
+			-- the target slot is the local player, exactly like an incoming ;command
+			pcall(whitelist.process, whitelist, ';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
 		end
 	end
 
 	local function beat()
-		if typeof(request) ~= 'function' then return end
+		local ok, response = pcall(function()
+			if typeof(request) ~= 'function' then return nil end
 
-		local success, response = pcall(request, {
-			Method = 'POST',
-			Url = 'https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/beat',
-			Headers = {
-				['Content-Type'] = 'application/json',
-				['x-inhaler-request'] = '1'
-			},
-			Body = httpService:JSONEncode({
-				username = lplr.Name,
-				userId = tostring(lplr.UserId),
-				jobId = game.JobId,
-				placeId = tostring(game.PlaceId),
-				executor = executorName()
+			return request({
+				Method = 'POST',
+				Url = 'https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/beat',
+				Headers = {
+					['Content-Type'] = 'application/json',
+					['x-inhaler-request'] = '1'
+				},
+				Body = httpService:JSONEncode({
+					username = lplr.Name,
+					userId = tostring(lplr.UserId),
+					jobId = game.JobId,
+					placeId = tostring(game.PlaceId),
+					executor = execname
+				})
 			})
-		})
+		end)
 
-		if not success or not response or response.Success == false or type(response.Body) ~= 'string' then
+		if not ok or not response or response.Success == false or type(response.Body) ~= 'string' then
 			return
 		end
 
@@ -1013,12 +1006,13 @@ run(function()
 		if socket or not haswebsockets then return end
 
 		task.spawn(function()
-			local exec = executorName()
-			local ok, connection = pcall(wsconnect, 'https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/ws?userId='..lplr.UserId
-				..'&username='..httpService:UrlEncode(lplr.Name)
-				..'&jobId='..httpService:UrlEncode(game.JobId)
-				..'&placeId='..game.PlaceId
-				..(exec and '&executor='..httpService:UrlEncode(exec) or ''))
+			local ok, connection = pcall(function()
+				return wsconnect('https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/ws?userId='..lplr.UserId
+					..'&username='..httpService:UrlEncode(lplr.Name)
+					..'&jobId='..httpService:UrlEncode(game.JobId)
+					..'&placeId='..game.PlaceId
+					..(execname and '&executor='..httpService:UrlEncode(execname) or ''))
+			end)
 			if not ok or not connection then return end
 
 			socket = connection
@@ -1044,15 +1038,12 @@ run(function()
 				return
 			end
 
-			if whitelist.loaded and not reported then
-				reported = true
-				-- one http beacon on load: the request user-agent is what names
-				-- the executor on the worker, the websocket only carries its library
-				task.spawn(beat)
-			end
-
 			if whitelist.loaded and os.time() - lastbeat >= 60 then
 				lastbeat = os.time()
+
+				-- the http beacon always runs: it is the reliable command channel,
+				-- so queued commands are delivered even when the websocket drops
+				task.spawn(beat)
 
 				if socket then
 					task.spawn(function()
@@ -1060,8 +1051,6 @@ run(function()
 					end)
 				elseif haswebsockets then
 					connectActivity()
-				else
-					task.spawn(beat)
 				end
 			end
 
