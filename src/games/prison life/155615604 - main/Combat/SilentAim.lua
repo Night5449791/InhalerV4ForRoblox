@@ -288,16 +288,42 @@ run(function()
 			if callback then
 				if old and hooked then
 					safeUnhook(hooked, old)
+					old, hooked = nil, nil
 				end
 
-				-- safeHook unwinds a wrapper left behind by a previous injection before
-				-- installing this one: two stacked Bullet hooks stop wallbang's
-				-- stack-origin replacement from finding the origin, so aim keeps
-				-- working while wallbang silently dies after a reload
-				hooked = pl.Bullet
-				old = safeHook(hooked, function(...)
-					return Hook(...)
-				end)
+				local function installHook()
+					-- the base resolves the gun controller in the background, so Bullet can still be
+					-- nil when the module is enabled from a saved profile. without this the module
+					-- looks enabled but nothing is hooked, and aiming only starts working after the
+					-- toggle is cycled by hand
+					if not SilentAim.Enabled or not pl.Bullet then
+						return false
+					end
+
+					if hooked == pl.Bullet and old then
+						return true
+					end
+
+					-- safeHook unwinds a wrapper left behind by a previous injection before
+					-- installing this one: two stacked Bullet hooks stop wallbang's
+					-- stack-origin replacement from finding the origin, so aim keeps
+					-- working while wallbang silently dies after a reload
+					hooked = pl.Bullet
+					old = safeHook(hooked, function(...)
+						return Hook(...)
+					end)
+
+					return old ~= nil
+				end
+
+				if not installHook() then
+					task.spawn(function()
+						while SilentAim.Enabled and not old do
+							task.wait(0.2)
+							installHook()
+						end
+					end)
+				end
 
 				local fireDelay = os.clock()
 				repeat
