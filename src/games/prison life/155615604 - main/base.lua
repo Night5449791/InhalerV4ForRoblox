@@ -134,8 +134,8 @@ end
 -- SafeDistance is how far a shot origin can be moved and still be accepted as a real shot; past
 -- it the game drops the bullet as invalid, which is what the hardcoded 7.5 used to be. HBE is set
 -- by the SilentAim 'Use HBE' toggle: only then does the scan report a part behind an unreachable
--- wall, and MaxDistance is how far away that wall may still be
-local OriginScanner = {Cache = {}, MaxDistance = 25, SafeDistance = 7.5, HBE = false}
+-- wall, and HBE fires from the true origin so that wall does not have to be close
+local OriginScanner = {Cache = {}, SafeDistance = 7.5, HBE = false}
 run(function()
 	local rayParams = RaycastParams.new()
 	local overlapParams = OverlapParams.new()
@@ -240,9 +240,10 @@ run(function()
 		end
 
 		-- a part behind a wall the origin cannot reach is only worth reporting when HBE is going to
-		-- fire through it. without HBE this stays the old behaviour: the target is skipped instead
-		-- of being hit through a wall the shot cannot cross
-		if self.HBE and shift <= self.MaxDistance then
+		-- fire through it. HBE keeps the shot itself valid by expanding the part instead of moving
+		-- the origin, so the wall can be as far as the aim range allows. without HBE this stays the
+		-- old behaviour: the target is skipped instead of being hit through a wall
+		if self.HBE then
 			self.Cache[part] = {origin, target, true}
 			return origin, target, true
 		end
