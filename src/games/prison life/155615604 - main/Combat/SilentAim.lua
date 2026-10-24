@@ -10,6 +10,7 @@ run(function()
 	local AutoFireTaser
 	local AutoFireSwitch
 	local Wallbang
+	local WallbangDistance
 	local CircleColor
 	local CircleTransparency
 	local CircleFilled
@@ -343,7 +344,24 @@ run(function()
 	})
 	Wallbang = SilentAim:CreateToggle({
 		Name = 'Wallbang',
-		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls (eg hugging walls) or if the target is stuck inside geometry)'
+		Function = function(callback)
+			WallbangDistance.Object.Visible = callback
+		end,
+		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls, or if the target is stuck inside geometry)\nA wall too far for the shot position to move is reported as a hit instead of being fired as an invalid bullet.'
+	})
+	WallbangDistance = SilentAim:CreateSlider({
+		Name = 'Distance',
+		Min = 5,
+		Max = 100,
+		Default = 25,
+		Function = function(val)
+			OriginScanner.MaxDistance = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+		Darker = true,
+		Visible = false
 	})
 	SilentAim:CreateToggle({
 		Name = 'Range Circle',
