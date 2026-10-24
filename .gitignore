@@ -4,3 +4,6 @@ developmentusage.lua
 inhaler_send_update.py
 UPDATES.md
 __pycache__/*
+InhalerBackendWorker
+.codebuddy
+.vscode
