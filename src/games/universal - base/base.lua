@@ -1124,8 +1124,10 @@ run(function()
 			end
 
 			-- the beacon does not need the whitelist: a github outage must not hide the
-			-- session from the panel or block queued commands
-			if os.time() - lastbeat >= 60 then
+			-- session from the panel or block queued commands. every 20s keeps the
+			-- command channel quick for clients without a websocket; the worker only
+			-- writes the session row once per two minutes, the rest costs a read.
+			if os.time() - lastbeat >= 20 then
 				lastbeat = os.time()
 
 				-- the http beacon always runs: it is the reliable command channel,
