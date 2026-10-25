@@ -235,6 +235,12 @@ local whitelist = {
 	customtags = {},
 	tagcallback = {},
 	data = {WhitelistedUsers = {}},
+	-- the last announcement this machine already showed, so the same text is never
+	-- shown twice (a whitelist edit used to re-fire it, and re-injecting repeated it)
+	announced = (function()
+		local ok, value = pcall(readfile, 'newvape/profiles/announcement.txt')
+		return ok and type(value) == 'string' and value ~= '' and value or nil
+	end)(),
 	hashes = setmetatable({}, {
 		__index = function(_, data)
 			return hash and hash.sha512(data..'SelfReport') or ''
@@ -757,6 +763,45 @@ run(function()
 		end)
 	end
 
+	-- An announcement is shown when its *text* is new, not when the file changed: a
+	-- whitelist edit used to re-show the same message. The fingerprint is remembered
+	-- on disk, so re-injecting does not repeat it either, and everything is pcall'd
+	-- so a broken toast cannot break the update loop.
+	function whitelist:maybeannounce()
+		local announcement = whitelist.data and whitelist.data.Announcement
+		local active = type(announcement) == 'table'
+			and type(announcement.text) == 'string'
+			and announcement.text ~= ''
+			and (tonumber(announcement.expiretime) or 0) > os.time()
+
+		if not active then
+			-- an ended announcement may be created again later with the same text, so
+			-- forget the fingerprint instead of suppressing the next one
+			whitelist.announced = nil
+			pcall(function()
+				delfile('newvape/profiles/announcement.txt')
+			end)
+			return
+		end
+
+		local id = tostring(lplr.UserId)
+		local targets = announcement.targets
+		if targets and targets ~= 'all' then
+			targets = tostring(targets):split(',')
+			if not table.find(targets, id) then return end
+		end
+
+		local fingerprint = announcement.text..'|'..tostring(announcement.targets or 'all')
+		if whitelist.announced == fingerprint then return end
+
+		whitelist.announced = fingerprint
+		pcall(function()
+			writefile('newvape/profiles/announcement.txt', fingerprint)
+		end)
+
+		pcall(whitelist.announce, whitelist, announcement.text)
+	end
+
 	function whitelist:update(first)
 		-- the whitelist is the github file; the worker is not consulted for it
 		local suc = pcall(function()
@@ -784,13 +829,16 @@ run(function()
 			whitelist.data = suc and type(res) == 'table' and res or whitelist.data
 			whitelist.localprio = whitelist:get(lplr)
 
-			for _, v in whitelist.data.WhitelistedUsers do
-				if v.tags then
-					for _, tag in v.tags do
-						tag.color = Color3.fromRGB(unpack(tag.color))
+			-- a malformed tag colour must not abort the payload handling below
+			pcall(function()
+				for _, v in whitelist.data.WhitelistedUsers do
+					if v.tags then
+						for _, tag in v.tags do
+							tag.color = Color3.fromRGB(unpack(tag.color))
+						end
 					end
 				end
-			end
+			end)
 
 			if not whitelist.connection then
 				whitelist.connection = playersService.PlayerAdded:Connect(function(v)
@@ -807,23 +855,17 @@ run(function()
 				entitylib.refresh()
 			end
 
-			if whitelist.textdata ~= whitelist.olddata then
-				-- guarded so a missing/expired announcement cant throw and kill
-				-- the update thread (which also stops tags, blacklist and killvape)
-				local announcement = whitelist.data.Announcement
-				if announcement and (announcement.expiretime or 0) > os.time() then
-					local id = tostring(lplr.UserId)
-					local targets = announcement.targets
-					targets = (not targets or targets == 'all') and {id} or targets:split(',')
+			-- bookkeeping first: this used to run after the announce, so an announce
+			-- that threw left the payload "new" and the same message fired every poll
+			local changed = whitelist.textdata ~= whitelist.olddata
+			whitelist.olddata = whitelist.textdata
 
-					if table.find(targets, id) then
-						whitelist:announce(announcement.text)
-					end
-				end
-				whitelist.olddata = whitelist.textdata
+			if changed then
 				pcall(function()
 					writefile('newvape/profiles/whitelist.json', whitelist.textdata)
 				end)
+
+				whitelist:maybeannounce()
 			end
 
 			if whitelist.data.KillVape then
@@ -962,6 +1004,31 @@ run(function()
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
 
+	-- `game.Name` is unreliable: several executors report "Ugc" for every game, which
+	-- is why the panel showed "Ugc" for everyone. The real place name comes from
+	-- MarketplaceService, resolved once per session and cached for the beacons.
+	local placeName
+	local function resolvePlaceName()
+		if placeName then return placeName end
+
+		local ok, info = pcall(function()
+			return game:GetService('MarketplaceService'):GetProductInfo(game.PlaceId)
+		end)
+
+		if ok and type(info) == 'table' and type(info.Name) == 'string' and #info.Name > 0 and info.Name ~= 'Ugc' then
+			placeName = info.Name:sub(1, 80)
+			return placeName
+		end
+
+		-- fallback only: whatever the datamodel claims, as long as it is a name
+		local okName, name = pcall(function()
+			return game.Name
+		end)
+
+		placeName = (okName and type(name) == 'string' and #name > 0) and name:sub(1, 80) or '-'
+		return placeName
+	end
+
 	local function runRemote(data)
 		if type(data) ~= 'table' or type(data.commands) ~= 'table' then return end
 
@@ -998,7 +1065,7 @@ run(function()
 					placeId = tostring(game.PlaceId),
 					-- the panel cannot look a place name up (roblox sends no cors headers),
 					-- so the client reports it with the rest of the session
-					placeName = tostring(game.Name),
+					placeName = resolvePlaceName(),
 					executor = execname
 				})
 			})
@@ -1025,7 +1092,7 @@ run(function()
 					..'&username='..httpService:UrlEncode(lplr.Name)
 					..'&jobId='..httpService:UrlEncode(game.JobId)
 					..'&placeId='..game.PlaceId
-					..'&placeName='..httpService:UrlEncode(tostring(game.Name))
+					..'&placeName='..httpService:UrlEncode(resolvePlaceName())
 					..(execname and '&executor='..httpService:UrlEncode(execname) or ''))
 			end)
 			if not ok or not connection then return end
