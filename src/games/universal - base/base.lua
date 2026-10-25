@@ -1110,7 +1110,10 @@ run(function()
 					-- the panel cannot look a place name up (roblox sends no cors headers),
 					-- so the client reports it with the rest of the session
 					placeName = resolvePlaceName(),
-					executor = execname
+					executor = execname,
+					-- what the panel shows as the connection: a live socket, or the http
+					-- beacon we fall back to when the executor has no websocket
+					connectionType = socket and 'websocket' or 'http'
 				})
 			})
 		end)
