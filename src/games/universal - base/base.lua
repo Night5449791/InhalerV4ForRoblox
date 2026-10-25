@@ -512,7 +512,15 @@ run(function()
 		obj.PrefixText = self:tag(plr, true, true)..(obj.PrefixText or '')
 
 		if not skip and self:process(obj.Text, plr) then
-			obj.Visible = false
+			-- the legacy chat returns a message object that has Visible; the new
+			-- TextChatService hands us a TextChatMessageProperties, which does not,
+			-- so blank it instead of trying to set a member it lacks
+			if obj:IsA('TextChatMessageProperties') then
+				obj.Text = ''
+				obj.PrefixText = ''
+			else
+				obj.Visible = false
+			end
 		end
 	end
 
