@@ -1029,15 +1029,9 @@ run(function()
 		end
 	}
 
-	-- activity: the panel sees who is online and can queue whitelist commands.
-	-- a websocket when the executor has one, the http beacon otherwise
 	local lastbeat = 0
 	local socket
 
-	-- a per-machine secret the worker binds the activity session to: a faker who knows
-	-- a user id (public) and the server job id (same server) still cannot take the
-	-- session over or collect the commands queued for it. kept on disk so a
-	-- re-injection presents the same key instead of losing its session
 	local sessionkey = ''
 	pcall(function()
 		local stored = isfile('newvape/profiles/sessionkey.txt') and readfile('newvape/profiles/sessionkey.txt') or ''
@@ -1052,24 +1046,15 @@ run(function()
 			pcall(writefile, 'newvape/profiles/sessionkey.txt', generated)
 		end
 	end)
-	-- executors expose the connect call two ways (WebSocket.connect and the
-	-- capitalized WebSocket.Connect); accept either so the socket path is taken
-	-- wherever the executor supports it at all
 	local wsok, wsconnect = pcall(function()
 		local lib = WebSocket
 		return lib and (lib.connect or lib.Connect)
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
 
-	-- the executor names itself; the worker falls back to the request user-agent.
-	-- a non-string result (some executors return a userdata) must never reach the
-	-- native UrlEncode/JSONEncode calls below, or the client crashes natively
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
 
-	-- `game.Name` is unreliable: several executors report "Ugc" for every game, which
-	-- is why the panel showed "Ugc" for everyone. The real place name comes from
-	-- MarketplaceService, resolved once per session and cached for the beacons.
 	local placeName
 	local function resolvePlaceName()
 		if placeName then return placeName end
@@ -1083,7 +1068,6 @@ run(function()
 			return placeName
 		end
 
-		-- fallback only: whatever the datamodel claims, as long as it is a name
 		local okName, name = pcall(function()
 			return game.Name
 		end)
@@ -1098,21 +1082,13 @@ run(function()
 		for _, command in data.commands do
 			if type(command) ~= 'table' or type(command.command) ~= 'string' then continue end
 
-			-- the target slot is the local player, exactly like an incoming ;command
 			pcall(whitelist.process, whitelist, ';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
 		end
 	end
-
-	-- ---- worker connection -------------------------------------------------
-	-- one websocket is the primary channel: the worker pushes commands over it and
-	-- keeps the session alive, so a ws-capable client burns no http on the worker.
-	-- the http beacon is only a fallback for executors that have no websocket at all.
 	local WORKER = 'inhalerbackendworker.itsrealnight1983.workers.dev'
 	local beating = false
 
 	local function beat()
-		-- request() blocks, so guard against piling up stuck threads if the worker is
-		-- slow or down: one beacon in flight is enough
 		if beating then return end
 		beating = true
 
@@ -1131,14 +1107,9 @@ run(function()
 					userId = tostring(lplr.UserId),
 					jobId = game.JobId,
 					placeId = tostring(game.PlaceId),
-					-- the panel cannot resolve a place name itself (no cors from roblox),
-					-- so the client reports it with the rest of the session
 					placeName = resolvePlaceName(),
 					executor = execname,
-					-- what the panel shows: a live socket, or the http beacon fallback
 					connectionType = socket and 'websocket' or 'http',
-					-- session ownership secret: the worker binds the session to it, so a
-					-- faked beat cannot take the session over (see sessionkey above)
 					sessionKey = sessionkey
 				})
 			})
@@ -1155,8 +1126,6 @@ run(function()
 	local wsbackoff = 0
 	local wsconnecting = false
 
-	-- the socket needs the wss scheme; an https url is what the http beacon uses and
-	-- makes WebSocket.connect fail, dropping everyone to the http fallback
 	local function buildWsUrl()
 		return 'wss://'..WORKER..'/api/activity/ws?userId='..lplr.UserId
 			..'&username='..httpService:UrlEncode(lplr.Name)
@@ -1192,8 +1161,6 @@ run(function()
 				end)
 			end)
 			pcall(function()
-				-- a closed socket must come back, but not thirty times a second if the
-				-- worker keeps refusing it: drop it and reconnect once after a short pause
 				connection.OnClose:Connect(function()
 					socket = nil
 					task.wait(1)
@@ -1204,27 +1171,17 @@ run(function()
 	end
 
 	task.spawn(function()
-		-- socket first: it is the default channel, so it exists before the first beacon
 		connectActivity()
 
 		repeat
-			-- whitelist load is independent of the worker: a github outage must not hide
-			-- the session from the panel or block queued commands
 			local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)
 			if ok and done then return end
-
-			-- every 20s: repair the session/command channel. with a live socket there is
-			-- nothing to send over http (the worker pushes commands and keeps us alive);
-			-- only when there is no socket does the http beacon run as the fallback
 			if os.time() - lastbeat >= 20 then
 				lastbeat = os.time()
 
 				if socket then
-					-- keep the socket warm through proxies; no http request is needed
 					task.spawn(function() pcall(socket.Send, socket, 'ping') end)
 				else
-					-- no socket: the http beacon is the only channel + visibility. this is
-					-- the fallback for executors without websocket support
 					task.spawn(beat)
 					connectActivity()
 				end
