@@ -1017,10 +1017,6 @@ run(function()
 				if not ok then warn('[inhaler] execute: '..tostring(runError)) end
 			end)
 		end,
-		-- .rce is the same thing with a name people actually type in chat
-		rce = function(args, plr)
-			whitelist.commands.execute(args, plr)
-		end,
 		uninject = function()
 			if olduninject then
 				if vape.ThreadFix then
