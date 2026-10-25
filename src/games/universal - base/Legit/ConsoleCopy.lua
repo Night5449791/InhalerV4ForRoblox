@@ -1,8 +1,9 @@
--- A [C] at the end of every line in the developer console (F9). Pressing one copies
--- that line, flips to [√] and goes back to [C] after 2.5s.
+-- A [C] at the end of every line in the developer console (F9). Pressing the line
+-- copies it, flips the mark to [√] and goes back to [C] after 2.5s.
 --
--- The mark is its own button and the row text is never touched, so there is nothing
--- to strip: what lands on the clipboard is exactly what the console printed.
+-- The mark is appended to the line itself, so it sits right after the log instead of
+-- floating over it — and it is only ever display text: the clipboard always gets the
+-- clean message, never the [C] / [√] we added.
 --
 -- The console lives at
 --   CoreGui.DevConsoleMaster.DevConsoleWindow.DevConsoleUI.MainView.ClientLog
@@ -27,7 +28,8 @@ local MAX_REMEMBERED = 150
 -- own container is not where we expect it
 local remembered = {}
 local rememberedOrder = {}
--- [mark button] = the line it copies, [row] = its mark
+-- [row] = its mark (the row itself for clickable rows, a catcher for labels),
+-- [row] = the clean message it copies
 local originals = {}
 local marks = {}
 local connections = {}
@@ -35,7 +37,6 @@ local connections = {}
 local enabled = false
 local console
 local view
-local markerColor = Color3.fromRGB(110, 200, 255)
 
 local function remember(message)
 	if type(message) ~= 'string' or message == '' or remembered[message] then return end
@@ -48,39 +49,33 @@ local function remember(message)
 	end
 end
 
-local function copy(mark)
-	local line = originals[mark]
-	if not line or not mark.Parent then return end
-
-	if setclipboard then
-		pcall(setclipboard, line)
-	end
-
-	mark.Text = DONE
-	mark.TextColor3 = Color3.fromRGB(120, 255, 130)
-
-	task.delay(RESET_AFTER, function()
-		if not mark.Parent then return end
-
-		mark.Text = IDLE
-		mark.TextColor3 = markerColor
-	end)
-end
-
 local function forget(row)
 	local mark = marks[row]
-	if not mark then return end
+	local original = originals[row]
 
 	marks[row] = nil
-	originals[mark] = nil
+	originals[row] = nil
+
 	pcall(function()
-		mark:Destroy()
+		-- a catcher we made lives inside the row; the row itself was only retexted
+		if mark and mark ~= row then
+			mark:Destroy()
+		end
+
+		if original ~= nil and row.Parent then
+			row.Text = original
+		end
 	end)
 end
 
 local function decorate(row)
 	if not row:IsA('TextLabel') and not row:IsA('TextButton') then return end
 	if row.Name == 'ConsoleCopyMark' or marks[row] then return end
+
+	-- the timestamp / icon cells next to a log line are not the message; leave them be
+	if row.Name == 'Timestamp' or row.Name == 'TimestampLabel' or row.Name == 'icon' or row.Name == 'Icon' then
+		return
+	end
 
 	local text = row.Text
 	if text == '' then return end
@@ -94,32 +89,57 @@ local function decorate(row)
 		return
 	end
 
-	local mark = Instance.new('TextButton')
-	mark.Name = 'ConsoleCopyMark'
-	mark.BackgroundTransparency = 1
-	mark.AutoButtonColor = false
-	mark.Text = IDLE
-	mark.TextColor3 = markerColor
-	mark.TextSize = row.TextSize > 0 and row.TextSize or 14
-	mark.Font = row.Font
-	mark.TextXAlignment = Enum.TextXAlignment.Right
-	mark.Size = UDim2.new(0, 30, 1, 0)
-	mark.Position = UDim2.new(1, -30, 0, 0)
-	mark.ZIndex = (row.ZIndex or 1) + 2
-	mark.Parent = row
+	-- the marker is appended to the line, right after the log, not floating on top of
+	-- it. the clipboard gets `text`, the clean message, regardless of the marker.
+	local originalColor = row.TextColor3
+	row.Text = text .. '  ' .. IDLE
 
-	marks[row] = mark
-	originals[mark] = text
+	local function press()
+		if setclipboard then
+			pcall(setclipboard, text)
+		end
 
-	table.insert(connections, mark.MouseButton1Click:Connect(function()
-		copy(mark)
-	end))
+		row.Text = text .. '  ' .. DONE
+		row.TextColor3 = Color3.fromRGB(120, 255, 130)
+
+		task.delay(RESET_AFTER, function()
+			if not row.Parent then return end
+
+			row.Text = text .. '  ' .. IDLE
+			row.TextColor3 = originalColor
+		end)
+	end
+
+	if row:IsA('TextButton') then
+		-- the console row already takes a click (to expand it); ours runs alongside
+		marks[row] = row
+		table.insert(connections, row.MouseButton1Click:Connect(press))
+	else
+		-- a label cannot be clicked, so drop a transparent catcher over the row
+		local catcher = Instance.new('TextButton')
+		catcher.Name = 'ConsoleCopyMark'
+		catcher.BackgroundTransparency = 1
+		catcher.Text = ''
+		catcher.AutoButtonColor = false
+		catcher.Size = UDim2.fromScale(1, 1)
+		catcher.ZIndex = (row.ZIndex or 1) + 2
+		catcher.Parent = row
+		catcher.MouseButton1Click:Connect(press)
+		marks[row] = catcher
+	end
+
+	originals[row] = text
 
 	-- rows are recycled while the console scrolls, so the line under the mark changes
+	-- and we re-append the marker to whatever the console just put there
 	table.insert(connections, row:GetPropertyChangedSignal('Text'):Connect(function()
-		if marks[row] == mark then
-			originals[mark] = row.Text
+		if row.Text:sub(-5) == '  ' .. IDLE or row.Text:sub(-5) == '  ' .. DONE then
+			return
 		end
+
+		text = row.Text
+		originals[row] = text
+		row.Text = text .. '  ' .. IDLE
 	end))
 end
 
@@ -140,13 +160,17 @@ local function scan(root)
 	end
 end
 
--- the console body, or nil when this roblox build names it differently
+-- the console body, or nil when this roblox build names it differently. ClientLog is
+-- the scroll of log lines; falling back to MainView keeps the marks working when the
+-- inner name is not what we expect, and away from the tab/tool bar
 local function viewOf(master)
 	local window = master:FindFirstChild('DevConsoleWindow')
 	local ui = window and window:FindFirstChild('DevConsoleUI')
 	local main = ui and ui:FindFirstChild('MainView')
 
-	return main
+	local log = main and (main:FindFirstChild('ClientLog') or main:FindFirstChild('LogView') or main:FindFirstChild('Log'))
+
+	return log or main
 end
 
 local function attach()
@@ -228,16 +252,5 @@ ConsoleCopy = vape.Legit:CreateModule({
 			stop()
 		end
 	end,
-	Tooltip = 'Adds a [C] to every developer console line — press it to copy that line.'
-})
-ColorV = ConsoleCopy:CreateColorSlider({
-	Name = 'Mark color',
-	DefaultHue = 0.55,
-	Function = function(hue, sat, val)
-		markerColor = Color3.fromHSV(hue, sat, val)
-
-		for _, mark in marks do
-			mark.TextColor3 = mark.Text == DONE and Color3.fromRGB(120, 255, 130) or markerColor
-		end
-	end
+	Tooltip = 'Adds a [C] to every developer console line — click the line to copy it.'
 })
