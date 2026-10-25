@@ -834,7 +834,14 @@ local function announceMember(plr)
 
 	announcedMembers[plr.UserId] = true
 	sayMessage('I use the script Inhaler V4')
-	sayMessage(('<member> Inhaler Private User is in the game'):gsub('<member>', plr.DisplayName))
+	-- the parenthetical is the member's whitelist tag (e.g. "Inhaler Owner"), not the
+	-- account handle; a member without a tag falls back to their name. % is doubled
+	-- because it is admin-written text and gsub would read a bare % as a capture
+	local tags = whitelist:tag(plr)
+	local nametag = (tags and tags[1] and tags[1].text) and removeTags(tags[1].text) or plr.Name
+	sayMessage(('<member> (<nametag>) Inhaler Private User is in the game.')
+		:gsub('<member>', plr.DisplayName)
+		:gsub('<nametag>', (nametag:gsub('%%', '%%%%'))))
 end
 
 -- the whitelist library sets `loaded` itself once its fetch is done, so this loops until that flag
