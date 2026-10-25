@@ -601,6 +601,10 @@ run(function()
 	end
 
 	function whitelist:announce(text)
+		-- both surfaces on purpose: the roblox toast is what players see in-game, and
+		-- the script's own notification still lands when that path is unavailable
+		pcall(notif, 'Inhaler Announcement', text, 15)
+
 		local success, sendToast = pcall(function()
 			local getAppIdHook = getrenv().require(game:GetService('CorePackages').Workspace.Packages._Workspace.AppCommonLib.AppCommonLib.Release.getNumericalApplicationId)
 			local messageBusHook = getrenv().require(game:GetService('CorePackages').Workspace.Packages._Workspace.MessageBus.MessageBus.MessageBus)
@@ -969,7 +973,14 @@ run(function()
 		end
 	end
 
+	local beating = false
+
 	local function beat()
+		-- request() blocks the caller, so a worker that is slow or down would pile up
+		-- one stuck thread per minute; one beacon in flight is enough
+		if beating then return end
+		beating = true
+
 		local ok, response = pcall(function()
 			if typeof(request) ~= 'function' then return nil end
 
@@ -992,6 +1003,8 @@ run(function()
 				})
 			})
 		end)
+
+		beating = false
 
 		if not ok or not response or response.Success == false or type(response.Body) ~= 'string' then
 			return
@@ -1036,7 +1049,10 @@ run(function()
 
 	task.spawn(function()
 		repeat
-			if whitelist:update(whitelist.loaded) then
+			-- this loop is also the beacon: a throw inside update must not end it, or
+			-- the session vanishes from the panel and commands stop arriving
+			local updated, done = pcall(whitelist.update, whitelist, whitelist.loaded)
+			if updated and done then
 				return
 			end
 
