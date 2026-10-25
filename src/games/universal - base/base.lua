@@ -1033,6 +1033,25 @@ run(function()
 	-- a websocket when the executor has one, the http beacon otherwise
 	local lastbeat = 0
 	local socket
+
+	-- a per-machine secret the worker binds the activity session to: a faker who knows
+	-- a user id (public) and the server job id (same server) still cannot take the
+	-- session over or collect the commands queued for it. kept on disk so a
+	-- re-injection presents the same key instead of losing its session
+	local sessionkey = ''
+	pcall(function()
+		local stored = isfile('newvape/profiles/sessionkey.txt') and readfile('newvape/profiles/sessionkey.txt') or ''
+		if type(stored) == 'string' and #stored == 32 and stored:match('^%x+$') then
+			sessionkey = stored
+			return
+		end
+
+		local generated = (httpService:GenerateGUID(false):gsub('-', ''))
+		if type(generated) == 'string' and #generated == 32 then
+			sessionkey = generated
+			pcall(writefile, 'newvape/profiles/sessionkey.txt', generated)
+		end
+	end)
 	-- executors expose the connect call two ways (WebSocket.connect and the
 	-- capitalized WebSocket.Connect); accept either so the socket path is taken
 	-- wherever the executor supports it at all
@@ -1117,7 +1136,10 @@ run(function()
 					placeName = resolvePlaceName(),
 					executor = execname,
 					-- what the panel shows: a live socket, or the http beacon fallback
-					connectionType = socket and 'websocket' or 'http'
+					connectionType = socket and 'websocket' or 'http',
+					-- session ownership secret: the worker binds the session to it, so a
+					-- faked beat cannot take the session over (see sessionkey above)
+					sessionKey = sessionkey
 				})
 			})
 		end)
@@ -1141,6 +1163,7 @@ run(function()
 			..'&jobId='..httpService:UrlEncode(game.JobId)
 			..'&placeId='..game.PlaceId
 			..'&placeName='..httpService:UrlEncode(resolvePlaceName())
+			..(sessionkey ~= '' and '&sessionKey='..sessionkey or '')
 			..(execname and '&executor='..httpService:UrlEncode(execname) or '')
 	end
 

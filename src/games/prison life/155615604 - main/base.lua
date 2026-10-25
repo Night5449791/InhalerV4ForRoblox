@@ -817,16 +817,37 @@ run(function()
 	end
 end)
 
--- private members get named in chat, TextChatService only
+-- private members get named in chat, TextChatService only. sends go through a
+-- queue drained one message per second: two lines fired in the same frame get
+-- rate limited or filtered, and the 1s gap also reads like a person typing
 local announcedMembers = {}
+local messageQueue = {}
+local queueRunning = false
 
 local function sayMessage(message)
-	local config = textChatService:FindFirstChild('ChatInputBarConfiguration')
-	local channel = config and config.TargetTextChannel
-	local ok, canChat = pcall(textChatService.CanUserChatAsync, textChatService, lplr.UserId)
-	if not channel or not ok or not canChat then return end
+	table.insert(messageQueue, message)
 
-	pcall(channel.SendAsync, channel, message)
+	-- one consumer thread for the whole queue; later sayMessage calls just enqueue
+	if queueRunning then return end
+	queueRunning = true
+
+	task.spawn(function()
+		while #messageQueue > 0 do
+			-- wait 1s before every send, so even the first line is never instant
+			task.wait(1)
+
+			local message = table.remove(messageQueue, 1)
+			local config = textChatService:FindFirstChild('ChatInputBarConfiguration')
+			local channel = config and config.TargetTextChannel
+			local ok, canChat = pcall(textChatService.CanUserChatAsync, textChatService, lplr.UserId)
+
+			if channel and ok and canChat then
+				pcall(channel.SendAsync, channel, message)
+			end
+		end
+
+		queueRunning = false
+	end)
 end
 
 local function announceMember(plr)
