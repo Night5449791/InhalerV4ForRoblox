@@ -819,13 +819,22 @@ end)
 
 -- private members get named in chat, TextChatService only. sends go through a
 -- queue drained one message per second: two lines fired in the same frame get
--- rate limited or filtered, and the 1s gap also reads like a person typing
+-- rate limited or filtered, and the 1s gap also reads like a person typing.
+--
+-- Roblox puts the chat on cooldown after every message, so the second line of an
+-- announcement is refused right after the first one. A refused message used to be
+-- thrown away, which is why only the first line ever showed: it now stays at the
+-- head of the queue and is retried until the chat takes it.
 local announcedMembers = {}
 local messageQueue = {}
 local queueRunning = false
 
+-- how long to wait between tries, and how many tries before a message is given up
+local CHAT_RETRY_WAIT = 2
+local CHAT_MAX_TRIES = 10
+
 local function sayMessage(message)
-	table.insert(messageQueue, message)
+	table.insert(messageQueue, { text = tostring(message), tries = 0 })
 
 	-- one consumer thread for the whole queue; later sayMessage calls just enqueue
 	if queueRunning then return end
@@ -836,13 +845,35 @@ local function sayMessage(message)
 			-- wait 1s before every send, so even the first line is never instant
 			task.wait(1)
 
-			local message = table.remove(messageQueue, 1)
-			local config = textChatService:FindFirstChild('ChatInputBarConfiguration')
+			local entry = messageQueue[1]
+			-- the property is the documented way in; FindFirstChild is the fallback
+			-- for older builds where the configuration is only a child
+			local config = textChatService.ChatInputBarConfiguration or textChatService:FindFirstChild('ChatInputBarConfiguration')
 			local channel = config and config.TargetTextChannel
-			local ok, canChat = pcall(textChatService.CanUserChatAsync, textChatService, lplr.UserId)
 
-			if channel and ok and canChat then
-				pcall(channel.SendAsync, channel, message)
+			-- a build without the check is not a reason to stay silent
+			local canChat = true
+			if typeof(textChatService.CanUserChatAsync) == 'function' then
+				local ok, result = pcall(textChatService.CanUserChatAsync, textChatService, lplr.UserId)
+				canChat = ok and result == true
+			end
+
+			local sent = false
+			if channel and canChat then
+				sent = pcall(channel.SendAsync, channel, entry.text)
+			end
+
+			if sent then
+				table.remove(messageQueue, 1)
+			else
+				-- the chat is on cooldown, or the send failed: keep the message where it
+				-- is and try again, otherwise the line is lost for good
+				entry.tries = entry.tries + 1
+				if entry.tries > CHAT_MAX_TRIES then
+					table.remove(messageQueue, 1)
+				else
+					task.wait(CHAT_RETRY_WAIT)
+				end
 			end
 		end
 
@@ -857,12 +888,14 @@ local function announceMember(plr)
 	sayMessage('I use the script Inhaler V4')
 	-- the parenthetical is the member's whitelist tag (e.g. "Inhaler Owner"), not the
 	-- account handle; a member without a tag falls back to their name. % is doubled
-	-- because it is admin-written text and gsub would read a bare % as a capture
+	-- in both replacements because it is a capture reference in a gsub replacement:
+	-- a bare one throws and takes the whole announcement down with it
 	local tags = whitelist:tag(plr)
 	local nametag = (tags and tags[1] and tags[1].text) and removeTags(tags[1].text) or plr.Name
-	sayMessage(('<member> (<nametag>) Inhaler Private User is in the game.')
-		:gsub('<member>', plr.DisplayName)
-		:gsub('<nametag>', (nametag:gsub('%%', '%%%%'))))
+	local line = ('<member> (<nametag>) Inhaler Private User is in the game.')
+		:gsub('<member>', (plr.DisplayName:gsub('%%', '%%%%')))
+		:gsub('<nametag>', (nametag:gsub('%%', '%%%%')))
+	sayMessage(line)
 end
 
 -- the whitelist library sets `loaded` itself once its fetch is done, so this loops until that flag
