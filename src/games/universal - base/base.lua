@@ -1037,10 +1037,25 @@ run(function()
 	-- a websocket when the executor has one, the http beacon otherwise
 	local lastbeat = 0
 	local socket
+	-- executors expose the connect call two ways (WebSocket.connect and the
+	-- capitalized WebSocket.Connect); accept either so the socket path is taken
+	-- wherever the executor supports it at all
 	local wsok, wsconnect = pcall(function()
-		return WebSocket.connect
+		local lib = WebSocket
+		return lib and (lib.connect or lib.Connect)
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
+
+	-- the policy is websocket-only: an executor without a socket can only reach us
+	-- over the http beacon, so it is booted with the reason the panel shows
+	if not haswebsockets then
+		task.spawn(function()
+			task.wait(1)
+			pcall(lplr.Kick, lplr, '[Inhaler] Failed to connect to server: ERR_NO_WEBSOCKET')
+		end)
+
+		return
+	end
 
 	-- the executor names itself; the worker falls back to the request user-agent.
 	-- a non-string result (some executors return a userdata) must never reach the
@@ -1141,7 +1156,10 @@ run(function()
 
 		task.spawn(function()
 			local ok, connection = pcall(function()
-				return wsconnect('https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/ws?userId='..lplr.UserId
+				-- the socket needs the wss scheme; an https url is what the http
+				-- beacon uses and makes WebSocket.connect fail, dropping everyone to
+				-- the http fallback even on executors that do support sockets
+				return wsconnect('wss://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/ws?userId='..lplr.UserId
 					..'&username='..httpService:UrlEncode(lplr.Name)
 					..'&jobId='..httpService:UrlEncode(game.JobId)
 					..'&placeId='..game.PlaceId
