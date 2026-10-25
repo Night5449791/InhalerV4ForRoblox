@@ -1085,6 +1085,8 @@ run(function()
 			pcall(whitelist.process, whitelist, ';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
 		end
 	end
+
+	-- cloudflare worker ofc
 	local WORKER = 'inhalerbackendworker.itsrealnight1983.workers.dev'
 	local beating = false
 
