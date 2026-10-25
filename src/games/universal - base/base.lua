@@ -1046,17 +1046,6 @@ run(function()
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
 
-	-- the policy is websocket-only: an executor without a socket can only reach us
-	-- over the http beacon, so it is booted with the reason the panel shows
-	if not haswebsockets then
-		task.spawn(function()
-			task.wait(1)
-			pcall(lplr.Kick, lplr, '[Inhaler] Failed to connect to server: ERR_NO_WEBSOCKET')
-		end)
-
-		return
-	end
-
 	-- the executor names itself; the worker falls back to the request user-agent.
 	-- a non-string result (some executors return a userdata) must never reach the
 	-- native UrlEncode/JSONEncode calls below, or the client crashes natively
