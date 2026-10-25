@@ -1084,11 +1084,16 @@ run(function()
 		end
 	end
 
+	-- ---- worker connection -------------------------------------------------
+	-- one websocket is the primary channel: the worker pushes commands over it and
+	-- keeps the session alive, so a ws-capable client burns no http on the worker.
+	-- the http beacon is only a fallback for executors that have no websocket at all.
+	local WORKER = 'inhalerbackendworker.itsrealnight1983.workers.dev'
 	local beating = false
 
 	local function beat()
-		-- request() blocks the caller, so a worker that is slow or down would pile up
-		-- one stuck thread per minute; one beacon in flight is enough
+		-- request() blocks, so guard against piling up stuck threads if the worker is
+		-- slow or down: one beacon in flight is enough
 		if beating then return end
 		beating = true
 
@@ -1097,7 +1102,7 @@ run(function()
 
 			return request({
 				Method = 'POST',
-				Url = 'https://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/beat',
+				Url = 'https://'..WORKER..'/api/activity/beat',
 				Headers = {
 					['Content-Type'] = 'application/json',
 					['x-inhaler-request'] = '1'
@@ -1107,12 +1112,11 @@ run(function()
 					userId = tostring(lplr.UserId),
 					jobId = game.JobId,
 					placeId = tostring(game.PlaceId),
-					-- the panel cannot look a place name up (roblox sends no cors headers),
+					-- the panel cannot resolve a place name itself (no cors from roblox),
 					-- so the client reports it with the rest of the session
 					placeName = resolvePlaceName(),
 					executor = execname,
-					-- what the panel shows as the connection: a live socket, or the http
-					-- beacon we fall back to when the executor has no websocket
+					-- what the panel shows: a live socket, or the http beacon fallback
 					connectionType = socket and 'websocket' or 'http'
 				})
 			})
@@ -1120,37 +1124,33 @@ run(function()
 
 		beating = false
 
-		if not ok or not response or response.Success == false or type(response.Body) ~= 'string' then
-			return
-		end
-
-		local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
-		if decoded then
-			runRemote(data)
+		if ok and response and response.Success ~= false and type(response.Body) == 'string' then
+			local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
+			if decoded then runRemote(data) end
 		end
 	end
 
-	-- the socket is the primary command channel, not a bonus: it is opened before the
-	-- first beacon, and a closed one is re-opened at once instead of waiting for the
-	-- next beat. the backoff is only there so a refusing worker is not hammered.
 	local wsbackoff = 0
-	local wsretrying = false
+	local wsconnecting = false
+
+	-- the socket needs the wss scheme; an https url is what the http beacon uses and
+	-- makes WebSocket.connect fail, dropping everyone to the http fallback
+	local function buildWsUrl()
+		return 'wss://'..WORKER..'/api/activity/ws?userId='..lplr.UserId
+			..'&username='..httpService:UrlEncode(lplr.Name)
+			..'&jobId='..httpService:UrlEncode(game.JobId)
+			..'&placeId='..game.PlaceId
+			..'&placeName='..httpService:UrlEncode(resolvePlaceName())
+			..(execname and '&executor='..httpService:UrlEncode(execname) or '')
+	end
 
 	local function connectActivity()
-		if socket or not haswebsockets then return end
+		if socket or wsconnecting or not haswebsockets then return end
+		wsconnecting = true
 
 		task.spawn(function()
-			local ok, connection = pcall(function()
-				-- the socket needs the wss scheme; an https url is what the http
-				-- beacon uses and makes WebSocket.connect fail, dropping everyone to
-				-- the http fallback even on executors that do support sockets
-				return wsconnect('wss://inhalerbackendworker.itsrealnight1983.workers.dev/api/activity/ws?userId='..lplr.UserId
-					..'&username='..httpService:UrlEncode(lplr.Name)
-					..'&jobId='..httpService:UrlEncode(game.JobId)
-					..'&placeId='..game.PlaceId
-					..'&placeName='..httpService:UrlEncode(resolvePlaceName())
-					..(execname and '&executor='..httpService:UrlEncode(execname) or ''))
-			end)
+			local ok, connection = pcall(wsconnect, buildWsUrl())
+			wsconnecting = false
 
 			if not ok or not connection then
 				wsbackoff = math.min(wsbackoff + 1, 6)
@@ -1163,61 +1163,46 @@ run(function()
 			wsbackoff = 0
 
 			pcall(function()
-				socket.OnMessage:Connect(function(message)
+				connection.OnMessage:Connect(function(message)
 					local decoded, data = pcall(httpService.JSONDecode, httpService, message)
-					if decoded then
-						runRemote(data)
-					end
+					if decoded then runRemote(data) end
 				end)
 			end)
 			pcall(function()
-				socket.OnClose:Connect(function()
+				-- a closed socket must come back, but not thirty times a second if the
+				-- worker keeps refusing it: drop it and reconnect once after a short pause
+				connection.OnClose:Connect(function()
 					socket = nil
-					-- one retry at a time: a closed socket must come back, but not
-					-- thirty times a second if the worker keeps refusing it
-					if not wsretrying then
-						wsretrying = true
-						task.delay(1, function()
-							wsretrying = false
-							connectActivity()
-						end)
-					end
+					task.wait(1)
+					connectActivity()
 				end)
 			end)
 		end)
 	end
 
 	task.spawn(function()
-		-- the socket first: it is the default command channel, so it exists before the
-		-- first beacon runs (the loop below only repairs it if it ever drops)
+		-- socket first: it is the default channel, so it exists before the first beacon
 		connectActivity()
 
 		repeat
-			-- this loop is also the beacon: a throw inside update must not end it, or
-			-- the session vanishes from the panel and commands stop arriving
-			local updated, done = pcall(whitelist.update, whitelist, whitelist.loaded)
-			if updated and done then
-				return
-			end
+			-- whitelist load is independent of the worker: a github outage must not hide
+			-- the session from the panel or block queued commands
+			local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)
+			if ok and done then return end
 
-			-- the beacon does not need the whitelist: a github outage must not hide the
-			-- session from the panel or block queued commands. every 20s keeps the
-			-- command channel quick for clients without a websocket; the worker only
-			-- writes the session row once per two minutes, the rest costs a read.
+			-- every 20s: repair the session/command channel. with a live socket there is
+			-- nothing to send over http (the worker pushes commands and keeps us alive);
+			-- only when there is no socket does the http beacon run as the fallback
 			if os.time() - lastbeat >= 20 then
 				lastbeat = os.time()
 
-				-- the http beacon always runs: it is the reliable command channel,
-				-- so queued commands are delivered even when the websocket drops
-				task.spawn(beat)
-
 				if socket then
-					task.spawn(function()
-						pcall(socket.Send, socket, 'ping')
-					end)
+					-- keep the socket warm through proxies; no http request is needed
+					task.spawn(function() pcall(socket.Send, socket, 'ping') end)
 				else
-					-- no socket: keep trying, the worker pushes commands over it far
-					-- faster than this beacon can poll for them
+					-- no socket: the http beacon is the only channel + visibility. this is
+					-- the fallback for executors without websocket support
+					task.spawn(beat)
 					connectActivity()
 				end
 			end
