@@ -7,7 +7,10 @@
 -- The console lives at
 --   CoreGui.DevConsoleMaster.DevConsoleWindow.DevConsoleUI.MainView.ClientLog
 -- and every entry in ClientLog holds the text row as `msg`. Both are version
--- dependent, so the path is tried first and the printed line itself is the fallback.
+-- dependent. DevConsoleMaster itself persists in CoreGui once the console has been
+-- opened (it just sits hidden), so the marks are attached to it as soon as it exists
+-- — whether or not F9 is pressed afterwards — and the printed line is only the
+-- fallback when that screen is not where we expect it.
 local ConsoleCopy
 local ColorV
 
@@ -30,6 +33,7 @@ local marks = {}
 local connections = {}
 
 local enabled = false
+local console
 local view
 local markerColor = Color3.fromRGB(110, 200, 255)
 
@@ -81,10 +85,12 @@ local function decorate(row)
 	local text = row.Text
 	if text == '' then return end
 
-	if view then
-		if not row:IsDescendantOf(view) then return end
+	-- once the console screen exists, mark every line in it; before it does, only
+	-- lines we watched LogService print (so we never touch unrelated CoreGui labels)
+	local container = view or console
+	if container then
+		if not row:IsDescendantOf(container) then return end
 	elseif not remembered[text] then
-		-- outside the console we only touch lines we saw LogService print
 		return
 	end
 
@@ -147,12 +153,11 @@ local function attach()
 	for _, child in CoreGui:GetChildren() do
 		if child.Name ~= 'DevConsoleMaster' then continue end
 
+		-- anchor to the whole screen so the marks survive even when MainView is named
+		-- differently in this roblox build; view is only a tighter scan target
+		console = child
 		view = viewOf(child)
-		if view then
-			scan(view)
-		else
-			scan(child)
-		end
+		scan(view or console)
 
 		return
 	end
@@ -161,6 +166,7 @@ end
 local function stop()
 	enabled = false
 	view = nil
+	console = nil
 
 	for _, connection in connections do
 		pcall(function()
@@ -201,14 +207,20 @@ ConsoleCopy = vape.Legit:CreateModule({
 
 			attach()
 
-			-- a recycled row never fires DescendantAdded, so the ones already on
-			-- screen are picked up here instead
+			-- rows are recycled without firing DescendantAdded, the console screen can
+			-- appear late, and some builds rebuild it on open — so keep attaching and
+			-- re-scanning until the module is switched off
 			task.spawn(function()
 				while enabled do
 					task.wait(1.5)
 
-					if view then
-						pcall(scan, view)
+					if not console then
+						attach()
+					end
+
+					local root = view or console
+					if root then
+						pcall(scan, root)
 					end
 				end
 			end)
