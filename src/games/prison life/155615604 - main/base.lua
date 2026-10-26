@@ -822,19 +822,14 @@ end)
 -- rate limited or filtered, and the 1s gap also reads like a person typing.
 --
 -- Roblox puts the chat on cooldown after every message, so the second line of an
--- announcement is refused right after the first one. A refused message used to be
--- thrown away, which is why only the first line ever showed: it now stays at the
--- head of the queue and is retried until the chat takes it.
+-- announcement is refused right after the first one. A refused message is dropped
+-- on the spot (no retry): the queue moves on instead of stalling behind it.
 local announcedMembers = {}
 local messageQueue = {}
 local queueRunning = false
 
--- how long to wait between tries, and how many tries before a message is given up
-local CHAT_RETRY_WAIT = 2
-local CHAT_MAX_TRIES = 10
-
 local function sayMessage(message)
-	table.insert(messageQueue, { text = tostring(message), tries = 0 })
+	table.insert(messageQueue, { text = tostring(message) })
 
 	-- one consumer thread for the whole queue; later sayMessage calls just enqueue
 	if queueRunning then return end
@@ -858,23 +853,13 @@ local function sayMessage(message)
 				canChat = ok and result == true
 			end
 
-			local sent = false
+			-- send once; do not retry a refused or failed message. the chat cooldown
+			-- or any other failure just drops the line rather than holding the queue
 			if channel and canChat then
-				sent = pcall(channel.SendAsync, channel, entry.text)
+				pcall(channel.SendAsync, channel, entry.text)
 			end
 
-			if sent then
-				table.remove(messageQueue, 1)
-			else
-				-- the chat is on cooldown, or the send failed: keep the message where it
-				-- is and try again, otherwise the line is lost for good
-				entry.tries = entry.tries + 1
-				if entry.tries > CHAT_MAX_TRIES then
-					table.remove(messageQueue, 1)
-				else
-					task.wait(CHAT_RETRY_WAIT)
-				end
-			end
+			table.remove(messageQueue, 1)
 		end
 
 		queueRunning = false
