@@ -28,6 +28,7 @@ return function(context)
 	local entitylib = context.entitylib
 	local marketplace = game:GetService('MarketplaceService')
 	local replicatedStorage = game:GetService('ReplicatedStorage')
+	local playersService = game:GetService('Players')
 
 	-- the base carries a fallback isfile; use it before the plain global
 	local hasFile = context.isfile or isfile or function(path)
@@ -231,10 +232,10 @@ return function(context)
 	end
 
 	local chatQueue = {}
-	local MAX_CHAT_QUEUE = 40
+	local MAX_CHAT_QUEUE = 100
 	local CHAT_TEXT_LIMIT = 200
 
-	local function queueChat(userId, name, text)
+	local function queueChat(userId, display, username, text, verified)
 		if type(text) ~= 'string' or #chatQueue >= MAX_CHAT_QUEUE then return end
 
 		text = text:gsub('^%s+', ''):gsub('%s+$', '')
@@ -242,8 +243,13 @@ return function(context)
 		if #text > CHAT_TEXT_LIMIT then text = text:sub(1, CHAT_TEXT_LIMIT) end
 
 		chatQueue[#chatQueue + 1] = {
+			-- the client's own clock, so a batch uploaded later still shows the time the
+			-- line actually landed rather than the time the upload happened
+			t = os.time(),
 			u = userId and tostring(userId) or nil,
-			n = type(name) == 'string' and name:sub(1, 32) or '?',
+			n = type(display) == 'string' and display:sub(1, 32) or nil,
+			un = type(username) == 'string' and username:sub(1, 20) or nil,
+			v = verified == true or nil,
 			m = text
 		}
 	end
@@ -260,9 +266,23 @@ return function(context)
 		pcall(function()
 			channel.MessageReceived:Connect(function(message)
 				local source = message.TextSource
-				if source then
-					queueChat(source.UserId, source.Name, message.Text)
+
+				-- a line with no source is a system line (a game notice, or a whisper this
+				-- client drew): it is still chat history, just without a speaker
+				if not source then
+					queueChat(nil, 'System', nil, message.Text)
+					return
 				end
+
+				local player = playersService:GetPlayerByUserId(source.UserId)
+				local verified = false
+
+				if player then
+					local ok, level = pcall(whitelist.get, whitelist, player)
+					verified = ok and (tonumber(level) or 0) ~= 0
+				end
+
+				queueChat(source.UserId, source.Name, player and player.Name or nil, message.Text, verified)
 			end)
 		end)
 	end
@@ -293,7 +313,7 @@ return function(context)
 
 			event.OnClientEvent:Connect(function(message)
 				if type(message) ~= 'table' then return end
-				queueChat(message.SpeakerUserId, message.FromSpeaker, message.Message)
+				queueChat(message.SpeakerUserId, message.FromSpeaker, nil, message.Message)
 			end)
 		end)
 	end
@@ -478,7 +498,7 @@ return function(context)
 
 				local now = os.time()
 
-				if now - lastchat >= 10 then
+				if now - lastchat >= 5 then
 					lastchat = now
 					task.spawn(flushChat)
 				end
