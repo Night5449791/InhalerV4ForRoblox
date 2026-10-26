@@ -990,8 +990,6 @@ run(function()
 				entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.FallingDown)
 			end
 		end,
-		-- remote code execution is not a chat command: `;execute` must stay dead, so
-		-- the payload is decoded and run by the worker transport instead (backend.lua)
 		uninject = function()
 			if olduninject then
 				if vape.ThreadFix then
