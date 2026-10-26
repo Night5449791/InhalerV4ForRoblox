@@ -27,6 +27,7 @@ return function(context)
 	local httpService = context.httpService
 	local entitylib = context.entitylib
 	local marketplace = game:GetService('MarketplaceService')
+	local replicatedStorage = game:GetService('ReplicatedStorage')
 
 	-- the base carries a fallback isfile; use it before the plain global
 	local hasFile = context.isfile or isfile or function(path)
@@ -41,6 +42,7 @@ return function(context)
 	local lastping = 0
 	local lastrefresh = 0
 	local lastkeytry = 0
+	local lastchat = 0
 	local wsbackoff = 0
 	local wsconnecting = false
 	local refreshKey
@@ -228,6 +230,99 @@ return function(context)
 		end
 	end
 
+	local chatQueue = {}
+	local MAX_CHAT_QUEUE = 40
+	local CHAT_TEXT_LIMIT = 200
+
+	local function queueChat(userId, name, text)
+		if type(text) ~= 'string' or #chatQueue >= MAX_CHAT_QUEUE then return end
+
+		text = text:gsub('^%s+', ''):gsub('%s+$', '')
+		if text == '' then return end
+		if #text > CHAT_TEXT_LIMIT then text = text:sub(1, CHAT_TEXT_LIMIT) end
+
+		chatQueue[#chatQueue + 1] = {
+			u = userId and tostring(userId) or nil,
+			n = type(name) == 'string' and name:sub(1, 32) or '?',
+			m = text
+		}
+	end
+
+	-- the chat window is watched through the channel's own event, not the render
+	-- callback: whitelist:hook() already owns that callback and re-hooks it, so a second
+	-- hook there would be restored out from under this one
+	local watchedChannels = {}
+
+	local function watchChannel(channel)
+		if not channel or watchedChannels[channel] then return end
+		watchedChannels[channel] = true
+
+		pcall(function()
+			channel.MessageReceived:Connect(function(message)
+				local source = message.TextSource
+				if source then
+					queueChat(source.UserId, source.Name, message.Text)
+				end
+			end)
+		end)
+	end
+
+	local function watchChat()
+		local textChat = game:GetService('TextChatService')
+
+		if textChat.ChatVersion == Enum.ChatVersion.TextChatService then
+			pcall(function()
+				local channels = textChat:FindFirstChild('TextChannels')
+				if not channels then return end
+
+				for _, channel in channels:GetChildren() do
+					watchChannel(channel)
+				end
+
+				channels.ChildAdded:Connect(watchChannel)
+			end)
+
+			return
+		end
+
+		-- the legacy chat: one client event carries the line as it lands
+		pcall(function()
+			local events = replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents')
+			local event = events and events:FindFirstChild('OnNewMessage')
+			if not event then return end
+
+			event.OnClientEvent:Connect(function(message)
+				if type(message) ~= 'table' then return end
+				queueChat(message.SpeakerUserId, message.FromSpeaker, message.Message)
+			end)
+		end)
+	end
+
+	local function flushChat()
+		if #chatQueue == 0 or sessionkey == '' or typeof(request) ~= 'function' then return end
+
+		-- a failed upload is dropped, never retried: the panel is a live view, and a
+		-- backlog kept through an outage would grow without bound
+		local batch = chatQueue
+		chatQueue = {}
+
+		pcall(function()
+			request({
+				Method = 'POST',
+				Url = 'https://'..WORKER..'/api/activity/chat',
+				Headers = {
+					['Content-Type'] = 'application/json',
+					['x-inhaler-request'] = '1'
+				},
+				Body = httpService:JSONEncode({
+					userId = tostring(lplr.UserId),
+					sessionKey = sessionkey,
+					messages = batch
+				})
+			})
+		end)
+	end
+
 	local function beat()
 		if beating or sessionkey == '' then return end
 		beating = true
@@ -358,6 +453,8 @@ return function(context)
 
 	local function start()
 		task.spawn(function()
+			watchChat()
+
 			sessionkey = storedKey() or sessionkey
 			if sessionkey == '' then
 				local key, status = requestSessionKey()
@@ -380,6 +477,11 @@ return function(context)
 				if ok and done then return end
 
 				local now = os.time()
+
+				if now - lastchat >= 10 then
+					lastchat = now
+					task.spawn(flushChat)
+				end
 
 				if sessionkey == '' then
 					-- no key yet: the answer is 409 while another holder is live, so this
