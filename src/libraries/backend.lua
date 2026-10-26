@@ -8,7 +8,7 @@
 -- keeps the command implementations and passes its handles in.
 --
 -- Usage:
---   local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')({
+--   local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')()({
 --       vape = vape,
 --       whitelist = whitelist,
 --       lplr = lplr,

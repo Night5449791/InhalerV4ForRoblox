@@ -1031,7 +1031,9 @@ run(function()
 
 	-- the worker transport (session key, beat, websocket, remote dispatch) lives
 	-- in its own library; the command implementations above stay in the client
-	local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')({
+	-- backend.lua returns a factory: the first call hands back the constructor,
+	-- the second one builds the table that exposes start/stop/beat
+	local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')()({
 		vape = vape,
 		whitelist = whitelist,
 		lplr = lplr,
