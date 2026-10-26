@@ -44,7 +44,11 @@ return function(context)
 	local lastrefresh = 0
 	local lastkeytry = 0
 	local lastchat = 0
-	local wsbackoff = 0
+	local lastwsretry = 0
+	local wsAttempts = 5
+	local wsDelay = 5
+	local wsFailures = 0
+	local wsDown = false
 	local wsconnecting = false
 	local refreshKey
 
@@ -67,6 +71,11 @@ return function(context)
 		return lib and (lib.connect or lib.Connect)
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
+
+	-- chat upload rides the socket, so a client that cannot hold one starts with it off.
+	-- The panel turns it on through remote code: shared.inhalerChatLog.enabled = true
+	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = haswebsockets }
+	shared.inhalerChatLog = chatControl
 
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
@@ -131,6 +140,21 @@ return function(context)
 		local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
 		local key = decoded and type(data) == 'table' and data.sessionKey or nil
 		if type(key) ~= 'string' then return nil, status end
+
+		-- the worker owns the retry budget for a dropped socket, so it can be tuned from
+		-- a deployment instead of a client update
+		if decoded and type(data.ws) == 'table' then
+			local attempts = tonumber(data.ws.attempts)
+			local delay = tonumber(data.ws.delayMs)
+
+			if attempts and attempts >= 1 then
+				wsAttempts = math.floor(math.min(attempts, 20))
+			end
+
+			if delay and delay >= 1000 then
+				wsDelay = math.floor(math.min(delay, 60000) / 1000)
+			end
+		end
 
 		key = key:lower()
 		if #key == 32 and key:match('^%x+$') then return key end
@@ -236,7 +260,7 @@ return function(context)
 	local CHAT_TEXT_LIMIT = 200
 
 	local function queueChat(userId, display, username, text, verified)
-		if type(text) ~= 'string' or #chatQueue >= MAX_CHAT_QUEUE then return end
+		if not chatControl.enabled or type(text) ~= 'string' or #chatQueue >= MAX_CHAT_QUEUE then return end
 
 		text = text:gsub('^%s+', ''):gsub('%s+$', '')
 		if text == '' then return end
@@ -408,7 +432,7 @@ return function(context)
 	local connectActivity
 
 	function connectActivity()
-		if stopped or socket or wsconnecting or not haswebsockets or sessionkey == '' then return end
+		if stopped or socket or wsconnecting or not haswebsockets or wsDown or sessionkey == '' then return end
 		wsconnecting = true
 
 		task.spawn(function()
@@ -417,14 +441,27 @@ return function(context)
 
 			if not ok or not connection then
 				if stopped then return end
-				wsbackoff = math.min(wsbackoff + 1, 6)
-				task.wait(wsbackoff)
+
+				wsFailures = wsFailures + 1
+
+				-- the budget is the worker's (wsAttempts / wsDelay): once it is spent the
+				-- beacon carries the commands and the socket is probed again later
+				if wsFailures >= wsAttempts then
+					wsFailures = 0
+					wsDown = true
+					lastwsretry = os.time()
+					return
+				end
+
+				task.wait(wsDelay)
 				connectActivity()
 				return
 			end
 
+			wsFailures = 0
 			socket = connection
-			wsbackoff = 0
+
+			local openedAt = os.time()
 
 			pcall(function()
 				connection.OnMessage:Connect(function(message)
@@ -436,16 +473,26 @@ return function(context)
 				connection.OnClose:Connect(function()
 					socket = nil
 					if stopped then return end
-					task.wait(1)
 
-					-- a 4401 close means the handshake key was refused: ask for a fresh
-					-- one before reconnecting, or the next socket fails the same way. when
-					-- the key did not change the slot is still held, so the reconnect is
-					-- left to the beacon loop instead of spinning here
-					local before = sessionkey
+					-- a socket that dies right after the handshake is the server refusing
+					-- this key rather than a normal drop: it counts against the budget, so
+					-- a refused key falls back to the beacon instead of spinning here
+					if os.time() - openedAt < 3 then
+						wsFailures = wsFailures + 1
+					else
+						wsFailures = 0
+					end
+
+					task.wait(wsDelay)
+
+					if wsFailures >= wsAttempts then
+						wsFailures = 0
+						wsDown = true
+						lastwsretry = os.time()
+						return
+					end
+
 					refreshKey(true)
-					if sessionkey == before then return end
-
 					connectActivity()
 				end)
 			end)
@@ -454,9 +501,9 @@ return function(context)
 
 	local PING_INTERVAL = 20
 	local BEAT_IDLE = 20
-	local BEAT_SOCKET = 120
 	local KEY_CHECK = 120
 	local KEY_RETRY = 60
+	local WS_PROBE = 300
 
 	-- the key this machine holds can go stale (the slot was re-bound elsewhere, or the
 	-- file was replaced). the worker says so by closing the socket with 4401 and by
@@ -477,6 +524,12 @@ return function(context)
 		socket = nil
 		if old then
 			pcall(function() old:Close() end)
+		end
+
+		-- a new key is worth a fresh socket even if the last one gave up
+		if wsDown then
+			wsDown = false
+			connectActivity()
 		end
 	end
 
@@ -524,19 +577,28 @@ return function(context)
 					refreshKey()
 
 					if socket then
+						-- the socket is the main connection: commands arrive through it and
+						-- the beacon is not used at all while it is healthy
 						if now - lastping >= PING_INTERVAL then
 							lastping = now
 							task.spawn(function() pcall(socket.Send, socket, 'ping') end)
 						end
-
-						if now - lastbeat >= BEAT_SOCKET then
+					elseif haswebsockets and not wsDown then
+						connectActivity()
+					else
+						-- no socket support, or the socket is down for now: the beacon is
+						-- the only way commands still land, and the socket is probed again
+						-- on a slow loop in case the network came back
+						if now - lastbeat >= BEAT_IDLE then
 							lastbeat = now
 							task.spawn(beat)
 						end
-					elseif now - lastbeat >= BEAT_IDLE then
-						lastbeat = now
-						task.spawn(beat)
-						connectActivity()
+
+						if wsDown and now - lastwsretry >= WS_PROBE then
+							lastwsretry = now
+							wsDown = false
+							connectActivity()
+						end
 					end
 				end
 
