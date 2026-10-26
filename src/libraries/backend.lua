@@ -243,9 +243,9 @@ return function(context)
 		if #text > CHAT_TEXT_LIMIT then text = text:sub(1, CHAT_TEXT_LIMIT) end
 
 		chatQueue[#chatQueue + 1] = {
-			-- the client's own clock, so a batch uploaded later still shows the time the
-			-- line actually landed rather than the time the upload happened
-			t = os.time(),
+			-- the client's own clock in milliseconds, so a batch uploaded later still
+			-- shows the time the line actually landed, to the second
+			t = DateTime.now().UnixTimestampMillis,
 			u = userId and tostring(userId) or nil,
 			n = type(display) == 'string' and display:sub(1, 32) or nil,
 			un = type(username) == 'string' and username:sub(1, 20) or nil,
@@ -267,10 +267,19 @@ return function(context)
 			channel.MessageReceived:Connect(function(message)
 				local source = message.TextSource
 
-				-- a line with no source is a system line (a game notice, or a whisper this
-				-- client drew): it is still chat history, just without a speaker
+				-- a line with no speaker is a join notice or a game announcement, and both
+				-- are noise: the one worth keeping is the whisper this panel drew, whose
+				-- text is the fixed shape the dashboard builds
 				if not source then
-					queueChat(nil, 'System', nil, message.Text)
+					local body, from
+					if type(message.Text) == 'string' then
+						body, from = message.Text:match('^Whispered "(.*)" From Dashboard (.+)$')
+					end
+
+					if body then
+						queueChat(nil, from, 'Dashboard', body, true)
+					end
+
 					return
 				end
 
