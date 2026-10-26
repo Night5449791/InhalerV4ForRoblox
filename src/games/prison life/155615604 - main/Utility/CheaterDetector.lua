@@ -53,6 +53,17 @@ local function saveCheaters()
 	pcall(writefile, backupPath, content)
 end
 
+-- the local list changed: ask the backend to upload it now instead of waiting for its
+-- next idle tick, so an add or a removal reaches the api while it is still news
+local function pushSkidList()
+	local signal = shared.inhalerSkidPush
+	if typeof(signal) == 'Instance' then
+		pcall(function()
+			signal:Fire()
+		end)
+	end
+end
+
 local function readDatabase(path)
 	if not isfile(path) then return end
 
@@ -353,6 +364,7 @@ local function editCheater(text, reason, remove)
 	end
 
 	saveCheaters()
+	pushSkidList()
 	sendWebhookLog(plr, name, reason, remove, existing)
 	notify((plr and plr.DisplayName or name)..(remove and ' removed from the cheater list.' or ' added to the cheater list. ('..reason..')'), 10)
 end
@@ -491,6 +503,7 @@ CheaterDetector:CreateButton({
 		table.clear(Cheaters.Names)
 		table.clear(Cheaters.Users)
 		saveCheaters()
+		pushSkidList()
 		notify('Cleared the cheater list.', 10)
 	end
 })

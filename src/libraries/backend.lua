@@ -78,6 +78,13 @@ return function(context)
 	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = haswebsockets }
 	shared.inhalerChatLog = chatControl
 
+	-- a game module that just changed its local cheater list fires this to have the
+	-- upload go out now instead of on the next idle tick. an event rather than a
+	-- function field in `shared`, so the table does not keep this chunk's upvalues
+	-- (and the socket) alive after an uninject
+	local skidPush = typeof(shared.inhalerSkidPush) == 'Instance' and shared.inhalerSkidPush or Instance.new('BindableEvent')
+	shared.inhalerSkidPush = skidPush
+
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
 
@@ -449,6 +456,11 @@ return function(context)
 		local entries = skidEntries()
 		if not entries then return end
 
+		-- an empty local database is never uploaded: a wiped or freshly recreated
+		-- cheaters.json would otherwise clear the api list for everyone. the global
+		-- list is emptied from the panel, not as a side effect of a client losing its file
+		if #entries == 0 then return end
+
 		local encoded = httpService:JSONEncode(entries)
 		if encoded == lastskidupload then return end
 
@@ -472,6 +484,21 @@ return function(context)
 		if ok and type(response) == 'table' and tonumber(response.StatusCode) == 200 then
 			lastskidupload = encoded
 		end
+	end
+
+	-- a wildcard add changes the list once per matched player: the one second of quiet
+	-- turns that burst into a single upload, and the worker drops it anyway when the
+	-- list it receives is the one it already holds
+	local skidpushtoken = 0
+
+	local function requestSkidPush()
+		skidpushtoken = skidpushtoken + 1
+		local token = skidpushtoken
+
+		task.delay(1, function()
+			if token ~= skidpushtoken then return end
+			uploadSkidList()
+		end)
 	end
 
 	local function beat()
@@ -635,6 +662,8 @@ return function(context)
 	end
 
 	local function start()
+		vape:Clean(skidPush.Event:Connect(requestSkidPush))
+
 		task.spawn(function()
 			watchChat()
 
