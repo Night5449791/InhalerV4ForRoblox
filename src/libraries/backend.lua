@@ -44,6 +44,8 @@ return function(context)
 	local lastrefresh = 0
 	local lastkeytry = 0
 	local lastchat = 0
+	local lastskidup = 0
+	local lastskiddl = 0
 	local lastwsretry = 0
 	local wsAttempts = 5
 	local wsDelay = 5
@@ -76,6 +78,19 @@ return function(context)
 	-- The panel turns it on through remote code: shared.inhalerChatLog.enabled = true
 	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = haswebsockets }
 	shared.inhalerChatLog = chatControl
+
+	-- the global skid list: the game modules read it from here, and `Changed` fires with
+	-- the entry array whenever a download brings a new revision, so a module never has
+	-- to poll this table
+	local skidControl = type(shared.inhalerSkidList) == 'table' and shared.inhalerSkidList or {}
+	if typeof(skidControl.Changed) ~= 'Instance' then
+		skidControl.Changed = Instance.new('BindableEvent')
+	end
+
+	skidControl.rev = tonumber(skidControl.rev) or 0
+	skidControl.at = tonumber(skidControl.at) or 0
+	skidControl.entries = type(skidControl.entries) == 'table' and skidControl.entries or {}
+	shared.inhalerSkidList = skidControl
 
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
@@ -376,6 +391,132 @@ return function(context)
 		end)
 	end
 
+	-- ------------------------------------------------------------------ skid list
+	--
+	-- The owner's local cheater database is mirrored on the worker, and every client
+	-- takes that mirror as its remote list. Uploading is opt-in per machine: the token
+	-- that authorises it lives in a profile file, not in this source, because this
+	-- source is public and the list decides who every client tags and targets.
+
+	local SKID_TOKEN_PATH = 'newvape/profiles/skidupload.txt'
+	local SKID_FILE = 'newvape/cheaters.json'
+
+	local function skidToken()
+		if not hasFile(SKID_TOKEN_PATH) then return nil end
+
+		local ok, token = pcall(readfile, SKID_TOKEN_PATH)
+		if not ok or type(token) ~= 'string' then return nil end
+
+		token = token:gsub('^%s+', ''):gsub('%s+$', '')
+		return token ~= '' and token or nil
+	end
+
+	-- the local database stores two shapes: a ByUserId table and a lowercased name map.
+	-- Wildcard patterns are dropped — the worker refuses them too, and a pattern here
+	-- would flag everyone it could match on every client
+	local function skidEntries()
+		if not hasFile(SKID_FILE) then return nil end
+
+		local ok, content = pcall(readfile, SKID_FILE)
+		if not ok or type(content) ~= 'string' or content == '' then return nil end
+
+		local decoded, data = pcall(httpService.JSONDecode, httpService, content)
+		if not decoded or type(data) ~= 'table' then return nil end
+
+		local entries, seen = {}, {}
+
+		for id, user in pairs(type(data.Users) == 'table' and data.Users or {}) do
+			local userId = tostring(id)
+
+			if type(user) == 'table' and userId:match('^%d+$') and not seen['i'..userId] then
+				seen['i'..userId] = true
+				entries[#entries + 1] = {
+					i = userId,
+					u = type(user.Name) == 'string' and user.Name or nil,
+					n = type(user.DisplayName) == 'string' and user.DisplayName or nil,
+					r = type(user.Reason) == 'string' and user.Reason or nil
+				}
+			end
+		end
+
+		for name, reason in pairs(type(data.Names) == 'table' and data.Names or {}) do
+			local lowered = tostring(name):lower()
+
+			if lowered ~= '' and not lowered:find('*', 1, true) and not seen['n'..lowered] then
+				seen['n'..lowered] = true
+				entries[#entries + 1] = {u = lowered, r = type(reason) == 'string' and reason or nil}
+			end
+		end
+
+		return entries
+	end
+
+	-- the last payload accepted by the worker: an unchanged list is not re-sent, and the
+	-- compare happens before the request, so a quiet machine costs nothing
+	local lastskidupload = ''
+
+	local function uploadSkidList()
+		local token = skidToken()
+		if not token or sessionkey == '' or typeof(request) ~= 'function' then return end
+
+		local entries = skidEntries()
+		if not entries then return end
+
+		local encoded = httpService:JSONEncode(entries)
+		if encoded == lastskidupload then return end
+
+		local ok, response = pcall(function()
+			return request({
+				Method = 'POST',
+				Url = 'https://'..WORKER..'/api/activity/skidlist',
+				Headers = {
+					['Content-Type'] = 'application/json',
+					['x-inhaler-request'] = '1',
+					['x-inhaler-skidtoken'] = token
+				},
+				Body = httpService:JSONEncode({
+					userId = tostring(lplr.UserId),
+					sessionKey = sessionkey,
+					entries = entries
+				})
+			})
+		end)
+
+		if ok and type(response) == 'table' and tonumber(response.StatusCode) == 200 then
+			lastskidupload = encoded
+		end
+	end
+
+	local function downloadSkidList()
+		if typeof(request) ~= 'function' then return end
+
+		local ok, response = pcall(function()
+			return request({
+				Method = 'GET',
+				Url = 'https://'..WORKER..'/api/activity/skidlist',
+				Headers = {['x-inhaler-request'] = '1'}
+			})
+		end)
+
+		if not ok or type(response) ~= 'table' or tonumber(response.StatusCode) ~= 200 or type(response.Body) ~= 'string' then
+			return
+		end
+
+		local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
+		if not decoded or type(data) ~= 'table' then return end
+
+		local rev = tonumber(data.rev) or 0
+		if rev == skidControl.rev then return end
+
+		skidControl.rev = rev
+		skidControl.at = tonumber(data.at) or 0
+		skidControl.entries = type(data.entries) == 'table' and data.entries or {}
+
+		pcall(function()
+			skidControl.Changed:Fire(skidControl.entries)
+		end)
+	end
+
 	local function beat()
 		if beating or sessionkey == '' then return end
 		beating = true
@@ -504,6 +645,11 @@ return function(context)
 	local KEY_CHECK = 120
 	local KEY_RETRY = 60
 	local WS_PROBE = 300
+	-- the skid mirror: an upload is skipped when the local file did not change, so the
+	-- idle timer only costs a read; the download is what every client pays, so it stays
+	-- slow — a cheater list does not need to be seconds fresh
+	local SKID_UPLOAD_IDLE = 60
+	local SKID_REFRESH = 600
 
 	-- the key this machine holds can go stale (the slot was re-bound elsewhere, or the
 	-- file was replaced). the worker says so by closing the socket with 4401 and by
@@ -563,6 +709,18 @@ return function(context)
 				if now - lastchat >= 5 then
 					lastchat = now
 					task.spawn(flushChat)
+				end
+
+				if now - lastskidup >= SKID_UPLOAD_IDLE then
+					lastskidup = now
+					task.spawn(uploadSkidList)
+				end
+
+				-- only a game that asked for the list pays for it: a module sets
+				-- shared.inhalerSkidList.wanted, and every other product stays silent
+				if skidControl.wanted and now - lastskiddl >= SKID_REFRESH then
+					lastskiddl = now
+					task.spawn(downloadSkidList)
 				end
 
 				if sessionkey == '' then
