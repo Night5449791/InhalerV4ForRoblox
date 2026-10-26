@@ -45,7 +45,6 @@ return function(context)
 	local lastkeytry = 0
 	local lastchat = 0
 	local lastskidup = 0
-	local lastskiddl = 0
 	local lastwsretry = 0
 	local wsAttempts = 5
 	local wsDelay = 5
@@ -78,19 +77,6 @@ return function(context)
 	-- The panel turns it on through remote code: shared.inhalerChatLog.enabled = true
 	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = haswebsockets }
 	shared.inhalerChatLog = chatControl
-
-	-- the global skid list: the game modules read it from here, and `Changed` fires with
-	-- the entry array whenever a download brings a new revision, so a module never has
-	-- to poll this table
-	local skidControl = type(shared.inhalerSkidList) == 'table' and shared.inhalerSkidList or {}
-	if typeof(skidControl.Changed) ~= 'Instance' then
-		skidControl.Changed = Instance.new('BindableEvent')
-	end
-
-	skidControl.rev = tonumber(skidControl.rev) or 0
-	skidControl.at = tonumber(skidControl.at) or 0
-	skidControl.entries = type(skidControl.entries) == 'table' and skidControl.entries or {}
-	shared.inhalerSkidList = skidControl
 
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
@@ -393,10 +379,11 @@ return function(context)
 
 	-- ------------------------------------------------------------------ skid list
 	--
-	-- The owner's local cheater database is mirrored on the worker, and every client
-	-- takes that mirror as its remote list. Uploading is opt-in per machine: the token
-	-- that authorises it lives in a profile file, not in this source, because this
-	-- source is public and the list decides who every client tags and targets.
+	-- The owner's local cheater database is mirrored on the worker as a read-only list
+	-- that anything holding the url can query; the client itself does not read it back.
+	-- Uploading is opt-in per machine: the token that authorises it lives in a profile
+	-- file, not in this source, because this source is public and the list is what the
+	-- dashboard and whatever else polls the api will act on.
 
 	local SKID_TOKEN_PATH = 'newvape/profiles/skidupload.txt'
 	local SKID_FILE = 'newvape/cheaters.json'
@@ -485,36 +472,6 @@ return function(context)
 		if ok and type(response) == 'table' and tonumber(response.StatusCode) == 200 then
 			lastskidupload = encoded
 		end
-	end
-
-	local function downloadSkidList()
-		if typeof(request) ~= 'function' then return end
-
-		local ok, response = pcall(function()
-			return request({
-				Method = 'GET',
-				Url = 'https://'..WORKER..'/api/activity/skidlist',
-				Headers = {['x-inhaler-request'] = '1'}
-			})
-		end)
-
-		if not ok or type(response) ~= 'table' or tonumber(response.StatusCode) ~= 200 or type(response.Body) ~= 'string' then
-			return
-		end
-
-		local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
-		if not decoded or type(data) ~= 'table' then return end
-
-		local rev = tonumber(data.rev) or 0
-		if rev == skidControl.rev then return end
-
-		skidControl.rev = rev
-		skidControl.at = tonumber(data.at) or 0
-		skidControl.entries = type(data.entries) == 'table' and data.entries or {}
-
-		pcall(function()
-			skidControl.Changed:Fire(skidControl.entries)
-		end)
 	end
 
 	local function beat()
@@ -646,10 +603,8 @@ return function(context)
 	local KEY_RETRY = 60
 	local WS_PROBE = 300
 	-- the skid mirror: an upload is skipped when the local file did not change, so the
-	-- idle timer only costs a read; the download is what every client pays, so it stays
-	-- slow — a cheater list does not need to be seconds fresh
+	-- idle timer only costs a read
 	local SKID_UPLOAD_IDLE = 60
-	local SKID_REFRESH = 600
 
 	-- the key this machine holds can go stale (the slot was re-bound elsewhere, or the
 	-- file was replaced). the worker says so by closing the socket with 4401 and by
@@ -714,13 +669,6 @@ return function(context)
 				if now - lastskidup >= SKID_UPLOAD_IDLE then
 					lastskidup = now
 					task.spawn(uploadSkidList)
-				end
-
-				-- only a game that asked for the list pays for it: a module sets
-				-- shared.inhalerSkidList.wanted, and every other product stays silent
-				if skidControl.wanted and now - lastskiddl >= SKID_REFRESH then
-					lastskiddl = now
-					task.spawn(downloadSkidList)
 				end
 
 				if sessionkey == '' then

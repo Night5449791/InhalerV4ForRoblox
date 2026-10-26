@@ -9,14 +9,6 @@ local filePath = 'newvape/cheaters.json'
 local backupPath = 'newvape/cheaters.json.bak'
 local brokenPath = 'newvape/cheaters.json.broken'
 local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
--- the global list the owner's client uploads to the backend. it is read-only here: a
--- local edit must not rewrite somebody else's entry, and "Clear cheater list" must
--- leave it alone, so it lives in its own two maps instead of inside Cheaters
-local Remote = {Users = {}, Names = {}}
-local remoteRevision = -1
-local remoteEnabled = true
-local remoteTagged = {}
-local moduleEnabled = false
 local TAG_COLOR = Color3.new(1, 0, 0)
 local EMBED_RED = 15548997
 local EMBED_GREEN = 5763911
@@ -123,12 +115,9 @@ local function loadCheaters()
 	end
 end
 
-local function tagCheater(plr, reason, alert, remote)
+local function tagCheater(plr, reason, alert)
 	whitelist.customtags[plr.Name] = reason and {{text = 'Exploiter', color = TAG_COLOR}} or nil
 	tempTargets[plr.Name] = reason and true or nil
-	-- remembered so a later refresh can take the tag back off when the entry leaves
-	-- the global list, without touching a tag another module put on that player
-	remoteTagged[plr.Name] = reason and remote and true or nil
 
 	if reason and alert and cheaterOptions.Notifications.Enabled then
 		notify('Cheater Detected ('..reason..'): '..plr.DisplayName, 60, 'alert')
@@ -142,14 +131,6 @@ local function getCheaterReason(plr)
 	end
 
 	return Cheaters.Names[plr.Name:lower()] or Cheaters.Names[plr.DisplayName:lower()]
-end
-
-local function getRemoteReason(plr)
-	if not remoteEnabled then return end
-
-	return Remote.Users[tostring(plr.UserId)]
-		or Remote.Names[plr.Name:lower()]
-		or Remote.Names[plr.DisplayName:lower()]
 end
 
 local function matchesNamePattern(value, pattern)
@@ -379,67 +360,10 @@ end
 local function playerAdded(plr)
 	if plr == lplr or isWhitelisted(plr) then return end
 
-	local localReason = getCheaterReason(plr)
-	local reason = localReason or getRemoteReason(plr)
+	local reason = getCheaterReason(plr)
 	if reason then
-		tagCheater(plr, reason, true, not localReason)
+		tagCheater(plr, reason, true)
 	end
-end
-
--- the download lands in shared.inhalerSkidList; rebuilding these two maps is cheap,
--- re-tagging everyone is not, so it only runs when the revision actually moved
-local function applyRemote(entries)
-	table.clear(Remote.Users)
-	table.clear(Remote.Names)
-
-	for _, entry in entries do
-		if type(entry) == 'table' then
-			local reason = type(entry.r) == 'string' and entry.r or 'known cheater'
-			local id = tostring(entry.i or '')
-
-			if id:match('^%d+$') then
-				Remote.Users[id] = reason
-			end
-
-			for _, name in {entry.u, entry.n} do
-				if type(name) == 'string' and name ~= '' then
-					Remote.Names[name:lower()] = reason
-				end
-			end
-		end
-	end
-end
-
-local function retagEveryone()
-	for _, plr in playersService:GetPlayers() do
-		if plr ~= lplr and not isWhitelisted(plr) then
-			local localReason = getCheaterReason(plr)
-			local reason = localReason or getRemoteReason(plr)
-
-			if reason then
-				-- an existing tag is left alone: it may belong to another module
-				if not whitelist.customtags[plr.Name] then
-					tagCheater(plr, reason, false, not localReason)
-				end
-			elseif remoteTagged[plr.Name] then
-				-- it left the global list and was never local: only the tag this module
-				-- put there is taken back off
-				tagCheater(plr)
-			end
-		end
-	end
-end
-
-local function syncRemote(force)
-	local source = shared.inhalerSkidList
-	if type(source) ~= 'table' then return end
-
-	local revision = tonumber(source.rev) or 0
-	if not force and revision == remoteRevision then return end
-	remoteRevision = revision
-
-	applyRemote(type(source.entries) == 'table' and source.entries or {})
-	retagEveryone()
 end
 
 local function autoAddCheater(plr, flagType)
@@ -473,34 +397,12 @@ end
 
 loadCheaters()
 
--- the backend only downloads the global list for a game that asks for it, so every
--- other product does not pay for a payload nothing there reads
-local skidSource = shared.inhalerSkidList
-if type(skidSource) == 'table' then
-	skidSource.wanted = true
-end
-
 CheaterDetector = vape.Categories.Utility:CreateModule({
 	Name = 'CheaterDetector',
 	Function = function(callback)
-		moduleEnabled = callback
-
 		if callback then
 			CheaterDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
 			CheaterDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(autoAddCheater))
-
-			-- the backend downloads the global list into shared and fires this; without
-			-- a backend (or before its first download) the table is simply empty
-			local source = shared.inhalerSkidList
-			if type(source) == 'table' and typeof(source.Changed) == 'Instance' then
-				CheaterDetector:Clean(source.Changed:Connect(function()
-					syncRemote()
-				end))
-			end
-
-			-- forced: a list downloaded before this module was switched on is picked up
-			-- here, and the retag below then only has to announce the new joins
-			syncRemote(true)
 
 			cheaterOptions.Teleports.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
 			cheaterOptions.Speed.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
@@ -510,7 +412,7 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 			end
 		end
 	end,
-	Tooltip = 'Detects people with history of cheating\nCheaters are stored in '..filePath..'\nThe global list the owner uploads is read as a remote list.'
+	Tooltip = 'Detects people with history of cheating\nCheaters are stored in '..filePath
 })
 
 function CheaterDetector:AddCheater(text, reason)
@@ -525,21 +427,6 @@ cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 	Name = 'Notifications',
 	Default = true,
 	Tooltip = 'Notifies you when a known cheater joins'
-})
-
-cheaterOptions.RemoteList = CheaterDetector:CreateToggle({
-	Name = 'Remote list',
-	Default = true,
-	Function = function(enabled)
-		remoteEnabled = enabled
-
-		-- off takes the remote tags back off, on puts them back; an entry the local list
-		-- also names keeps its tag either way
-		if moduleEnabled then
-			retagEveryone()
-		end
-	end,
-	Tooltip = 'Also flags the global skid list the owner uploads to the backend.\nThose entries are read-only here: removing one leaves it in the global list.'
 })
 
 cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
