@@ -33,8 +33,8 @@ local function getRequestFunction()
 	if requestResolved then return requestFunction end
 	requestResolved = true
 
-	local genv = (getgenv and getgenv()) or _G
-	for _, env in {genv, {request = request, http_request = http_request, syn = syn}} do
+	local genv = getgenv and getgenv()
+	for _, env in {genv or {}, {request = request, http_request = http_request, syn = syn}} do
 		if typeof(env) == 'table' then
 			requestFunction = (typeof(env.request) == 'function' and env.request)
 				or (typeof(env.http_request) == 'function' and env.http_request)

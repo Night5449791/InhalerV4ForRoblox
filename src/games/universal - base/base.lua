@@ -1029,171 +1029,19 @@ run(function()
 		end
 	}
 
-	local lastbeat = 0
-	local socket
-
-	local sessionkey = ''
-	pcall(function()
-		local stored = isfile('newvape/profiles/sessionkey.txt') and readfile('newvape/profiles/sessionkey.txt') or ''
-		if type(stored) == 'string' and #stored == 32 and stored:match('^%x+$') then
-			sessionkey = stored
-			return
-		end
-
-		local generated = (httpService:GenerateGUID(false):gsub('-', ''))
-		if type(generated) == 'string' and #generated == 32 then
-			sessionkey = generated
-			pcall(writefile, 'newvape/profiles/sessionkey.txt', generated)
-		end
-	end)
-	local wsok, wsconnect = pcall(function()
-		local lib = WebSocket
-		return lib and (lib.connect or lib.Connect)
-	end)
-	local haswebsockets = wsok and typeof(wsconnect) == 'function'
-
-	local execok, execname = pcall(identifyexecutor)
-	if not execok or type(execname) ~= 'string' then execname = nil end
-
-	local placeName
-	local function resolvePlaceName()
-		if placeName then return placeName end
-
-		local ok, info = pcall(function()
-			return game:GetService('MarketplaceService'):GetProductInfo(game.PlaceId)
-		end)
-
-		if ok and type(info) == 'table' and type(info.Name) == 'string' and #info.Name > 0 and info.Name ~= 'Ugc' then
-			placeName = info.Name:sub(1, 80)
-			return placeName
-		end
-
-		local okName, name = pcall(function()
-			return game.Name
-		end)
-
-		placeName = (okName and type(name) == 'string' and #name > 0) and name:sub(1, 80) or '-'
-		return placeName
-	end
-
-	local function runRemote(data)
-		if type(data) ~= 'table' or type(data.commands) ~= 'table' then return end
-
-		for _, command in data.commands do
-			if type(command) ~= 'table' or type(command.command) ~= 'string' then continue end
-
-			pcall(whitelist.process, whitelist, ';'..command.command..' '..lplr.Name..' '..tostring(command.args or ''), lplr)
-		end
-	end
-
-	-- cloudflare worker ofc
-	local WORKER = 'inhalerbackendworker.itsrealnight1983.workers.dev'
-	local beating = false
-
-	local function beat()
-		if beating then return end
-		beating = true
-
-		local ok, response = pcall(function()
-			if typeof(request) ~= 'function' then return nil end
-
-			return request({
-				Method = 'POST',
-				Url = 'https://'..WORKER..'/api/activity/beat',
-				Headers = {
-					['Content-Type'] = 'application/json',
-					['x-inhaler-request'] = '1'
-				},
-				Body = httpService:JSONEncode({
-					username = lplr.Name,
-					userId = tostring(lplr.UserId),
-					jobId = game.JobId,
-					placeId = tostring(game.PlaceId),
-					placeName = resolvePlaceName(),
-					executor = execname,
-					connectionType = socket and 'websocket' or 'http',
-					sessionKey = sessionkey
-				})
-			})
-		end)
-
-		beating = false
-
-		if ok and response and response.Success ~= false and type(response.Body) == 'string' then
-			local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
-			if decoded then runRemote(data) end
-		end
-	end
-
-	local wsbackoff = 0
-	local wsconnecting = false
-
-	local function buildWsUrl()
-		return 'wss://'..WORKER..'/api/activity/ws?userId='..lplr.UserId
-			..'&username='..httpService:UrlEncode(lplr.Name)
-			..'&jobId='..httpService:UrlEncode(game.JobId)
-			..'&placeId='..game.PlaceId
-			..'&placeName='..httpService:UrlEncode(resolvePlaceName())
-			..(sessionkey ~= '' and '&sessionKey='..sessionkey or '')
-			..(execname and '&executor='..httpService:UrlEncode(execname) or '')
-	end
-
-	local function connectActivity()
-		if socket or wsconnecting or not haswebsockets then return end
-		wsconnecting = true
-
-		task.spawn(function()
-			local ok, connection = pcall(wsconnect, buildWsUrl())
-			wsconnecting = false
-
-			if not ok or not connection then
-				wsbackoff = math.min(wsbackoff + 1, 6)
-				task.wait(wsbackoff)
-				connectActivity()
-				return
-			end
-
-			socket = connection
-			wsbackoff = 0
-
-			pcall(function()
-				connection.OnMessage:Connect(function(message)
-					local decoded, data = pcall(httpService.JSONDecode, httpService, message)
-					if decoded then runRemote(data) end
-				end)
-			end)
-			pcall(function()
-				connection.OnClose:Connect(function()
-					socket = nil
-					task.wait(1)
-					connectActivity()
-				end)
-			end)
-		end)
-	end
-
-	task.spawn(function()
-		connectActivity()
-
-		repeat
-			local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)
-			if ok and done then return end
-			if os.time() - lastbeat >= 20 then
-				lastbeat = os.time()
-
-				if socket then
-					task.spawn(function() pcall(socket.Send, socket, 'ping') end)
-				else
-					task.spawn(beat)
-					connectActivity()
-				end
-			end
-
-			task.wait(10)
-		until vape.Loaded == nil
-	end)
+	-- the worker transport (session key, beat, websocket, remote dispatch) lives
+	-- in its own library; the command implementations above stay in the client
+	local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')({
+		vape = vape,
+		whitelist = whitelist,
+		lplr = lplr,
+		httpService = httpService,
+		isfile = isfile
+	})
+	backend:start()
 
 	vape:Clean(function()
+		backend:stop()
 		table.clear(whitelist.commands)
 		table.clear(whitelist.data)
 		table.clear(whitelist)

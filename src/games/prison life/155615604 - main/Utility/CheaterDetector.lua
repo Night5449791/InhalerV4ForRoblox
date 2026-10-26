@@ -1,6 +1,8 @@
 local CheaterDetector
 local webhookUrl
 local whitelist = vape.Libraries.whitelist
+local jsonEncode, jsonDecode = httpService.JSONEncode, httpService.JSONDecode
+local osDate, osTime = os.date, os.time
 local DB_VERSION = 3
 local cheaterOptions = {}
 local filePath = 'newvape/cheaters.json'
@@ -10,18 +12,13 @@ local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
 local TAG_COLOR = Color3.new(1, 0, 0)
 local EMBED_RED = 15548997
 local EMBED_GREEN = 5763911
+-- the name discord shows as the poster; the adder is still in the "Added By" field
+local WEBHOOK_NAME = 'Inhaler CheaterDetector'
 
 local function countCheaters(names, users)
 	local count = 0
-
-	for _ in names do
-		count += 1
-	end
-
-	for _ in users do
-		count += 1
-	end
-
+	for _ in names do count += 1 end
+	for _ in users do count += 1 end
 	return count
 end
 
@@ -40,76 +37,17 @@ local function notify(text, duration, type)
 	end
 end
 
-local function beautifyJSON(json)
-	local out, indent, inString, escaped = {}, 0, false, false
-	local length = #json
-
-	local i = 1
-	while i <= length do
-		local char = json:sub(i, i)
-
-		if inString then
-			out[#out + 1] = char
-
-			if escaped then
-				escaped = false
-			elseif char == '\\' then
-				escaped = true
-			elseif char == '"' then
-				inString = false
-			end
-
-			i += 1
-			continue
-		end
-
-		if char == '"' then
-			inString = true
-			out[#out + 1] = char
-		elseif char == '{' or char == '[' then
-			local closing = json:sub(i + 1, i + 1)
-			if closing == '}' or closing == ']' then
-				out[#out + 1] = char..closing
-				i += 2
-				continue
-			end
-
-			indent += 1
-			out[#out + 1] = char
-			out[#out + 1] = '\n'..string.rep('\t', indent)
-		elseif char == '}' or char == ']' then
-			indent -= 1
-			out[#out + 1] = '\n'..string.rep('\t', indent)
-			out[#out + 1] = char
-		elseif char == ',' then
-			out[#out + 1] = ',\n'..string.rep('\t', indent)
-		elseif char == ':' then
-			out[#out + 1] = ': '
-		else
-			out[#out + 1] = char
-		end
-
-		i += 1
-	end
-
-	return table.concat(out)
-end
-
 local function saveCheaters()
 	Cheaters.Count = countCheaters(Cheaters.Names, Cheaters.Users)
 
-	local encoded, content = pcall(httpService.JSONEncode, httpService, Cheaters)
-
+	local encoded, content = pcall(jsonEncode, httpService, Cheaters)
 	if not encoded then
 		return notify('Failed to encode: '..tostring(content), 15, 'warning')
 	end
 
-	content = beautifyJSON(content)
-
 	local written, err = pcall(writefile, filePath, content)
 	if not written then
-		notify('Failed to write '..filePath..' ('..tostring(err)..')', 15, 'warning')
-		return
+		return notify('Failed to write '..filePath..' ('..tostring(err)..')', 15, 'warning')
 	end
 
 	pcall(writefile, backupPath, content)
@@ -121,8 +59,7 @@ local function readDatabase(path)
 	local read, content = pcall(readfile, path)
 	if not read or type(content) ~= 'string' then return end
 
-	local decoded, data = pcall(httpService.JSONDecode, httpService, content)
-
+	local decoded, data = pcall(jsonDecode, httpService, content)
 	if not decoded or type(data) ~= 'table' then
 		return nil, content
 	end
@@ -147,9 +84,7 @@ local function loadCheaters()
 		end
 	end
 
-	if not data then
-		return saveCheaters()
-	end
+	if not data then return saveCheaters() end
 
 	local version = type(data.Version) == 'number' and data.Version or 1
 	local upgraded = false
@@ -198,32 +133,24 @@ local function getCheaterReason(plr)
 	return Cheaters.Names[plr.Name:lower()] or Cheaters.Names[plr.DisplayName:lower()]
 end
 
-local function hasCheaterEntry(plr)
-	return Cheaters.Users[tostring(plr.UserId)] ~= nil
-		or Cheaters.Names[plr.Name:lower()] ~= nil
-		or Cheaters.Names[plr.DisplayName:lower()] ~= nil
-end
-
 local function matchesNamePattern(value, pattern)
 	value, pattern = value:lower(), pattern:lower()
 	if not pattern:find('*', 1, true) then
 		return value == pattern
 	end
 
-	pattern = '^'..pattern:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
-	return value:match(pattern) ~= nil
+	return value:match('^'..pattern:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$') ~= nil
 end
 
 local function splitCheaterText(text)
 	local words = {}
 	for word in text:gmatch('%S+') do
-		table.insert(words, word)
+		words[#words + 1] = word
 	end
 
 	if #words == 0 then return end
 
-	local entries = {}
-	local exact = {}
+	local entries, exact = {}, {}
 	for _, plr in playersService:GetPlayers() do
 		local username, displayName = plr.Name:lower(), plr.DisplayName:lower()
 		entries[#entries + 1] = {plr, username, displayName}
@@ -234,16 +161,21 @@ local function splitCheaterText(text)
 	for i = #words, 1, -1 do
 		local name = table.concat(words, ' ', 1, i)
 		local lowered = name:lower()
-		if exact[lowered] then
-			return exact[lowered], table.concat(words, ' ', i + 1), name
+		local hit = exact[lowered]
+
+		if hit then
+			return hit, table.concat(words, ' ', i + 1), name
 		end
 
+		-- the pattern is built once per prefix instead of once per online player
+		local wildcard = lowered:find('*', 1, true)
+			and '^'..lowered:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
 		local partial, wildcardMatches
 
 		for _, entry in entries do
-			if lowered:find('*', 1, true) and (matchesNamePattern(entry[2], lowered) or matchesNamePattern(entry[3], lowered)) then
+			if wildcard and (entry[2]:match(wildcard) or entry[3]:match(wildcard)) then
 				wildcardMatches = wildcardMatches or {}
-				table.insert(wildcardMatches, entry[1])
+				wildcardMatches[#wildcardMatches + 1] = entry[1]
 			end
 
 			if not partial and (entry[2]:sub(1, #lowered) == lowered or entry[3]:sub(1, #lowered) == lowered) then
@@ -285,14 +217,14 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 	local fields = {}
 
 	if removed then
-		table.insert(fields, {name = 'Status', value = 'Removed from skidlist'})
-		table.insert(fields, {name = 'Reason Was', value = previous or 'unknown'})
+		fields[1] = {name = 'Status', value = 'Removed from skidlist'}
+		fields[2] = {name = 'Reason Was', value = previous or 'unknown'}
 	else
-		table.insert(fields, {name = '⚠️ Reason', value = '`'..(reason or 'manually added')..'`'})
+		fields[1] = {name = '⚠️ Reason', value = '`'..(reason or 'manually added')..'`'}
 	end
 
-	table.insert(fields, {name = 'Added By', value = lplr.Name, inline = true})
-	table.insert(fields, {name = 'Logged Date', value = os.date('%m/%d/%Y %H:%M:%S'), inline = true})
+	fields[#fields + 1] = {name = 'Added By', value = lplr.Name, inline = true}
+	fields[#fields + 1] = {name = 'Logged Date', value = osDate('%m/%d/%Y %H:%M:%S'), inline = true}
 
 	task.spawn(function()
 		local sent, err = webhook.sendEmbed(url, {
@@ -300,7 +232,7 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 			description = 'User: '..user..' (@'..display..')\nID: '..id,
 			color = removed and EMBED_GREEN or EMBED_RED,
 			fields = fields
-		}, lplr.Name)
+		}, WEBHOOK_NAME)
 
 		if not sent then
 			notify('Webhook failed: '..tostring(err), 10, 'warning')
@@ -310,41 +242,56 @@ end
 
 local function editCheater(text, reason, remove)
 	text = trimText(text)
-	if not text or text == '' then return notify('No player given.', 8, 'warning') end
+	if not text or text == '' then
+		return notify('No player given.', 8, 'warning')
+	end
 
 	local plr, rest, name, wildcardMatches = splitCheaterText(text)
+
 	if wildcardMatches then
-		if #wildcardMatches == 0 and not remove then
+		local count = #wildcardMatches
+
+		if count == 0 and not remove then
 			return notify('No online players match that pattern.', 8, 'warning')
-		elseif remove and #wildcardMatches > 1 then
-			local removed = 0
-			for _, matchedPlayer in wildcardMatches do
-				if hasCheaterEntry(matchedPlayer) then
-					editCheater(matchedPlayer.Name, nil, true)
-					removed += 1
+		end
+
+		if count > 1 then
+			if remove then
+				local removed = 0
+				for _, matched in wildcardMatches do
+					if getCheaterReason(matched) ~= nil then
+						editCheater(matched.Name, nil, true)
+						removed += 1
+					end
 				end
+
+				if removed == 0 then
+					return notify('No matching players are on the cheater list.', 8, 'warning')
+				end
+
+				return
 			end
 
-			if removed == 0 then
-				return notify('No matching players are on the cheater list.', 8, 'warning')
-			end
-			return
-		elseif not remove and #wildcardMatches > 1 then
 			local addReason = trimText(reason) or (rest and rest ~= '' and rest) or 'manually added'
-			for _, matchedPlayer in wildcardMatches do
-				editCheater(matchedPlayer.Name, addReason, false)
+			for _, matched in wildcardMatches do
+				editCheater(matched.Name, addReason, false)
 			end
 			return
 		end
 	end
 
-	if remove and plr and not hasCheaterEntry(plr) then
+	local onlineReason = plr and getCheaterReason(plr)
+
+	-- a remove for someone who is not on the list falls back to the stored entries
+	if remove and plr and not onlineReason then
 		plr = nil
 	end
 
 	local storedUserId, storedUser
+
 	if not plr then
 		local matches = {}
+
 		for userId, user in Cheaters.Users do
 			if type(user) == 'table'
 				and ((type(user.Name) == 'string' and matchesNamePattern(user.Name, name))
@@ -368,18 +315,15 @@ local function editCheater(text, reason, remove)
 		name = match and match.Name or (storedUser and (storedUser.Name or storedUser.DisplayName)) or name
 	end
 
-	local existing = (plr and getCheaterReason(plr))
-		or (storedUser and (storedUser.Reason or 'known cheater'))
-		or (not storedUserId and Cheaters.Names[name:lower()])
+	local lowered = name:lower()
+	local nameReason = not storedUserId and Cheaters.Names[lowered]
+	local existing = onlineReason or (storedUser and (storedUser.Reason or 'known cheater')) or nameReason
 
 	if not remove and existing then
 		return notify((plr and plr.DisplayName or name)..' is already on the cheater list ('..existing..'), not added again.', 10, 'warning')
 	end
 
-	local listed = (plr and hasCheaterEntry(plr))
-		or storedUser ~= nil
-		or (not storedUserId and Cheaters.Names[name:lower()] ~= nil)
-	if remove and not listed then
+	if remove and not (onlineReason ~= nil or storedUser ~= nil or nameReason ~= nil) then
 		return notify((plr and plr.DisplayName or name)..' is not on the cheater list.', 8, 'warning')
 	end
 
@@ -395,7 +339,7 @@ local function editCheater(text, reason, remove)
 			Name = plr.Name,
 			DisplayName = plr.DisplayName,
 			Reason = reason,
-			Time = os.time()
+			Time = osTime()
 		} or nil
 		Cheaters.Names[plr.Name:lower()] = nil
 		Cheaters.Names[plr.DisplayName:lower()] = nil
@@ -403,9 +347,9 @@ local function editCheater(text, reason, remove)
 	elseif storedUserId then
 		Cheaters.Users[storedUserId] = nil
 	elseif remove then
-		Cheaters.Names[name:lower()] = nil
+		Cheaters.Names[lowered] = nil
 	else
-		Cheaters.Names[name:lower()] = reason
+		Cheaters.Names[lowered] = reason
 	end
 
 	saveCheaters()
@@ -424,7 +368,7 @@ end
 
 local function autoAddCheater(plr, flagType)
 	if not cheaterOptions.AutomaticAdd.Enabled then return end
-	if flagType ~= 'invalid animation' and flagType:find('invalid state') ~= 1
+	if flagType ~= 'invalid animation' and flagType:sub(1, 13) ~= 'invalid state'
 		and not (flagType == 'teleport' and cheaterOptions.Teleports.Enabled)
 		and not (flagType == 'speed' and cheaterOptions.Speed.Enabled) then return end
 	if plr == lplr or isWhitelisted(plr) or getCheaterReason(plr) then return end
@@ -479,13 +423,6 @@ function CheaterDetector:RemoveCheater(text)
 	editCheater(text, nil, true)
 end
 
-function CheaterDetector:FindCheater(text)
-	text = trimText(text)
-	if not text or text == '' then return end
-
-	return splitCheaterText(text)
-end
-
 cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 	Name = 'Notifications',
 	Default = true,
@@ -536,7 +473,7 @@ cheaterOptions.Webhook = CheaterDetector:CreateToggle({
 })
 
 webhookUrl = CheaterDetector:CreateTextBox({
-	Name = 'Webhook URL',
+	Name = 'Webhook URL', -- for anyone reading this, we WONT LOG ur discord webhook and never will. dashboard is used to manage inhaler users
 	Placeholder = 'https://discord.com/api/webhooks/...',
 	Visible = false,
 	Darker = true,

@@ -77,7 +77,7 @@ local function localAdded(char)
 		end
 	else
 		local success, data = pcall(function()
-			data = marketplaceService:GetProductInfo(IDBox.Value == '' and 43 or tonumber(IDBox.Value), Enum.InfoType.Bundle)
+			data = marketplaceService:GetProductInfoAsync(IDBox.Value == '' and 43 or tonumber(IDBox.Value), Enum.InfoType.Bundle)
 		end)
 
 		if success and Disguise.Enabled then
