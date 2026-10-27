@@ -1,5 +1,4 @@
 local AutoRejoin
-local Sort
 
 AutoRejoin = vape.Categories.Utility:CreateModule({
 	Name = 'AutoRejoin',
@@ -9,15 +8,15 @@ AutoRejoin = vape.Categories.Utility:CreateModule({
 			AutoRejoin:Clean(guiService.ErrorMessageChanged:Connect(function(str)
 				if (str:lower():find('anomalous behavior detected') or not rejoinCheck or guiService:GetErrorCode() ~= Enum.ConnectionError.DisconnectLuaKick) and guiService:GetErrorCode() ~= Enum.ConnectionError.DisconnectConnectionLost and not str:lower():find('ban') then
 					rejoinCheck = true
-					serverHop(nil, Sort.Value)
+
+					if playersService.NumPlayers > 1 then
+						teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
+					else
+						teleportService:Teleport(game.PlaceId)
+					end
 				end
 			end))
 		end
 	end,
-	Tooltip = 'Automatically rejoins into a new server if you get disconnected / kicked'
-})
-Sort = AutoRejoin:CreateDropdown({
-	Name = 'Sort',
-	List = {'Descending', 'Ascending'},
-	Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers'
+	Tooltip = 'Force rejoins the same server if you get disconnected / kicked'
 })
