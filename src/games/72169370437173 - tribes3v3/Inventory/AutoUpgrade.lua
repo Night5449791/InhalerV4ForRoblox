@@ -5,10 +5,23 @@ AutoUpgrade = vape.Categories.Inventory:CreateModule({
 	Function = function(callback)
 		if callback then
 			repeat
-				if (not lplr:GetAttribute('MatchId') or lplr:GetAttribute('MatchId') == '') then
-					local item = tribes.Economy.ReadyList()[1]
-					if item then
-						tribes.Economy.Upgrade(item)
+				local gui = lplr.PlayerGui:FindFirstChild('TR_Menus')
+				gui = gui and gui:FindFirstChild('Collection', true) or nil
+
+				if gui and gui:IsA('Frame') then
+					local holder = gui:FindFirstChild('Grid', true)
+
+					if holder and holder:IsA('ScrollingFrame') then
+						for _, button in holder:GetChildren() do
+							if button:IsA('TextButton') then
+								local upgrade = button:FindFirstChild('Upgrade', true)
+
+								if upgrade and upgrade:IsA('TextButton') and upgrade.Visible then
+									clickButton(upgrade)
+									break
+								end
+							end
+						end
 					end
 				end
 

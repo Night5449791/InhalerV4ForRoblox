@@ -3,17 +3,31 @@ local Target
 local Part
 local Range
 local HitChance
+local Prediction
+local PredictionTime
 local CircleColor
 local CircleTransparency
 local CircleFilled
 local CircleObject
 local ProjectileRaycast = RaycastParams.new()
 ProjectileRaycast.RespectCanCollide = true
+local Toggles = {}
 local old
 
-local function Hook(...)
-	local handler
+local function getMousePosition()
+	if inputService.TouchEnabled then
+		return gameCamera.ViewportSize / 2
+	end
 
+	return inputService:GetMouseLocation()
+end
+
+local function Hook(...)
+	local a, b = debug.info(1, 'f'), debug.info(2, 'f')
+	setstackhidden(a, true)
+	setstackhidden(b, true)
+
+	local handler
 	for _, obj in debug.getstack(3) do
 		if type(obj) == 'table' and rawget(obj, 'tuning') then
 			handler = obj
@@ -22,6 +36,14 @@ local function Hook(...)
 	end
 
 	if handler then
+		if type(tribes.Handlers) == 'table' then
+			for index, obj in next, tribes.Handlers do
+				if getmetatable(handler) == obj and not Toggles[index].Enabled then
+					return old(...)
+				end
+			end
+		end
+
 		local entity = entitylib.EntityMouse({
 			Range = Range.Value,
 			Part = Part.Value,
@@ -47,7 +69,7 @@ local function Hook(...)
 				gravity = handler.tuning.throw.gravity or 0
 			end
 
-			local calc = prediction.SolveTrajectory(origin, projSpeed, math.abs(gravity), targetPart.Position, targetPart.AssemblyLinearVelocity, workspace.Gravity, entity.HipHeight, nil, ProjectileRaycast)
+			local calc = prediction.SolveTrajectory(origin, projSpeed, math.abs(gravity), targetPart.Position + (Part.Value == 'Head' and Vector3.new(0, 0.3, 0) or Vector3.zero), Prediction.Enabled and VelocityTracker:Get(entity.RootPart, PredictionTime.Value) or targetPart.AssemblyLinearVelocity, workspace.Gravity, entity.HipHeight, nil, ProjectileRaycast)
 			if calc then
 				local lookDir = CFrame.lookAt(origin, calc).LookVector
 				targetinfo.Targets[entity] = os.clock() + 1
@@ -95,13 +117,19 @@ SilentAim = vape.Categories.Combat:CreateModule({
 		end
 
 		if callback then
+			if not setstackhidden then
+				notif('SilentAim', 'setstackhidden only currently.', 10, 'alert')
+				SilentAim:Toggle()
+				return
+			end
+
 			old = hookfunction(tribes.Util.AimDirection, function(...)
 				return Hook(...)
 			end)
 
 			repeat
 				if CircleObject then
-					CircleObject.Position = inputService:GetMouseLocation()
+					CircleObject.Position = getMousePosition()
 				end
 
 				task.wait()
@@ -151,6 +179,21 @@ HitChance = SilentAim:CreateSlider({
 	Max = 100,
 	Default = 85,
 	Suffix = '%'
+})
+Prediction = SilentAim:CreateToggle({
+	Name = 'Velocity prediction',
+	Function = function(callback)
+		PredictionTime.Object.Visible = callback
+	end
+})
+PredictionTime = SilentAim:CreateSlider({
+	Name = 'Prediction time',
+	Min = 0,
+	Max = 0.5,
+	Default = 0.15,
+	Decimal = 100,
+	Visible = false,
+	Darker = true
 })
 SilentAim:CreateToggle({
 	Name = 'Range Circle',
@@ -209,3 +252,15 @@ CircleFilled = SilentAim:CreateToggle({
 	Darker = true,
 	Visible = false
 })
+
+if type(tribes.Handlers) == 'table' then
+	for index in next, tribes.Handlers do
+		if type(index) == 'string' then
+			Toggles[index] = SilentAim:CreateToggle({
+				Name = index,
+				Default = true,
+				Darker = true
+			})
+		end
+	end
+end

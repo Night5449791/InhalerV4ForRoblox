@@ -1,7 +1,5 @@
 local Killaura
 local Targets
-local CPS
-local SwingRange
 local AttackRange
 local AngleSlider
 local Max
@@ -14,6 +12,7 @@ local ParticleColor1
 local ParticleColor2
 local ParticleSize
 local Particles, Boxes, AttackDelay = {}, {}, os.clock()
+local rand = Random.new()
 
 local function getAttackData()
 	if Mouse.Enabled then
@@ -21,7 +20,7 @@ local function getAttackData()
 	end
 
 	if tribes.State.handler and tribes.State.handler.lastSwing then
-		return tribes.State.tool
+		return tribes.State.handler.ctx.tool
 	end
 end
 
@@ -34,6 +33,12 @@ Killaura = vape.Categories.Blatant:CreateModule({
 	Name = 'Killaura',
 	Function = function(callback)
 		if callback then
+			if not shared.VapeDeveloper then
+				notif('Killaura', 'This module is disabled until safety can be ensured, please use SilentAura.', 30, 'alert')
+				Killaura:Toggle()
+				return
+			end
+
 			repeat
 				local tool = getAttackData()
 				local attacked = {}
@@ -77,11 +82,13 @@ Killaura = vape.Categories.Blatant:CreateModule({
 								entitylib.character.RootPart.CFrame = CFrame.lookAlong(localPos, delta * Vector3.new(1, 0, 1))
 							end
 
+							handler.lastSwing = os.clock()
 							if AttackDelay < os.clock() and (AutoBlock.Enabled or not tribes.State.handler.blocking) then
 								local targets = {}
-								handler.lastSwing = os.clock()
+								local cooldown = handler:Cooldown()
+								local hitDelay = handler.preset.hitDelay or 0.1
 
-								AttackDelay = os.clock() + handler:Cooldown()
+								AttackDelay = os.clock() + cooldown
 								for _, data in attacked do
 									table.insert(targets, data.Entity.Character)
 								end
@@ -95,23 +102,26 @@ Killaura = vape.Categories.Blatant:CreateModule({
 								local animTable = oneHanded and handler.preset.oneSwings or handler.preset.swings or {}
 								handler.combo = (handler.combo % #comboTable) + 1
 								local finisher = (#comboTable > 2) and (handler.combo == #comboTable)
+								local fakeTime = os.clock() - (hitDelay + (rand:NextNumber() * 0.02) - 0.01)
 								tribes.Util.PlayAnim(handler.ctx.animator, animTable[((handler.combo - 1) % math.max(1, #animTable)) + 1], (handler.preset.swingSpeed or 1) * (finisher and 0.95 or 1), 0.05)
 
 								handler.ctx.emit('Swing', {
 									step = handler.combo,
 									finisher = finisher,
-									hitDelay = handler.preset.hitDelay or 0.1,
+									hitDelay = hitDelay,
 									oneHanded = oneHanded
 								})
 
 								handler.ctx.send('Swing', {
 									dir = sanitizeAngle(CFrame.lookAt(localPos + Vector3.new(0, 1.5, 0), attacked[1].Entity.RootPart.Position)),
 									tool = tool,
-									hits = targets
+									hits = targets,
+									k = math.floor((os.clock() - fakeTime) * 1000),
+									w = math.floor(fakeTime * 1000) % 9973
 								})
 
 								if AutoBlock.Enabled and handler.tuning.block then
-									tribes.State.handler:SetBlock(true)
+									handler:SetBlock(true)
 								end
 
 								if vape.ThreadFix then
@@ -121,7 +131,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 						end
 					elseif AutoBlock.Enabled and handler.tuning.block then
 						if tribes.Util.CanAct() then
-							tribes.State.handler:SetBlock(true)
+							handler:SetBlock(true)
 						end
 
 						if vape.ThreadFix then

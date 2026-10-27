@@ -7,13 +7,22 @@ AutoQueue = vape.Categories.Utility:CreateModule({
 	Function = function(callback)
 		if callback then
 			AutoQueue:Clean(vapeEvents.MatchEnded.Event:Connect(function()
-				if Notification.Enabled and Delay.Value > 0 then
-					notif('AutoQueue', 'Playing again in '..string.format('%.1f', Delay.Value)..' seconds!', Delay.Value)
-				end
+				repeat
+					local button = lplr.PlayerGui:FindFirstChild('TR_Menus')
+					local holder = button and button:FindFirstChild('MatchEnd', true) or nil
+					button = holder and holder:FindFirstChild('PlayAgain', true) or nil
 
-				task.delay(Delay.Value, function()
-					replicatedStorage.Remotes.QueueAction:InvokeServer('PlayAgain')
-				end)
+					if button and button:IsA('TextButton') and button.Visible and holder.Visible then
+						AutoQueue:Clean(task.delay(Delay.Value, clickButton, button))
+						if Notification.Enabled and Delay.Value > 0 then
+							notif('AutoQueue', 'Playing again in '..string.format('%.1f', Delay.Value)..' seconds!', Delay.Value)
+						end
+
+						break
+					end
+
+					task.wait(0.05)
+				until not AutoQueue.Enabled
 			end))
 		end
 	end,

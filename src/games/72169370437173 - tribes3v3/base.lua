@@ -20,6 +20,8 @@ local textChatService = cloneref(game:GetService('TextChatService'))
 local runService = cloneref(game:GetService('RunService'))
 local guiService = cloneref(game:GetService('GuiService'))
 local coreGui = cloneref(game:GetService('CoreGui'))
+local contextActionService = cloneref(game:GetService('ContextActionService'))
+local vim = cloneref(Instance.new('VirtualInputManager'))
 
 local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer
@@ -32,7 +34,69 @@ local sessioninfo = vape.Libraries.sessioninfo
 local getfontbounds = vape.Libraries.getfontbounds
 
 local tribes = {}
+local HitboxHook = {Hooks = {}}
+local VelocityTracker = {Entries = setmetatable({}, {__mode = 'k'})}
 local isMatch = false
+local clickQueue = {}
+local clickThread = nil
+
+local function clickButton(obj)
+	if not (obj and obj:IsA('TextButton')) then
+		return
+	end
+
+	if true then return end
+
+	if not table.find(clickQueue, obj) then
+		table.insert(clickQueue, obj)
+
+		if not clickThread then
+			clickThread = task.spawn(function()
+				repeat
+					local i, button = next(clickQueue)
+					if i then
+						if button:IsDescendantOf(lplr.PlayerGui) then
+							local cPos = button.AbsolutePosition + guiService:GetGuiInset()
+							local gui = Instance.new('ScreenGui')
+							gui.IgnoreGuiInset = true
+							gui.DisplayOrder = 10000000
+							gui.Parent = vape.gui.Parent
+							local gbutton = Instance.new('TextButton')
+							gbutton.BackgroundTransparency = 1
+							gbutton.Size = UDim2.fromScale(1, 1)
+							gbutton.Text = ''
+							gbutton.Parent = gui
+
+							for _, event in {'MouseButton1Down', 'InputBegan', 'MouseButton1Up', 'Activated', 'MouseButton1Click', 'InputEnded'} do
+								gbutton[event]:Connect(function(...)
+									firesignal(button[event], ...)
+								end)
+							end
+
+							if inputService.TouchEnabled then
+								vim:SendTouchEvent(0, 0, cPos.X, cPos.Y)
+								vim:SendTouchEvent(0, 2, cPos.X, cPos.Y)
+							else
+								vim:SendMouseButtonEvent(cPos.X, cPos.Y, 0, true, gui, 0)
+								vim:SendMouseButtonEvent(cPos.X, cPos.Y, 0, false, gui, 0)
+							end
+
+							gbutton.Activated:Wait()
+							gui:Destroy()
+							task.wait(0.016)
+						end
+
+						table.remove(clickQueue, i)
+					else
+						break
+					end
+				until false
+
+				clickThread = nil
+			end)
+		end
+	end
+end
 
 local function isFriend(plr, recolor)
 	if vape.Categories.Friends.Options['Use friends'].Enabled then
@@ -60,13 +124,10 @@ end
 
 run(function()
 	entitylib.targetCheck = function(entity)
-		if entity.TeamCheck then
-			return entity:TeamCheck()
-		end
-		if entity.NPC then return true end
+		if entity.NPC then return lplr:GetAttribute('Team') ~= entity.Character:GetAttribute('Team') end
 		if isFriend(entity.Player) then return false end
 		if not select(2, whitelist:get(entity.Player)) then return false end
-		return lplr:GetAttribute('Team') ~= entity.Player:GetAttribute('Team')
+		return lplr:GetAttribute('Team') ~= entity.Character:GetAttribute('Team')
 	end
 
 	entitylib.addPlayer = function(plr)
@@ -76,9 +137,14 @@ run(function()
 	local oldstart = entitylib.start
 	local function customEntity(entity)
 		local plr = playersService:GetPlayerFromCharacter(entity)
-		entitylib.addEntity(entity, plr, not plr and function(self)
-			return lplr:GetAttribute('Team') ~= self.Character:GetAttribute('Team')
-		end or nil)
+
+		entity:GetAttributeChangedSignal('Team'):Connect(function()
+			if plr ~= lplr and vape.Loaded ~= nil then
+				entitylib.refreshEntity(entity, plr)
+			end
+		end)
+
+		entitylib.addEntity(entity, plr)
 	end
 
 	entitylib.start = function()
@@ -111,8 +177,12 @@ run(function()
 		WeaponRedraw = debug.getupvalue(debug.getupvalue(debug.getupvalue(require(lplr.PlayerScripts.UI.WeaponIcon).Init, 5), 3), 8)
 	}
 
+	local cIndex = debug.getupvalue(tribes.CombatController.Equip, 11)
+	cIndex = type(cIndex) == 'function' and debug.info(cIndex, 'n') == 'refreshEquipped' and 11 or 12
+
 	tribes.State = debug.getupvalue(tribes.CombatController.State, 2)
-	tribes.SetSpeed = debug.getupvalue(debug.getupvalue(tribes.CombatController.Equip, 11), 15)
+	tribes.Handlers = debug.getupvalue(debug.getupvalue(tribes.CombatController.Equip, cIndex), 10)
+	tribes.SetSpeed = debug.getupvalue(debug.getupvalue(tribes.CombatController.Equip, cIndex), 15)
 
 	local kills = sessioninfo:AddItem('Kills')
 	local deaths = sessioninfo:AddItem('Deaths')
@@ -165,8 +235,115 @@ run(function()
 			end
 		end
 	end))
+
+	vape:Clean(task.spawn(function()
+		repeat
+			for _, entity in entitylib.List do
+				if not VelocityTracker.Entries[entity.RootPart] then
+					VelocityTracker.Entries[entity.RootPart] = {}
+				end
+
+				local entry = VelocityTracker.Entries[entity.RootPart]
+				repeat
+					local _, obj = next(entry)
+					if obj and (os.clock() - obj[2]) > 0.5 then
+						table.remove(entry, 1)
+					else
+						break
+					end
+				until false
+
+				table.insert(entry, {entity.RootPart.AssemblyLinearVelocity, os.clock()})
+			end
+
+			task.wait()
+		until false
+	end))
+
+	vape:Clean(function()
+		table.clear(clickQueue)
+
+		if clickThread then
+			task.cancel(clickThread)
+			clickThread = nil
+		end
+	end)
 end)
 
-for _, v in {'AutoClicker', 'TriggerBot', 'Jesus', 'AutoRejoin', 'Disabler', 'MurderMystery', 'Parkour', 'Wallhop'} do
+run(function()
+	local oldhitbox
+
+	local function Hook(...)
+		if setstackhidden then
+			local a, b = debug.info(1, 'f'), debug.info(2, 'f')
+			setstackhidden(a, true)
+			setstackhidden(b, true)
+		end
+
+		local args = table.pack(...)
+		for _, v in HitboxHook.Hooks do
+			if v[2](args) then return end
+		end
+
+		return oldhitbox(unpack(args, 1, args.n))
+	end
+
+	function HitboxHook:Add(key, val, priority)
+		table.insert(self.Hooks, {key, val, priority or 0})
+		table.sort(self.Hooks, function(a, b)
+			return a[3] < b[3]
+		end)
+
+		if not oldhitbox then
+			oldhitbox = hookfunction(tribes.Melee.Detect, function(...)
+				return Hook(...)
+			end)
+		end
+	end
+
+	function HitboxHook:Remove(key)
+		for i, v in self.Hooks do
+			if v[1] == key then
+				table.remove(self.Hooks, i)
+				break
+			end
+		end
+
+		if oldhitbox and not next(self.Hooks) then
+			if restorefunction then
+				restorefunction(tribes.Melee.Detect)
+			else
+				hookfunction(tribes.Melee.Detect, oldhitbox)
+			end
+
+			oldhitbox = nil
+		end
+	end
+
+	function VelocityTracker:Get(root, diff)
+		local entry = self.Entries[root]
+
+		if entry and diff then
+			local final, count = Vector3.zero, 0
+			local ctime = os.clock()
+
+			for _, velo in entry do
+				if (ctime - velo[2]) <= diff then
+					final += velo[1]
+					count += 1
+				end
+			end
+
+			if count > 0 then
+				final /= count
+				return Vector3.new(final.X, root.AssemblyLinearVelocity.Y, final.Z)
+			end
+		end
+
+		return root.AssemblyLinearVelocity
+	end
+end)
+
+for _, v in {'AutoClicker', 'TriggerBot', 'HitBoxes', 'Jesus', 'AutoRejoin', 'Disabler', 'MurderMystery', 'Parkour', 'Wallhop'} do
 	vape:Remove(v)
 end
