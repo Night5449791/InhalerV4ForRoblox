@@ -154,7 +154,7 @@ local function startFollow(player)
 	end)
 end
 
--- hop, rj and fling only turn their module on, each gated by its own toggle
+-- hop and rj only turn their module on, each gated by its own toggle
 local function enableModule(option, name)
 	if not options[option].Enabled then return end
 
@@ -288,6 +288,71 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
+-- the module flings whatever its Targets list holds, so the command rewrites that
+-- list, picks the kick style and starts the module; a changed target restarts it so
+-- the target still cached on a seat is dropped
+local function handleFling(args, kick)
+	if not options.Fling.Enabled then return end
+
+	local module = vape.Modules and vape.Modules.FlingExploit
+	local targetMode = module and module.Options.Mode
+	local kickMode = module and module.Options.KickMode
+	local list = module and module.Options.Targets
+	if not (targetMode and kickMode and list) then
+		notif('ChatCommand', 'FlingExploit is not available in this game.', 5, 'warning')
+		return
+	end
+
+	local text = argument(args)
+	if not text then
+		notif('ChatCommand', 'Usage: .'..(kick and 'kick' or 'fling')..' <plr/all>', 5, 'warning')
+		return
+	end
+
+	local player
+	if text:lower() ~= 'all' then
+		player = findPlayer(text)
+		if not player then
+			notif('ChatCommand', 'No player found.', 5, 'warning')
+			return
+		end
+
+		if isFriend(player) or not select(2, whitelist:get(player)) then
+			notif('ChatCommand', player.DisplayName..' is protected.', 5, 'warning')
+			return
+		end
+	end
+
+	local mode = player and 'Individual' or 'All'
+	local changed = targetMode.Value ~= mode
+	if changed then
+		targetMode:SetValue(mode)
+	end
+
+	local kickValue = kick and 'ForceKick' or 'Regular'
+	if kickMode.Value ~= kickValue then
+		kickMode:SetValue(kickValue)
+	end
+
+	if player then
+		if #list.List ~= 1 or list.List[1] ~= player.Name or #list.ListEnabled ~= 1 then
+			table.clear(list.List)
+			table.clear(list.ListEnabled)
+			list:ChangeValue(player.Name)
+			changed = true
+		end
+	end
+
+	if not module.Enabled then
+		module:Toggle()
+	elseif changed then
+		module:Toggle()
+		module:Toggle()
+	end
+
+	notif('ChatCommand', (kick and 'Kicking ' or 'Flinging ')..(player and player.DisplayName or 'everyone')..'.', 5)
+end
+
 -- same invite and same rpc trick as the gui's discord button
 local DISCORD_CODE = 'YSzD7f9neR'
 local DISCORD_INVITE = 'https://discord.gg/'..DISCORD_CODE
@@ -347,7 +412,7 @@ local toggles = {
 	end},
 	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
-	{Name = 'Fling', Tooltip = '.fling'},
+	{Name = 'Fling', Tooltip = '.fling <plr/all> flings the target with a vehicle seat (KickMode Regular)\n.kick / ;bang <plr/all> seats them in the driver seat and gets them kicked (KickMode ForceKick)'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
@@ -385,8 +450,15 @@ local commands = {
 	rj = function()
 		enableModule('Rejoin', 'Rejoin')
 	end,
-	fling = function()
-		enableModule('Fling', 'FlingExploit')
+	fling = function(args)
+		handleFling(args, false)
+	end,
+	kick = function(args)
+		handleFling(args, true)
+	end,
+	-- the semicolon spelling of .kick, it drives the car spawn + forced seat routine
+	bang = function(args)
+		handleFling(args, true)
 	end,
 	reload = handleReload,
 	copyserver = handleCopyServer
@@ -421,7 +493,9 @@ end
 -- a message from someone else only runs when the sharing rules allow it
 local function onChatted(message, plr)
 	message = argument(message)
-	if not message or message:sub(1, 1) ~= '.' then return end
+	local prefix = message and message:sub(1, 1)
+	-- the dot is the normal prefix, the semicolon is the one ;bang is used with
+	if prefix ~= '.' and prefix ~= ';' then return end
 	if plr and not canShare(plr) then return end
 
 	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
@@ -509,9 +583,9 @@ CommandBox = ChatCommand:CreateTextBox({
 	Function = function(enter)
 		if not enter then return end
 
-		-- the dot is optional, so ".tp player" and "tp player" run the same command
+		-- the prefix is optional, so ".tp player" and "tp player" run the same command
 		local command = argument(CommandBox.Value)
-		command = command and argument((command:gsub('^%.', '')))
+		command = command and argument((command:gsub('^[%.;]', '')))
 		if not command then return end
 
 		-- the command never reaches the chat, so the box is emptied to show it ran
