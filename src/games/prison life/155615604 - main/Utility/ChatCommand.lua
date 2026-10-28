@@ -316,11 +316,6 @@ local function handleFling(args, kick)
 			notif('ChatCommand', 'No player found.', 5, 'warning')
 			return
 		end
-
-		if isFriend(player) or not select(2, whitelist:get(player)) then
-			notif('ChatCommand', player.DisplayName..' is protected.', 5, 'warning')
-			return
-		end
 	end
 
 	local mode = player and 'Individual' or 'All'
