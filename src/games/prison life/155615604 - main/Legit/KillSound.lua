@@ -8,9 +8,7 @@ KillSound = vape.Legit:CreateModule({
 	Function = function(callback)
 		if callback then
 			KillSound:Clean(vapeEvents.PlayerKill.Event:Connect(function(plr)
-				if plr ~= lplr.Name or #sounds == 0 then
-					return
-				end
+				if plr ~= lplr.Name or #sounds == 0 then return end
 
 				local sound = Instance.new('Sound')
 				sound.SoundId = sounds[math.random(#sounds)]
@@ -31,17 +29,13 @@ KillSound:CreateTextList({
 		table.clear(sounds)
 
 		for _, sound in list or {} do
-			local asset
-
 			if sound:find('rbxasset', 1, true) then
-				asset = sound
+				table.insert(sounds, sound)
 			elseif isfile(sound) then
 				local success, path = pcall(getcustomasset, sound)
-				asset = success and path or nil
-			end
-
-			if asset then
-				table.insert(sounds, asset)
+				if success then
+					table.insert(sounds, path)
+				end
 			end
 		end
 	end

@@ -29,9 +29,7 @@ local function destroyViewmodel()
 end
 
 local function ToolAdded(tool)
-	if not tool or not tool:IsA('Tool') then
-		return
-	end
+	if not tool or not tool:IsA('Tool') then return end
 
 	setTransparency(old, 0)
 	destroyViewmodel()
@@ -66,15 +64,11 @@ local function EntityAdded(entity)
 	old = nil
 
 	local character = entity and entity.Character
-	if not character then
-		return
-	end
+	if not character then return end
 
 	toolAddedConn = character.ChildAdded:Connect(ToolAdded)
 	toolRemovedConn = character.ChildRemoved:Connect(function(tool)
-		if tool ~= old then
-			return
-		end
+		if tool ~= old then return end
 
 		destroyViewmodel()
 		setTransparency(old, 0)
@@ -82,33 +76,6 @@ local function EntityAdded(entity)
 	end)
 
 	ToolAdded(character:FindFirstChildWhichIsA('Tool'))
-end
-
-local function renderViewmodel(dt)
-	if not handle then
-		return
-	end
-
-	local camCF = gameCamera.CFrame
-	local clock = os.clock()
-	local root = entitylib.isAlive and entitylib.character.RootPart
-	local target = root and root.AssemblyLinearVelocity * 0.005 or Vector3.zero
-
-	if Sway.Enabled then
-		if target.Magnitude > 0.1 then
-			target += (camCF * CFrame.new(math.sin(clock * 10) * 0.06, 0, 0)).Position - camCF.Position
-		else
-			target += (camCF * CFrame.new(0, math.sin(clock) * 0.04, 0)).Position - camCF.Position
-		end
-	end
-
-	moveSpring.Target = target
-
-	local cf = (camCF * CFrame.new(Horizontal.Value, Vertical.Value, -Depth.Value)) + moveSpring:Update(dt)
-	local recoil = math.max(shootTimer - clock, 0)
-	aimSpring.Target = aimTimer > clock and CFrame.lookAt(cf.Position, aimVec).LookVector or camCF.LookVector
-	handle.CFrame = CFrame.lookAlong(cf.Position, aimSpring:Update(dt)) * (CFrame.Angles(math.rad(recoil * 10), 0, 0) * CFrame.new(0, 0, recoil))
-	handle.AssemblyLinearVelocity = Vector3.zero
 end
 
 Viewmodel = vape.Legit:CreateModule({
@@ -124,7 +91,30 @@ Viewmodel = vape.Legit:CreateModule({
 				task.spawn(EntityAdded, entitylib.character)
 			end
 
-			Viewmodel:Clean(runService.RenderStepped:Connect(renderViewmodel))
+			Viewmodel:Clean(runService.RenderStepped:Connect(function(dt)
+				if not handle then return end
+
+				local camCF = gameCamera.CFrame
+				local clock = os.clock()
+				local root = entitylib.isAlive and entitylib.character.RootPart
+				local target = root and root.AssemblyLinearVelocity * 0.005 or Vector3.zero
+
+				if Sway.Enabled then
+					if target.Magnitude > 0.1 then
+						target += (camCF * CFrame.new(math.sin(clock * 10) * 0.06, 0, 0)).Position - camCF.Position
+					else
+						target += (camCF * CFrame.new(0, math.sin(clock) * 0.04, 0)).Position - camCF.Position
+					end
+				end
+
+				moveSpring.Target = target
+
+				local cf = (camCF * CFrame.new(Horizontal.Value, Vertical.Value, -Depth.Value)) + moveSpring:Update(dt)
+				local recoil = math.max(shootTimer - clock, 0)
+				aimSpring.Target = aimTimer > clock and CFrame.lookAt(cf.Position, aimVec).LookVector or camCF.LookVector
+				handle.CFrame = CFrame.lookAlong(cf.Position, aimSpring:Update(dt)) * (CFrame.Angles(math.rad(recoil * 10), 0, 0) * CFrame.new(0, 0, recoil))
+				handle.AssemblyLinearVelocity = Vector3.zero
+			end))
 		else
 			TracerHook:Remove('Viewmodel')
 
@@ -179,9 +169,7 @@ ForceField = Viewmodel:CreateToggle({
 ColorSl = Viewmodel:CreateColorSlider({
 	Name = 'Color',
 	Function = function(hue, sat, val)
-		if not ForceField.Enabled or not vtool then
-			return
-		end
+		if not ForceField.Enabled or not vtool then return end
 
 		for _, part in vtool:QueryDescendants('BasePart') do
 			part.Color = Color3.fromHSV(hue, sat, val)

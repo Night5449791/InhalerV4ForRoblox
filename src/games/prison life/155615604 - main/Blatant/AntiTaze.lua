@@ -1,21 +1,18 @@
 local AntiTaze
 local old, connection
 
--- the game's handler sits on this remote next to engine ones whose Function is nil, a
--- thread or a number, and hookfunction only accepts a real function
-local function tazeConnection()
-	for _, conn in getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent) do
-		if typeof(conn.Function) == 'function' then
-			return conn
-		end
-	end
-end
-
 local function EntityAdded()
 	if old then return end
 
 	repeat
-		connection = tazeConnection()
+		connection = nil
+		for _, conn in getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent) do
+			if typeof(conn.Function) == 'function' then
+				connection = conn
+				break
+			end
+		end
+
 		if not connection then
 			task.wait(0.25)
 		end

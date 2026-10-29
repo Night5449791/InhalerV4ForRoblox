@@ -1,9 +1,6 @@
 local AutoTeam
 local AutoOnDied
 
--- the picker only exists while its menu is open and a single click can silently fail
--- (dead, menu closed, team list not replicated yet), so both are retried until the game
--- actually puts the player on a team
 local function joinTeam()
 	while AutoTeam.Enabled and (not lplr.Team or lplr.Team == teams.Neutral) do
 		local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
@@ -30,7 +27,6 @@ local function joinTeam()
 	end
 end
 
--- the team the picker would hand out: the first one it still offers
 local function pickTarget()
 	local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
 	if not teamGui then return nil end
@@ -45,9 +41,6 @@ local function pickTarget()
 	return nil
 end
 
--- The picker ignores a player who still has a team (clicking a team button while in one
--- does nothing), so leaving is what turns a respawn into a pick: Switch Team puts the
--- player back to Neutral and the picker accepts from there.
 local function leaveTeam()
 	local home = lplr.PlayerGui:FindFirstChild('Home', true)
 	local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
@@ -68,10 +61,6 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 	Name = 'AutoTeam',
 	Function = function(callback)
 		if callback then
-			-- Respawning keeps the team the player died with, so the death is not a
-			-- picking moment — the new character is, and only when the picker would put
-			-- the player somewhere else (staying on the same team costs the slot for the
-			-- second the team is left, so it is left alone).
 			AutoTeam:Clean(lplr.CharacterAdded:Connect(function()
 				if not AutoOnDied.Enabled then return end
 

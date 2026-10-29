@@ -5,10 +5,8 @@ local options = {}
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 
--- where .tp lands the local character (the flat mask itself comes from base.lua)
 local TP_OFFSET = Vector3.new(0, 2, 0)
 
--- nil when the text is missing or only whitespace
 local function argument(text)
 	text = text and text:match('^%s*(.-)%s*$') or nil
 	return text ~= '' and text or nil
@@ -20,15 +18,12 @@ local function getLocalHumanoid()
 	return humanoid or (entitylib.character and entitylib.character.Humanoid)
 end
 
--- lists: toggles one entry, the update event only fires on an actual change
 local function setListValue(list, value, enabled)
 	if list and list.ListEnabled and enabled ~= (table.find(list.ListEnabled, value) ~= nil) then
 		list:ChangeValue(value)
 	end
 end
 
--- entries are either entities, which expose their player, or plain players; the
--- filter drops entries and exact matches win over wildcard and prefix matches
 local function search(list, lowered, filter)
 	local partial, wildcardMatch
 	local pattern
@@ -57,7 +52,6 @@ local function search(list, lowered, filter)
 	return wildcardMatch or partial
 end
 
--- npcs carry no player and dead characters only count when asked for
 local function findEntity(prefix, includeDead)
 	local text = argument(prefix)
 	if not text then return end
@@ -67,7 +61,6 @@ local function findEntity(prefix, includeDead)
 	end)
 end
 
--- spawned players first, then everyone still in the server when allowLeft is set
 local function findPlayer(prefix, allowLeft)
 	local entity = findEntity(prefix, true)
 	if entity then
@@ -154,7 +147,6 @@ local function startFollow(player)
 	end)
 end
 
--- hop and rj only turn their module on, each gated by its own toggle
 local function enableModule(option, name)
 	if not options[option].Enabled then return end
 
@@ -217,7 +209,6 @@ local function handleTargets(args, remove)
 		return
 	end
 
-	-- the tag and the temporary target live exactly as long as the target entry
 	local name = player.Name
 	setListValue(list, name, not remove)
 	whitelist.customtags[name] = not remove and {{text = 'Exploiter', color = TARGET_COLOR}} or nil
@@ -288,9 +279,6 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
--- the module flings whatever its Targets list holds, so the command rewrites that
--- list, picks the kick style and starts the module; a changed target restarts it so
--- the target still cached on a seat is dropped
 local function handleFling(args, kick)
 	if not options.Fling.Enabled then return end
 
@@ -348,12 +336,9 @@ local function handleFling(args, kick)
 	notif('ChatCommand', (kick and 'Kicking ' or 'Flinging ')..(player and player.DisplayName or 'everyone')..'.', 5)
 end
 
--- same invite and same rpc trick as the gui's discord button
 local DISCORD_CODE = 'YSzD7f9neR'
 local DISCORD_INVITE = 'https://discord.gg/'..DISCORD_CODE
 
--- the desktop client listens on 127.0.0.1 and falls back downwards through this
--- range; every port is asked, only the one that answers opens the invite
 local function openDiscordInvite(code)
 	if typeof(request) ~= 'function' then return false end
 
@@ -394,8 +379,6 @@ local function handleCopyServer()
 	notif('ChatCommand', 'Copied the discord invite.', 5)
 end
 
--- one toggle per command family, then the dispatch table; the long names are
--- aliased onto the short ones right after
 local toggles = {
 	{Name = 'ShareCommand', Tooltip = 'Allows whitelisted users to directly access chat commands.\nPrivate members always have access.'},
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
@@ -451,7 +434,6 @@ local commands = {
 	kick = function(args)
 		handleFling(args, true)
 	end,
-	-- the semicolon spelling of .kick, it drives the car spawn + forced seat routine
 	bang = function(args)
 		handleFling(args, true)
 	end,
@@ -459,7 +441,6 @@ local commands = {
 	copyserver = handleCopyServer
 }
 
--- long forms point at the same handler as the short ones
 for alias, name in {
 	whitelist = 'wl',
 	unwhitelist = 'unwl',
@@ -471,8 +452,6 @@ for alias, name in {
 	commands[alias] = commands[name]
 end
 
--- the .wl command fills the Friends list, so that list is the whitelist for sharing;
--- a whitelist entry above level 0 is a private member and always keeps control
 local function canShare(plr)
 	if options.ShareCommand.Enabled and table.find(vape.Categories.Friends.ListEnabled, plr.Name) then
 		return true
@@ -485,11 +464,9 @@ local function canShare(plr)
 	return success and level ~= 0
 end
 
--- a message from someone else only runs when the sharing rules allow it
 local function onChatted(message, plr)
 	message = argument(message)
 	local prefix = message and message:sub(1, 1)
-	-- the dot is the normal prefix, the semicolon is the one ;bang is used with
 	if prefix ~= '.' and prefix ~= ';' then return end
 	if plr and not canShare(plr) then return end
 
@@ -506,7 +483,6 @@ local function onChatted(message, plr)
 	return false
 end
 
--- one connection per player, dropped again on PlayerRemoving
 local sharedConnections = {}
 
 local function trackPlayer(plr)
@@ -525,7 +501,6 @@ local function untrackPlayer(plr)
 	sharedConnections[plr] = nil
 end
 
--- module registration: the toggles above are the options the handlers check
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
 	Function = function(callback)
@@ -549,7 +524,6 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 				gameCamera.CameraSubject = entity.Humanoid
 			end
 		end))
-		-- chatted also hands over the whisper recipient, so the local path passes no player
 		ChatCommand:Clean(lplr.Chatted:Connect(function(message)
 			onChatted(message)
 		end))
@@ -578,12 +552,10 @@ CommandBox = ChatCommand:CreateTextBox({
 	Function = function(enter)
 		if not enter then return end
 
-		-- the prefix is optional, so ".tp player" and "tp player" run the same command
 		local command = argument(CommandBox.Value)
 		command = command and argument((command:gsub('^[%.;]', '')))
 		if not command then return end
 
-		-- the command never reaches the chat, so the box is emptied to show it ran
 		if onChatted('.'..command) then
 			CommandBox:SetValue('')
 		end

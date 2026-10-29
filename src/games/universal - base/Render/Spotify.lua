@@ -194,15 +194,8 @@ do
 	end
 
 	local function readURLAndConfig(code)
-		local normalizedCode = code:gsub('\\/', '/'):gsub('\\u002[fF]', '/')
-		local scriptUrl = normalizedCode:match('(https://[^"\'%s<>]+/build/web%-player/web%-player%.[%w_%-]+%.js)')
-			or normalizedCode:match('(//[^"\'%s<>]+/build/web%-player/web%-player%.[%w_%-]+%.js)')
-		if scriptUrl and scriptUrl:sub(1, 2) == '//' then
-			scriptUrl = 'https:'..scriptUrl
-		end
-
-		local appCfg = normalizedCode:match([=[<script[^>]-id=["']appServerConfig["'][^>]*>(.-)</script>]=])
-		return scriptUrl, appCfg and httpService:JSONDecode(base64decode(appCfg)) or nil
+		local appCfg = code:find('appServerConfig\" type=\"text\/plain\">')
+		return code:match('(https://[^"\']+/web%-player%.[0-9a-f]+%.js)'), appCfg and httpService:JSONDecode(base64decode(code:sub(appCfg + 35, code:find('<', appCfg + 1) - 1))) or nil
 	end
 
 	local function readOTPCodes(code)
@@ -267,12 +260,12 @@ do
 			local diff = currentTime - (tonumber(data.player_state.timestamp) / 1000)
 			self.playPosition = posAsTime + (data.player_state.is_paused and 0 or diff)
 			self.playRate = data.player_state.playback_speed
-			self.playDuration = tonumber(data.player_state.duration) / 1000
+			self.playDuration = tonumber(data.player_state.duration or 1000) / 1000
 
 			if data.player_state.track then
-				self:RequestCache(data.player_state.track.uri)
+				self:RequestCache(data.player_state.track.uri, data.player_state.track)
 				self.track = data.player_state.track.uri
-				title.Text = data.player_state.track.metadata.title
+				title.Text = data.player_state.track.metadata.title or self.Cache[self.track].Title
 				artist.Text = table.concat(self.Cache[self.track].Artists, ', ')
 			end
 		end
@@ -328,10 +321,8 @@ do
 				else
 					error('Failed to get script data: '..scriptCode.Body)
 				end
-			elseif not scriptUrl then
-				error('Failed to find Spotify web player script URL in the main page.')
 			else
-				error('Failed to find Spotify app config in the main page.')
+				error('Failed to get script url or app config.')
 			end
 		else
 			error('Failed to get main page: '..mainPage.Body)
@@ -373,11 +364,18 @@ do
 		end
 	end
 
-	function SpotifyHandler:RequestCache(id)
+	function SpotifyHandler:RequestCache(id, data)
 		if not self.Cache[id] then
-			self.Cache[id] = {Artists = {'None'}}
+			self.Cache[id] = {Artists = {'None'}, Title = 'Unknown'}
 
-			if self.Data.fetchKey and not id:find('spotify:local') then
+			if id:find('spotify:local') then
+				local lArtist = data.metadata.artist_uri:sub(15)
+				self.Cache[id].Artists = {lArtist ~= '' and lArtist or 'None'}
+				artist.Text = table.concat(self.Cache[id].Artists, ', ')
+				return
+			end
+
+			if self.Data.fetchKey then
 				task.spawn(function()
 					local dataRequest = safeRequest({
 						Url = 'https://api-partner.spotify.com/pathfinder/v2/query',
@@ -413,6 +411,7 @@ do
 							table.clear(self.Cache[id].Artists)
 
 							if track.data.__typename == 'Track' then
+								self.Cache[id].Title = track.data.name
 								for _, artist in track.data.artists.items do
 									table.insert(self.Cache[id].Artists, artist.profile.name)
 								end
@@ -421,6 +420,7 @@ do
 							end
 
 							if self.track == id then
+								title.Text = self.Cache[id].Title
 								artist.Text = table.concat(self.Cache[id].Artists, ', ')
 							end
 						end
@@ -476,15 +476,15 @@ do
 						metadata = {},
 						model = 'web_player',
 						name = 'Web Player (Firefox)',
-						platform_identifier = 'web_player windows 10;firefox 154.0;desktop',
+						platform_identifier = 'web_player windows 10;firefox 158.0;desktop',
 						is_group = false,
 						is_public = false,
 						correlation_id = self.Data.correlationId,
-						client_version = 'harmony:4.78.0-f1c77f179'
+						client_version = 'harmony:4.81.1-1f3d48b7f'
 					},
 					outro_endcontent_snooping = false,
 					connection_id = self.connectionId,
-					client_version = 'harmony:4.78.0-f1c77f179',
+					client_version = 'harmony:4.81.1-1f3d48b7f',
 					volume = 65535
 				}):gsub('"metadata":%[%]', '"metadata":{}')
 			})
@@ -586,20 +586,14 @@ do
 	end
 
 	function SpotifyHandler:Start()
-		local cookieSuccess, cookie = pcall(readfile, 'newvape/profiles/spotify.txt')
-		cookie = cookieSuccess and type(cookie) == 'string' and cookie:match('^%s*(.-)%s*$') or nil
-		if not cookie or cookie == '' then
-			if not self.MissingCookie then
-				self.MissingCookie = true
-				notif('Spotify', 'Missing cookie! (dump sp_dc from the browser and write to profiles/spotify.txt)', 30, 'warning')
-			end
+		if not isfile('newvape/profiles/spotify.txt') then
+			notif('Spotify', 'Missing cookie! (dump sp_dc from the browser and write to profiles/spotify.txt)', 30, 'warning')
 			return
 		end
-		self.MissingCookie = nil
 
 		self.Headers = {
-			Cookie = 'sp_dc='..cookie..';',
-			['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0'
+			Cookie = 'sp_dc='..readfile('newvape/profiles/spotify.txt')..';',
+			['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0'
 		}
 
 		local data = isfile('newvape/profiles/spotifydata.txt') and httpService:JSONDecode(readfile('newvape/profiles/spotifydata.txt')) or {expireTime = 0}

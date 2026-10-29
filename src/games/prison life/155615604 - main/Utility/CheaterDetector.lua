@@ -12,7 +12,6 @@ local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
 local TAG_COLOR = Color3.new(1, 0, 0)
 local EMBED_RED = 15548997
 local EMBED_GREEN = 5763911
--- the name discord shows as the poster; the adder is still in the "Added By" field
 local WEBHOOK_NAME = 'Inhaler CheaterDetector'
 
 local function countCheaters(names, users)
@@ -30,7 +29,6 @@ local function isWhitelisted(plr)
 	return select(1, whitelist:get(plr)) ~= 0
 end
 
--- vape.Notifications only exists once the gui is loaded, this file runs before that
 local function notify(text, duration, type)
 	if vape.Notifications then
 		notif('CheaterDetector', text, duration, type)
@@ -53,8 +51,6 @@ local function saveCheaters()
 	pcall(writefile, backupPath, content)
 end
 
--- the local list changed: ask the backend to upload it now instead of waiting for its
--- next idle tick, so an add or a removal reaches the api while it is still news
 local function pushSkidList()
 	local signal = shared.inhalerSkidPush
 	if typeof(signal) == 'Instance' then
@@ -178,7 +174,6 @@ local function splitCheaterText(text)
 			return hit, table.concat(words, ' ', i + 1), name
 		end
 
-		-- the pattern is built once per prefix instead of once per online player
 		local wildcard = lowered:find('*', 1, true)
 			and '^'..lowered:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
 		local partial, wildcardMatches
@@ -293,7 +288,6 @@ local function editCheater(text, reason, remove)
 
 	local onlineReason = plr and getCheaterReason(plr)
 
-	-- a remove for someone who is not on the list falls back to the stored entries
 	if remove and plr and not onlineReason then
 		plr = nil
 	end

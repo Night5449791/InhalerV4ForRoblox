@@ -13,20 +13,11 @@ local ParticleSize
 local Face
 local SkipTeam
 local Particles, Boxes = {}, {}
-local MARKERS = 10
-local HIDDEN = Vector3.new(math.huge, math.huge, math.huge)
-local skipTeamTargets = {}
-local skipTeamDistances = {}
-
-local function compareSkipTeamTargets(a, b)
-	return skipTeamDistances[a] < skipTeamDistances[b]
-end
+local targets = {}
+local distances = {}
 
 local function getEntities()
 	local localTeam = lplr.Team
-	-- criminals are not a real team in prison life, but the shared targetCheck treats
-	-- them as one, so they always go through the manual pass below where team mates are
-	-- allowed; guards and inmates only do so when SkipTeam is on
 	local teamFiltering = (SkipTeam.Enabled or localTeam == teams.Criminals) and (
 		localTeam == teams.Guards
 		or localTeam == teams.Inmates
@@ -52,12 +43,11 @@ local function getEntities()
 	local wallcheck = Targets.Walls.Enabled or nil
 	local maxTargets = Max.Value
 
-	table.clear(skipTeamTargets)
+	table.clear(targets)
 	for _, entity in entitylib.List do
 		if not players and entity.Player then continue end
 		if not npcs and entity.NPC then continue end
 		if entity.Player then
-			-- friends and whitelisted players stay protected, only the team gate is skipped
 			if isFriend(entity.Player) or not select(2, whitelist:get(entity.Player)) then continue end
 
 			local targetTeam = entity.Player.Team
@@ -71,39 +61,38 @@ local function getEntities()
 		end
 
 		local distance = (entity.RootPart.Position - localPosition).Magnitude
-		-- skipCheck follows the option: a criminal without SkipTeam keeps the same
-		-- innocent inmate protection AllPosition gave them, only team mates are added
 		if distance > range or not entitylib.isVulnerable(entity, true, SkipTeam.Enabled) then continue end
 
-		skipTeamDistances[entity] = entity.Target and -1 or distance
-		table.insert(skipTeamTargets, entity)
+		distances[entity] = entity.Target and -1 or distance
+		table.insert(targets, entity)
 	end
 
-	table.sort(skipTeamTargets, compareSkipTeamTargets)
+	table.sort(targets, function(a, b)
+		return distances[a] < distances[b]
+	end)
 
 	local targetCount = 0
-	for _, entity in skipTeamTargets do
+	for _, entity in targets do
 		if wallcheck and entitylib.Wallcheck(localPosition, entity.RootPart.Position, wallcheck) then
 			continue
 		end
 		targetCount += 1
-		skipTeamTargets[targetCount] = entity
+		targets[targetCount] = entity
 		if targetCount >= maxTargets then break end
 	end
 
-	for index = #skipTeamTargets, targetCount + 1, -1 do
-		skipTeamTargets[index] = nil
+	for index = #targets, targetCount + 1, -1 do
+		targets[index] = nil
 	end
-	table.clear(skipTeamDistances)
+	table.clear(distances)
 
-	return skipTeamTargets
+	return targets
 end
 
 Killaura = vape.Categories.Blatant:CreateModule({
 	Name = 'Killaura',
 	Function = function(callback)
 		if callback then
-			-- reused every tick, the list only lives until the markers are updated
 			local attacked = {}
 
 			repeat
@@ -143,7 +132,7 @@ Killaura = vape.Categories.Blatant:CreateModule({
 
 				for index, particle in Particles do
 					particle.Parent = attacked[index] and gameCamera or nil
-					particle.Position = attacked[index] and attacked[index].RootPart.Position or HIDDEN
+					particle.Position = attacked[index] and attacked[index].RootPart.Position or Vector3.new(math.huge, math.huge, math.huge)
 				end
 
 				if Face.Enabled and attacked[1] then
@@ -202,7 +191,7 @@ Killaura:CreateToggle({
 		BoxSwingColor.Object.Visible = callback
 		BoxAttackColor.Object.Visible = callback
 		if callback then
-			for i = 1, MARKERS do
+			for i = 1, 10 do
 				local box = Instance.new('BoxHandleAdornment')
 				box.Adornee = nil
 				box.AlwaysOnTop = true
@@ -242,7 +231,7 @@ Killaura:CreateToggle({
 		ParticleSize.Object.Visible = callback
 
 		if callback then
-			for i = 1, MARKERS do
+			for i = 1, 10 do
 				local part = Instance.new('Part')
 				part.Size = Vector3.new(2, 4, 2)
 				part.Anchored = true

@@ -8,16 +8,11 @@ HitSound = vape.Legit:CreateModule({
 	Function = function(callback)
 		if callback then
 			local played
-
 			TracerHook:Add('HitSound', function()
-				if played or #sounds == 0 then
-					return
-				end
+				if played or #sounds == 0 then return end
 
 				local part = debug.getstack(4, 13)
-				if typeof(part) ~= 'Instance' then
-					return
-				end
+				if typeof(part) ~= 'Instance' then return end
 
 				for _, v in entitylib.List do
 					if part:IsDescendantOf(v.Character) and entitylib.isVulnerable(v, true) then
@@ -50,17 +45,13 @@ HitSound:CreateTextList({
 		table.clear(sounds)
 
 		for _, sound in list or {} do
-			local asset
-
 			if sound:find('rbxasset', 1, true) then
-				asset = sound
+				table.insert(sounds, sound)
 			elseif isfile(sound) then
 				local success, path = pcall(getcustomasset, sound)
-				asset = success and path or nil
-			end
-
-			if asset then
-				table.insert(sounds, asset)
+				if success then
+					table.insert(sounds, path)
+				end
 			end
 		end
 	end

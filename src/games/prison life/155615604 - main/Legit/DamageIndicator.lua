@@ -16,7 +16,6 @@ local function renderStepForLoop(startVal, endVal, increment, callback)
 			return
 		end
 
-		-- RenderStepped:Wait() returns the frame delta, so the step stays time based
 		startVal += increment * runService.RenderStepped:Wait() * 60
 	end
 end
@@ -74,7 +73,6 @@ local function createIndicator(damage, pos)
 		indi.Parent = billboard
 	end
 
-	-- completely skidded from RIVALS
 	indithread = task.spawn(function()
 		local sign = math.random() < 0.5 and -1 or 1
 		renderStepForLoop(0, 100, 3, function(value)

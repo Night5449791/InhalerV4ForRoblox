@@ -6,28 +6,6 @@ local Fade
 local DrawingToggle
 local drawingobjs = {}
 local drawingpool = {}
-local POOL_LIMIT = 64
-
-local function acquireLine()
-	local line = table.remove(drawingpool)
-	if line then
-		return line
-	end
-
-	line = Drawing.new('Line')
-	line.Thickness = 2
-	return line
-end
-
-local function releaseLine(line)
-	line.Visible = false
-
-	if #drawingpool < POOL_LIMIT then
-		table.insert(drawingpool, line)
-	else
-		line:Remove()
-	end
-end
 
 BulletTracers = vape.Legit:CreateModule({
 	Name = 'BulletTracers',
@@ -42,32 +20,34 @@ BulletTracers = vape.Legit:CreateModule({
 
 				local velocity = CFrame.lookAt(origin, dir).LookVector * 1000
 				local color = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-				local endPoint = origin + velocity
 
 				if DrawingToggle.Enabled then
-					local line = acquireLine()
+					local line = table.remove(drawingpool) or Drawing.new('Line')
 					local from, visibleFrom = gameCamera:WorldToViewportPoint(origin)
-					local to, visibleTo = gameCamera:WorldToViewportPoint(endPoint)
+					local to, visibleTo = gameCamera:WorldToViewportPoint(origin + velocity)
 
+					line.Thickness = 2
 					line.Color = color
 					line.Transparency = 1 - Color.Opacity
 					line.From = Vector2.new(from.X, from.Y)
 					line.To = Vector2.new(to.X, to.Y)
 					line.Visible = visibleFrom and visibleTo
-					drawingobjs[line] = {origin, endPoint, os.clock()}
+					drawingobjs[line] = {origin, origin + velocity, os.clock()}
 
 					task.delay(Lifetime.Value, function()
-						if not drawingobjs[line] then
-							return
-						end
-
 						drawingobjs[line] = nil
-						releaseLine(line)
+						line.Visible = false
+
+						if #drawingpool < 64 then
+							table.insert(drawingpool, line)
+						else
+							line:Remove()
+						end
 					end)
 				else
 					local obj = Instance.new('Part')
 					obj.Size = Vector3.new(0.1, 0.1, velocity.Magnitude)
-					obj.CFrame = CFrame.lookAt(origin + (velocity / 2), endPoint)
+					obj.CFrame = CFrame.lookAt(origin + (velocity / 2), origin + velocity)
 					obj.CanCollide = false
 					obj.CanQuery = false
 					obj.Anchored = true
@@ -106,9 +86,9 @@ BulletTracers = vape.Legit:CreateModule({
 						local to, visibleTo = gameCamera:WorldToViewportPoint(data[2])
 
 						if visibleFrom and visibleTo then
+							line.Visible = true
 							line.From = Vector2.new(from.X, from.Y)
 							line.To = Vector2.new(to.X, to.Y)
-							line.Visible = true
 
 							if fade then
 								local progress = lifetime > 0 and math.clamp((clock - data[3]) / lifetime, 0, 1) or 1

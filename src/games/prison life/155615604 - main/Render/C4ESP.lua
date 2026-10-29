@@ -38,9 +38,6 @@ local function Added(c4)
 
 	Reference[c4] = cham
 
-	-- the model gets destroyed when the c4 blows up but keeps its tag, so the removed
-	-- signal alone would leave the highlight and its reference behind for the rest of
-	-- the session
 	c4.Destroying:Connect(function()
 		Removed(c4)
 	end)

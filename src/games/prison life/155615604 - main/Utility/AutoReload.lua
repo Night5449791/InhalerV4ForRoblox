@@ -70,8 +70,6 @@ AutoReload = vape.Categories.Utility:CreateModule({
 			end
 		else
 			if oldplaysound and hookedplaysound then
-				-- restored through the reference captured while hooking: pl is cleared on
-				-- uninject before this thread runs, so pl.PlaySound can already be gone
 				safeUnhook(hookedplaysound, oldplaysound)
 				oldplaysound, hookedplaysound = nil, nil
 			end

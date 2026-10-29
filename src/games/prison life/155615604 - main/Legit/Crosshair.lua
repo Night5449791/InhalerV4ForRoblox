@@ -1,47 +1,27 @@
 local Crosshair
 local Image
-local original
+local old
 
-local DEFAULT_IMAGE = 'rbxassetid://98794608762931'
-
-local function resolveImage(value)
-	if not value or value == '' then
-		return ''
-	end
-
-	if value:find('rbxasset', 1, true) then
-		return value
-	end
-
-	return isfile(value) and getcustomasset(value) or ''
-end
-
-local function setImage(image)
+local function setImage(value)
 	local equip = oldequip or pl.Equip
-	if equip then
-		debug.setconstant(equip, 30, image)
-	end
-end
+	if not equip then return end
 
-local function getImage()
-	local equip = oldequip or pl.Equip
-	if equip and debug.getconstant then
-		local success, value = pcall(debug.getconstant, equip, 30)
-		if success and type(value) == 'string' then
-			return value
-		end
-	end
+	value = value or ''
+	debug.setconstant(equip, 30, value:find('rbxasset', 1, true) and value or isfile(value) and getcustomasset(value) or '')
 end
 
 Crosshair = vape.Legit:CreateModule({
 	Name = 'Crosshair',
 	Function = function(callback)
 		if callback then
-			original = original or getImage()
+			if not old and debug.getconstant then
+				local success, value = pcall(debug.getconstant, oldequip or pl.Equip, 30)
+				old = success and type(value) == 'string' and value or nil
+			end
 
-			setImage(resolveImage(Image.Value))
+			setImage(Image.Value)
 		else
-			setImage(original or DEFAULT_IMAGE)
+			setImage(old or 'rbxassetid://98794608762931')
 		end
 	end,
 	Tooltip = 'Change the crosshair icon'
@@ -51,7 +31,7 @@ Image = Crosshair:CreateTextBox({
 	Placeholder = 'assetid',
 	Function = function()
 		if Crosshair.Enabled then
-			setImage(resolveImage(Image.Value))
+			setImage(Image.Value)
 		end
 	end
 })

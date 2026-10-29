@@ -3,9 +3,7 @@ local AutoPickOnDied
 local items = {}
 local PickupList = {}
 local died = false
--- the gun spawn spot; standing on it keeps us in the spawner's range
-local PICKUP_GUN_POSITION = Vector3.new(816, 98, 2225)
-local PICKUP_GUN_CFRAME = CFrame.new(PICKUP_GUN_POSITION)
+local PICKUP_GUN_CFRAME = CFrame.new(816, 98, 2225)
 
 local function AddPickup(pickup)
 	if pickup:IsA('Model') and pickup.Name ~= 'Model' and pickup:GetAttribute('ToolName') then
@@ -21,18 +19,12 @@ local function hasTool(name, backpack)
 	return backpack:FindFirstChild(name) or tool and tool.Name == name and tool
 end
 
-local function getBackpackTool(backpack)
-	return backpack and backpack:FindFirstChildWhichIsA('Tool')
-end
-
--- spawn trip: teleport onto the gun spawner, let the pickup loop grab a gun and return,
--- anything already carried is equipped instead of travelling
 local function grabEquipment(destination)
 	local character = entitylib.character
 	local humanoid = character.Humanoid
 	local backpack = lplr:FindFirstChildWhichIsA('Backpack')
 	local held = lplr.Character:FindFirstChildWhichIsA('Tool')
-	local stash = getBackpackTool(backpack)
+	local stash = backpack and backpack:FindFirstChildWhichIsA('Tool')
 	local root = character.RootPart
 
 	if held or stash then
@@ -59,7 +51,7 @@ local function grabEquipment(destination)
 		local char = lplr.Character
 		backpack = lplr:FindFirstChildWhichIsA('Backpack')
 		held = char and char:FindFirstChildWhichIsA('Tool')
-		stash = getBackpackTool(backpack)
+		stash = backpack and backpack:FindFirstChildWhichIsA('Tool')
 	until held or stash or os.clock() > deadline or not entitylib.isAlive or not AutoPickup.Enabled
 
 	if root.Parent and lplr.Character == character.Character then

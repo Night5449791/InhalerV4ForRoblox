@@ -26,35 +26,16 @@ run(function()
 		return inputService.GetMouseLocation(inputService)
 	end
 
-	local backpack
-	-- cached, both scanners below can run every AutoFire tick
-	local function getBackpack()
-		if not backpack or backpack.Parent ~= lplr then
-			backpack = lplr:FindFirstChildWhichIsA('Backpack')
-		end
-
-		return backpack
-	end
-
-	-- 0 while the tool is reloading or carries no range attribute
-	local function getToolRange(tool)
-		if (tool:GetAttribute('Local_ReloadSession') or 0) > 0 then
-			return 0
-		end
-
-		return tool:GetAttribute('Range') or 0
-	end
-
 	local function getShootTool(range)
 		local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
-		if tool and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and (tool:GetAttribute('Local_CurrentAmmo') or 1) > 0 and getToolRange(tool) > range then
+		if tool and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and (tool:GetAttribute('Local_CurrentAmmo') or 1) > 0 and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 and (tool:GetAttribute('Range') or 0) > range then
 			return tool
 		end
 
-		local container = getBackpack()
-		if container then
-			for _, tool in container:GetChildren() do
-				if tool:IsA('Tool') and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and tool.Name ~= 'Taser' and getToolRange(tool) > range then
+		local backpack = lplr:FindFirstChildWhichIsA('Backpack')
+		if backpack then
+			for _, tool in backpack:GetChildren() do
+				if tool:IsA('Tool') and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 and tool.Name ~= 'Taser' and (tool:GetAttribute('Range') or 0) > range then
 					return tool
 				end
 			end
@@ -64,15 +45,18 @@ run(function()
 	local function getMaxRange()
 		local mag = 0
 		local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
-		if tool then
-			mag = getToolRange(tool)
+		if tool and tool:GetAttribute('Range') and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 then
+			local dist = tool:GetAttribute('Range')
+			if dist > mag then
+				mag = dist
+			end
 		end
 
-		local container = getBackpack()
-		if container then
-			for _, tool in container:GetChildren() do
-				if tool:IsA('Tool') and tool.Name ~= 'Taser' then
-					local dist = getToolRange(tool)
+		local backpack = lplr:FindFirstChildWhichIsA('Backpack')
+		if backpack then
+			for _, tool in backpack:GetChildren() do
+				if tool:IsA('Tool') and tool:GetAttribute('Range') and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 and tool.Name ~= 'Taser' then
+					local dist = tool:GetAttribute('Range')
 					if dist > mag then
 						mag = dist
 					end
@@ -83,25 +67,13 @@ run(function()
 		return mag
 	end
 
-	local entityMode
-	local entityFunc
-	-- caches the lookup so the 'Entity'..Mode.Value concat isnt rebuilt per shot
-	local function getEntity(settings)
-		if entityMode ~= Mode.Value then
-			entityMode = Mode.Value
-			entityFunc = entitylib['Entity'..entityMode]
-		end
-
-		return entityFunc(settings)
-	end
-
 	local function getTarget(origin, limit, attackcheck)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then
 			return
 		end
 
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
-		local entity = getEntity({
+		local entity = entitylib['Entity'..Mode.Value]({
 			Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
 			RangePosition = limit,
 			AttackCheck = attackcheck,
@@ -121,9 +93,6 @@ run(function()
 	end
 
 	local function replaceOriginOnStack(origin, newOrigin)
-		-- every copy in range is replaced, not just the first frame holding one: the
-		-- payload the server validates the shot with can be built from any of them, and
-		-- stopping at the first match left the one that mattered behind
 		for level = 4, 8 do
 			local success, stack = pcall(debug.getstack, level)
 			if not success or not stack then break end
@@ -163,9 +132,6 @@ run(function()
 					entity
 				)
 
-				-- the part sits inside geometry, so no bullet can travel there from any origin:
-				-- report the hit directly instead of firing one into the wall. nothing is
-				-- rewritten on the stack here because no shot is going out
 				if fake then
 					return targetPart, hit
 				end
@@ -174,10 +140,6 @@ run(function()
 					replaceOriginOnStack(origin, newOrigin)
 
 					origin = newOrigin
-					-- a scan result sitting on the aimed part itself means the shot can be
-					-- fired from the new origin for real; faking the hit there skipped the
-					-- bullet's own damage, which is why some wallbangs landed for nothing.
-					-- only the exposed-hitbox fallback (the part is unreachable) is faked
 					if hit and hit ~= aimPosition then
 						return targetPart, hit
 					end
@@ -200,10 +162,6 @@ run(function()
 					safeUnhook(hooked, old)
 				end
 
-				-- safeHook unwinds a wrapper left behind by a previous injection before
-				-- installing this one: two stacked Bullet hooks stop wallbang's
-				-- stack-origin replacement from finding the origin, so aim keeps
-				-- working while wallbang silently dies after a reload
 				hooked = pl.Bullet
 				old = safeHook(hooked, function(...)
 					return Hook(...)
@@ -224,7 +182,7 @@ run(function()
 							local limit = AutoFireSwitch.Enabled and getMaxRange() or gundata.Range or 1000
 							local taser = gundata.Behavior == 'Taser'
 							local headPosition = entitylib.character.Head.Position
-							local entity = getEntity({
+							local entity = entitylib['Entity'..Mode.Value]({
 								Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
 								RangePosition = limit,
 								AttackCheck = not taser,

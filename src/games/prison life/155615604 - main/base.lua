@@ -101,17 +101,11 @@ local function removeTags(str)
 	return (str:gsub('<[^<>]->', ''))
 end
 
--- hookfunction rejects anything that is not a function, and pl is rebuilt from the
--- live game objects on every reinject, so a target that is missing or has the wrong
--- type is skipped instead of taking the whole module down with it
 local function safeHook(target, replacement)
 	if typeof(target) ~= 'function' then
 		return
 	end
 
-	-- unwind a wrapper left by a previous injection before installing ours: two
-	-- stacked Bullet hooks stop wallbang's stack-origin replacement from finding
-	-- the origin, which is what breaks wallbang after a reload
 	if restorefunction then
 		pcall(restorefunction, target)
 	end
@@ -176,8 +170,6 @@ run(function()
 			return table.unpack(self.Cache[part])
 		end
 
-		-- an exposed part is one the scan can actually aim at; a part buried in geometry has no
-		-- hitbox to shoot and is only handled by the fallback below
 		local exposed = checkPoint(target, overlapParams)
 		local hitboxPositions = {}
 		if exposed then
@@ -225,10 +217,6 @@ run(function()
 			end
 		end
 
-		-- the target is standing inside geometry (noclip, clipped into the floor, hugging a
-		-- ceiling): no bullet can reach the part from any origin on this side, so the last
-		-- wallbang left is a fabricated hit on the aimed part. range, team and vulnerability
-		-- already ran before the scan, so this cannot reach past the configured range
 		if not exposed then
 			self.Cache[part] = {origin, target, true}
 			return origin, target, true
@@ -236,8 +224,6 @@ run(function()
 	end
 
 	function OriginScanner:UpdateIgnore()
-		-- a nil character here would leave a hole at index 1 and drop the whole
-		-- array, leaving nothing ignored so every wallbang scan gets blocked
 		local ignoreList = {}
 		if lplr.Character then
 			table.insert(ignoreList, lplr.Character)
@@ -491,17 +477,11 @@ run(function()
 	end
 
 	local function getShootFunction()
-		-- more than one handler lives on this action area (tools, melee) and only the
-		-- gun one carries the shoot/reload/bullet closures; taking the first connection
-		-- blindly handed pl.Bullet a number after a reload, which hookfunction then
-		-- rejected, so every field is type checked before it is committed
 		local fallbackShoot, fallbackReload
 		for _, connection in getconnections(gui.InputBegan) do
 			local func = connection.Function
 			if func then
 				local shoot = debug.getupvalue(func, 2)
-				-- digging reload/bullet already collapses to nil when shoot is not a
-				-- function, so the match only has to re-check the two derived values
 				local reload = typeof(shoot) == 'function' and debug.getupvalue(shoot, 2) or nil
 				local bullet = typeof(reload) == 'function' and debug.getupvalue(shoot, 16) or nil
 
@@ -520,8 +500,6 @@ run(function()
 			end
 		end
 
-		-- nothing matched the gun layout: keep what is genuinely callable so the
-		-- modules reading pl.Shoot stay inert instead of being handed a number
 		pl.Shoot = pl.Shoot or fallbackShoot
 		pl.Reload = pl.Reload or fallbackReload
 	end
@@ -533,8 +511,6 @@ run(function()
 				local shootParams = debug.getupvalue(func, 2)
 				local equip = debug.getupvalue(func, 3)
 
-				-- ShootParams is the controller's RaycastParams rather than a plain table,
-				-- so accepting only tables left it nil and VehicleWallbang threw on it
 				local paramsType = typeof(shootParams)
 				if paramsType == 'table' or paramsType == 'RaycastParams' or paramsType == 'OverlapParams' then
 					pl.ShootParams = shootParams
@@ -567,15 +543,12 @@ run(function()
 		end
 	end
 
-	local function resolveGunFunctions()
-		getShootFunction()
-		getGunController()
-	end
-
-	resolveGunFunctions()
+	getShootFunction()
+	getGunController()
 	if not (pl.Bullet and pl.SwitchTable) then
 		repeat
-			resolveGunFunctions()
+			getShootFunction()
+			getGunController()
 			task.wait()
 		until pl.Bullet and pl.SwitchTable or vape.Loaded == nil
 
@@ -805,8 +778,6 @@ run(function()
 		end
 
 		if oldtracer and not next(self.Hooks) then
-			-- restored through the references captured while hooking: pl is cleared on
-			-- uninject before this can run, so reading pl.GunTracers here is not safe
 			safeUnhook(hookedtracer, oldtracer)
 			safeUnhook(hookedtracertaser, oldtracertaser)
 			safeUnhook(hookedtracersniper, oldtracersniper)
@@ -817,13 +788,6 @@ run(function()
 	end
 end)
 
--- private members get named in chat, TextChatService only. sends go through a
--- queue drained one message per second: two lines fired in the same frame get
--- rate limited or filtered, and the 1s gap also reads like a person typing.
---
--- Roblox puts the chat on cooldown after every message, so the second line of an
--- announcement is refused right after the first one. A refused message is dropped
--- on the spot (no retry): the queue moves on instead of stalling behind it.
 local announcedMembers = {}
 local messageQueue = {}
 local queueRunning = false
@@ -831,30 +795,23 @@ local queueRunning = false
 local function sayMessage(message)
 	table.insert(messageQueue, { text = tostring(message) })
 
-	-- one consumer thread for the whole queue; later sayMessage calls just enqueue
 	if queueRunning then return end
 	queueRunning = true
 
 	task.spawn(function()
 		while #messageQueue > 0 do
-			-- wait 1s before every send, so even the first line is never instant
 			task.wait(1)
 
 			local entry = messageQueue[1]
-			-- the property is the documented way in; FindFirstChild is the fallback
-			-- for older builds where the configuration is only a child
 			local config = textChatService.ChatInputBarConfiguration or textChatService:FindFirstChild('ChatInputBarConfiguration')
 			local channel = config and config.TargetTextChannel
 
-			-- a build without the check is not a reason to stay silent
 			local canChat = true
 			if typeof(textChatService.CanUserChatAsync) == 'function' then
 				local ok, result = pcall(textChatService.CanUserChatAsync, textChatService, lplr.UserId)
 				canChat = ok and result == true
 			end
 
-			-- send once; do not retry a refused or failed message. the chat cooldown
-			-- or any other failure just drops the line rather than holding the queue
 			if channel and canChat then
 				pcall(channel.SendAsync, channel, entry.text)
 			end
@@ -871,10 +828,6 @@ local function announceMember(plr)
 
 	announcedMembers[plr.UserId] = true
 	sayMessage('I use the script Inhaler V4')
-	-- the parenthetical is the member's whitelist tag (e.g. "Inhaler Owner"), not the
-	-- account handle; a member without a tag falls back to their name. % is doubled
-	-- in both replacements because it is a capture reference in a gsub replacement:
-	-- a bare one throws and takes the whole announcement down with it
 	local tags = whitelist:tag(plr)
 	local nametag = (tags and tags[1] and tags[1].text) and removeTags(tags[1].text) or plr.Name
 	local line = ('<member> (<nametag>) Inhaler Private User is in the game.')
@@ -883,9 +836,6 @@ local function announceMember(plr)
 	sayMessage(line)
 end
 
--- the whitelist library sets `loaded` itself once its fetch is done, so this loops until that flag
--- is set instead of giving up on a timer; the check is one table read per frame and the loop ends
--- on the frame the whitelist lands. players who join in the meantime are caught by the connection
 vape:Clean(playersService.PlayerAdded:Connect(announceMember))
 
 task.spawn(function()

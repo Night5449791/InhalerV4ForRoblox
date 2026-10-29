@@ -12,7 +12,6 @@ carOverlap.FilterDescendantsInstances = {workspace.CarContainer}
 carOverlap.FilterType = Enum.RaycastFilterType.Include
 carOverlap.MaxParts = 1
 
-local whitelist = vape.Libraries.whitelist
 local stats = cloneref(game:GetService('Stats'))
 local pingItem = stats.Network.ServerStatsItem['Data Ping']
 
@@ -20,10 +19,6 @@ local function isWhitelisted(plr)
 	return select(1, whitelist:get(plr)) ~= 0
 end
 
--- the movement checks compare positions the client only sees fresh while the connection
--- keeps up; the Data Ping stat itself only moves about once a second, so the value is
--- cached instead of pcall'ing it twenty times a second, and an unreadable ping counts as
--- fine so detection never silently stops
 local pingValue, pingTime = 0, 0
 local function getPing()
 	local now = os.clock()
@@ -78,9 +73,6 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 
 			repeat
 				local clock = os.clock()
-				-- over the ping limit the client's view of everyone else is stale enough
-				-- that movement would be flagged on innocent players, so only the humanoid
-				-- state check keeps running (invalid animations are flagged elsewhere)
 				local movement = getPing() <= PingLimit.Value
 
 				for _, entity in entitylib.List do
@@ -118,9 +110,6 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 								end
 							end
 
-							-- the recorded position keeps updating while the movement checks
-							-- are paused, comparing against a stale entry on the next frame
-							-- would flag a teleport
 							if not last or (clock - last[2]) > 0.2 then
 								positions[entity] = {playerPos, clock}
 							end
