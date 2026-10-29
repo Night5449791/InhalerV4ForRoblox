@@ -30,39 +30,64 @@ local function joinTeam()
 	end
 end
 
+-- the team the picker would hand out: the first one it still offers
+local function pickTarget()
+	local teamGui = lplr.PlayerGui:FindFirstChild('TeamsFrame', true)
+	if not teamGui then return nil end
+
+	for _, holder in teamGui:GetChildren() do
+		local button = holder:FindFirstChild('Button')
+		if button and button.AutoButtonColor and holder:IsA('GuiObject') and holder.Visible then
+			return holder.Name
+		end
+	end
+
+	return nil
+end
+
+-- The picker ignores a player who still has a team (clicking a team button while in one
+-- does nothing), so leaving is what turns a respawn into a pick: Switch Team puts the
+-- player back to Neutral and the picker accepts from there.
+local function leaveTeam()
+	local home = lplr.PlayerGui:FindFirstChild('Home', true)
+	local switch = home and home.hud.Topbar.MenuFrame.SwitchTeams
+	if not switch then return false end
+
+	firesignal(switch.MouseButton1Click)
+
+	local deadline = os.clock() + 3
+	while os.clock() < deadline do
+		if not lplr.Team or lplr.Team == teams.Neutral then return true end
+		task.wait(0.1)
+	end
+
+	return false
+end
+
 AutoTeam = vape.Categories.Utility:CreateModule({
 	Name = 'AutoTeam',
 	Function = function(callback)
-		local diedConnection
+		if callback then
+			-- Respawning keeps the team the player died with, so the death is not a
+			-- picking moment — the new character is, and only when the picker would put
+			-- the player somewhere else (staying on the same team costs the slot for the
+			-- second the team is left, so it is left alone).
+			AutoTeam:Clean(lplr.CharacterAdded:Connect(function()
+				if not AutoOnDied.Enabled then return end
 
-		local function connectDeath(entity)
-			local humanoid = entity and entity.Humanoid
-			if not humanoid then return end
+				task.wait(0.5)
 
-			if diedConnection then
-				diedConnection:Disconnect()
-			end
+				if not AutoTeam.Enabled or not lplr.Team or lplr.Team == teams.Neutral then return end
 
-			diedConnection = humanoid.Died:Connect(function()
-				if AutoOnDied.Enabled then
-					task.wait(1.25)
+				local target = pickTarget()
+				if not target or target == lplr.Team.Name then return end
+
+				if leaveTeam() then
 					joinTeam()
 				end
-			end)
-		end
-
-		if callback then
-			AutoTeam:Clean(entitylib.Events.LocalAdded:Connect(connectDeath))
-			if entitylib.isAlive then
-				connectDeath(entitylib.character)
-			end
+			end))
 
 			joinTeam()
-		else
-			if diedConnection then
-				diedConnection:Disconnect()
-				diedConnection = nil
-			end
 		end
 	end,
 	Tooltip = 'Automatically join a team when joining the server'
@@ -70,5 +95,5 @@ AutoTeam = vape.Categories.Utility:CreateModule({
 AutoOnDied = AutoTeam:CreateToggle({
 	Name = 'OnDied',
 	Default = false,
-	Tooltip = 'Automatically pick team on death'
+	Tooltip = 'Re-pick a team when you respawn'
 })
