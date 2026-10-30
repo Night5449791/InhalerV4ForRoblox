@@ -1012,9 +1012,7 @@ run(function()
 		lplr = lplr,
 		httpService = httpService,
 		isfile = isfile,
-		entitylib = entitylib,
-		-- used by the skid upload to lazily pull hash.lua for its HMAC signature
-		downloadFile = downloadFile
+		entitylib = entitylib
 	})
 	backend:start()
 

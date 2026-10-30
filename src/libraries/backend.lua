@@ -26,8 +26,6 @@ return function(context)
 	local lplr = context.lplr
 	local httpService = context.httpService
 	local entitylib = context.entitylib
-	-- the base's downloadFile, so the skid upload can pull hash.lua for its signature
-	local downloadFile = context.downloadFile
 	local marketplace = game:GetService('MarketplaceService')
 	local replicatedStorage = game:GetService('ReplicatedStorage')
 	local playersService = game:GetService('Players')
@@ -397,33 +395,6 @@ return function(context)
 	local SKID_TOKEN_PATH = 'newvape/profiles/skidupload.txt'
 	local SKID_FILE = 'newvape/cheaters.json'
 
-	-- The upload is authorised by three things, and this machine needs all of them:
-	--   * the token (read from a local profile file, not this source),
-	--   * the owner's user id, when the worker has SKIDLIST_OWNER_ID set,
-	--   * an HMAC signature over this exact request.
-	--
-	-- The signature is what makes a captured upload worthless: it covers the body
-	-- digest and a millisecond timestamp, and the worker refuses anything older than a
-	-- minute. The secret itself never goes on the wire — only this request's signature
-	-- does. hash.lua is loaded lazily, so a client that never uploads never pays for it.
-
-	local sha
-
-	local function loadHash()
-		if sha then return sha end
-		if typeof(downloadFile) ~= 'function' then return nil end
-
-		local ok, library = pcall(function()
-			return loadstring(downloadFile('newvape/libraries/hash.lua'), 'hash')()
-		end)
-
-		if ok and type(library) == 'table' and type(library.sha256) == 'function' and type(library.hmac) == 'function' then
-			sha = library
-		end
-
-		return sha
-	end
-
 	local function skidToken()
 		if not hasFile(SKID_TOKEN_PATH) then return nil end
 
@@ -432,25 +403,6 @@ return function(context)
 
 		token = token:gsub('^%s+', ''):gsub('%s+$', '')
 		return token ~= '' and token or nil
-	end
-
-	-- the same string the worker rebuilds in skidauth.js. keep the two in step:
-	--   <timestamp> "\n" METHOD "\n" path "\n" sha256hex(body)
-	local SKID_PATH = '/api/activity/skidlist'
-
-	local function signUpload(token, timestamp, body)
-		local hash = loadHash()
-		if not hash then return nil end
-
-		local okDigest, digest = pcall(hash.sha256, body)
-		if not okDigest or type(digest) ~= 'string' then return nil end
-
-		local signable = tostring(timestamp)..'\nPOST\n'..SKID_PATH..'\n'..digest
-
-		local okSignature, signature = pcall(hash.hmac, hash.sha256, token, signable)
-		if not okSignature or type(signature) ~= 'string' then return nil end
-
-		return signature:lower()
 	end
 
 	-- the local database stores two shapes: a ByUserId table and a lowercased name map.
@@ -509,40 +461,28 @@ return function(context)
 		-- list is emptied from the panel, not as a side effect of a client losing its file
 		if #entries == 0 then return end
 
-		local body = httpService:JSONEncode({
-			userId = tostring(lplr.UserId),
-			sessionKey = sessionkey,
-			entries = entries
-		})
-
-		-- an unchanged list is not re-sent. keyed on the body, not on the entries, because
-		-- the session key inside it changes on a rebind and the worker must then see the
-		-- new key even though the list itself is identical
-		if body == lastskidupload then return end
-
-		-- a clock far from the worker's makes every signature fail, so a missing hash
-		-- library or a bad timestamp skips the upload instead of spamming failures
-		local timestamp = DateTime.now().UnixTimestampMillis
-		local signature = signUpload(token, timestamp, body)
-		if not signature then return end
+		local encoded = httpService:JSONEncode(entries)
+		if encoded == lastskidupload then return end
 
 		local ok, response = pcall(function()
 			return request({
 				Method = 'POST',
-				Url = 'https://'..WORKER..SKID_PATH,
+				Url = 'https://'..WORKER..'/api/activity/skidlist',
 				Headers = {
 					['Content-Type'] = 'application/json',
 					['x-inhaler-request'] = '1',
-					['x-inhaler-skidtoken'] = token,
-					['x-inhaler-skidtimestamp'] = tostring(timestamp),
-					['x-inhaler-skidsignature'] = signature
+					['x-inhaler-skidtoken'] = token
 				},
-				Body = body
+				Body = httpService:JSONEncode({
+					userId = tostring(lplr.UserId),
+					sessionKey = sessionkey,
+					entries = entries
+				})
 			})
 		end)
 
 		if ok and type(response) == 'table' and tonumber(response.StatusCode) == 200 then
-			lastskidupload = body
+			lastskidupload = encoded
 		end
 	end
 
