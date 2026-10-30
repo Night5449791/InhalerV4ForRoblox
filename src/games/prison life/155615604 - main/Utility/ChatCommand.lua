@@ -1,12 +1,30 @@
+-- Chat commands for the prison products. The shape is the same everywhere in this file:
+-- one named handler per command, one entry per command name in `commands`, one toggle per
+-- command family in `toggles`. A handler only runs while its toggle is on.
+--
+-- Other players' chat is listened to only while the module runs. A friend may drive these
+-- commands when ShareCommands is on, a private member (whitelist level above zero) always
+-- may, and this client's own chat and the command box are never gated.
+
 local ChatCommand
 local TARGET_COLOR = Color3.new(1, 0, 0)
 
 local options = {}
+local sharedConnections = {}
+
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 
 local TP_OFFSET = Vector3.new(0, 2, 0)
 
+local DISCORD_CODE = 'YSzD7f9neR'
+local DISCORD_INVITE = 'https://discord.gg/'..DISCORD_CODE
+
+-- ============================================================================
+-- helpers
+-- ============================================================================
+
+-- nil when the text is missing or only whitespace
 local function argument(text)
 	text = text and text:match('^%s*(.-)%s*$') or nil
 	return text ~= '' and text or nil
@@ -24,9 +42,25 @@ local function setListValue(list, value, enabled)
 	end
 end
 
+-- returns how many entries were dropped
+local function clearListValues(list)
+	if not list or not list.List then return 0 end
+
+	local count = #list.List + #list.ListEnabled
+	if count == 0 then return 0 end
+
+	table.clear(list.List)
+	table.clear(list.ListEnabled)
+	list:ChangeValue()
+	return count
+end
+
+-- entries are either entities, which expose their player, or plain players. filter drops
+-- entries, an exact match wins over a wildcard match, which wins over a prefix match
 local function search(list, lowered, filter)
 	local partial, wildcardMatch
 	local pattern
+
 	if lowered:find('*', 1, true) then
 		pattern = '^'..lowered:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
 	end
@@ -56,11 +90,13 @@ local function findEntity(prefix, includeDead)
 	local text = argument(prefix)
 	if not text then return end
 
+	-- npcs carry no player and dead characters only count when asked for
 	return search(entitylib.List, text:lower(), function(entity)
 		return entity.Player and (includeDead or entity.Humanoid.Health > 0)
 	end)
 end
 
+-- spawned players first, then everyone still in the server when allowLeft is set
 local function findPlayer(prefix, allowLeft)
 	local entity = findEntity(prefix, true)
 	if entity then
@@ -72,6 +108,10 @@ local function findPlayer(prefix, allowLeft)
 
 	return search(playersService:GetPlayers(), text:lower())
 end
+
+-- ============================================================================
+-- camera / follow / other modules
+-- ============================================================================
 
 local function restoreCamera()
 	viewPlayer = nil
@@ -147,8 +187,9 @@ local function startFollow(player)
 	end)
 end
 
-local function enableModule(option, name)
-	if not options[option].Enabled then return end
+-- enables another product module when its toggle here allows it
+local function enableModule(name)
+	if not options[name].Enabled then return end
 
 	local module = vape.Modules and vape.Modules[name]
 	if module and not module.Enabled then
@@ -156,81 +197,9 @@ local function enableModule(option, name)
 	end
 end
 
-local function handleReload()
-	if not options.ReloadVape.Enabled then return end
-
-	local success, err = pcall(function()
-		vape:Save()
-		shared.vapereload = true
-		if shared.VapeDeveloper then
-			loadstring(readfile('newvape/loader.lua'), 'loader')()
-		else
-			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
-		end
-	end)
-
-	if not success then
-		notif('ChatCommand', 'Failed to reload : '..tostring(err), 5, 'warning')
-	end
-end
-
-local function handleWhitelist(args, remove)
-	if not options.Whitelist.Enabled then return end
-
-	local player = findPlayer(args, remove)
-	if not player then
-		notif('Whitelist', 'No player found.', 5, 'warning')
-		return
-	end
-
-	setListValue(vape.Categories.Friends, player.Name, not remove)
-	notif('Whitelist', player.DisplayName..' has been '..(remove and 'unwhitelisted.' or 'whitelisted.'), 5)
-end
-
-local function handleTargets(args, remove)
-	if not options.Blacklist.Enabled then return end
-
-	args = argument(args)
-	if not args then return end
-
-	local list = vape.Categories.Targets
-	if args:lower() == 'all' then
-		local count = #list.List + #list.ListEnabled
-		table.clear(list.List)
-		table.clear(list.ListEnabled)
-		list:ChangeValue()
-		notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
-		return
-	end
-
-	local player = findPlayer(args, remove)
-	if not player then
-		notif('Blacklist', 'No player found.', 5, 'warning')
-		return
-	end
-
-	local name = player.Name
-	setListValue(list, name, not remove)
-	whitelist.customtags[name] = not remove and {{text = 'Exploiter', color = TARGET_COLOR}} or nil
-	tempTargets[name] = not remove or nil
-	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
-end
-
-local function handleCheater(args, remove)
-	if not options.Cheater.Enabled then return end
-
-	local module = vape.Modules and vape.Modules.CheaterDetector
-	if not (module and module.AddCheater) then
-		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
-		return
-	end
-
-	if remove then
-		module:RemoveCheater(args)
-	else
-		module:AddCheater(args)
-	end
-end
+-- ============================================================================
+-- command handlers
+-- ============================================================================
 
 local function handleTP(args)
 	if not options.PlayerTP.Enabled then return end
@@ -279,7 +248,96 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
-local function handleFling(args, kick)
+-- the two whitelist commands share this body; the handlers below pick the direction
+local function changeWhitelist(args, remove)
+	if not options.Whitelist.Enabled then return end
+
+	local player = findPlayer(args, remove)
+	if not player then
+		notif('Whitelist', 'No player found.', 5, 'warning')
+		return
+	end
+
+	setListValue(vape.Categories.Friends, player.Name, not remove)
+	notif('Whitelist', player.DisplayName..' has been '..(remove and 'unwhitelisted.' or 'whitelisted.'), 5)
+end
+
+local function whitelistAdd(args)
+	return changeWhitelist(args, false)
+end
+
+local function whitelistRemove(args)
+	return changeWhitelist(args, true)
+end
+
+local function changeTargets(args, remove)
+	if not options.Blacklist.Enabled then return end
+
+	args = argument(args)
+	if not args then return end
+
+	local list = vape.Categories.Targets
+	if args:lower() == 'all' then
+		local count = clearListValues(list)
+		notif('Blacklist', count > 0 and 'Cleared '..count..' target'..(count == 1 and '' or 's') or 'No targets to clear.', 5)
+		return
+	end
+
+	local player = findPlayer(args, remove)
+	if not player then
+		notif('Blacklist', 'No player found.', 5, 'warning')
+		return
+	end
+
+	local name = player.Name
+	setListValue(list, name, not remove)
+	whitelist.customtags[name] = not remove and {{text = 'Exploiter', color = TARGET_COLOR}} or nil
+	tempTargets[name] = not remove or nil
+	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
+end
+
+local function targetAdd(args)
+	return changeTargets(args, false)
+end
+
+local function targetRemove(args)
+	return changeTargets(args, true)
+end
+
+local function changeCheater(args, remove)
+	if not options.Cheater.Enabled then return end
+
+	local module = vape.Modules and vape.Modules.CheaterDetector
+	if not (module and module.AddCheater) then
+		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
+		return
+	end
+
+	if remove then
+		module:RemoveCheater(args)
+	else
+		module:AddCheater(args)
+	end
+end
+
+local function skidAdd(args)
+	return changeCheater(args, false)
+end
+
+local function skidRemove(args)
+	return changeCheater(args, true)
+end
+
+local function hopServer()
+	enableModule('ServerHop')
+end
+
+local function rejoinServer()
+	enableModule('Rejoin')
+end
+
+-- one body for .fling and .kick, the second argument is the only difference
+local function startFling(args, kick)
 	if not options.Fling.Enabled then return end
 
 	local module = vape.Modules and vape.Modules.FlingExploit
@@ -336,8 +394,31 @@ local function handleFling(args, kick)
 	notif('ChatCommand', (kick and 'Kicking ' or 'Flinging ')..(player and player.DisplayName or 'everyone')..'.', 5)
 end
 
-local DISCORD_CODE = 'YSzD7f9neR'
-local DISCORD_INVITE = 'https://discord.gg/'..DISCORD_CODE
+local function flingTarget(args)
+	return startFling(args, false)
+end
+
+local function kickTarget(args)
+	return startFling(args, true)
+end
+
+local function reloadVape()
+	if not options.ReloadVape.Enabled then return end
+
+	local success, err = pcall(function()
+		vape:Save()
+		shared.vapereload = true
+		if shared.VapeDeveloper then
+			loadstring(readfile('newvape/loader.lua'), 'loader')()
+		else
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+		end
+	end)
+
+	if not success then
+		notif('ChatCommand', 'Failed to reload : '..tostring(err), 5, 'warning')
+	end
+end
 
 local function openDiscordInvite(code)
 	if typeof(request) ~= 'function' then return false end
@@ -379,8 +460,53 @@ local function handleCopyServer()
 	notif('ChatCommand', 'Copied the discord invite.', 5)
 end
 
+-- ============================================================================
+-- commands
+-- every command name points at one handler; the long names are the same handler as
+-- their short form, so the table stays flat and needs no aliasing pass
+-- ============================================================================
+
+local commands = {
+	tp = handleTP,
+	follow = handleFollow,
+	unfollow = handleUnfollow,
+	view = handleView,
+	unview = restoreCamera,
+
+	wl = whitelistAdd,
+	whitelist = whitelistAdd,
+	unwl = whitelistRemove,
+	unwhitelist = whitelistRemove,
+
+	target = targetAdd,
+	blacklist = targetAdd,
+	untarget = targetRemove,
+	unblacklist = targetRemove,
+
+	addskid = skidAdd,
+	delskid = skidRemove,
+
+	hop = hopServer,
+	serverhop = hopServer,
+	rj = rejoinServer,
+	rejoin = rejoinServer,
+
+	fling = flingTarget,
+	kick = kickTarget,
+	bang = kickTarget,
+
+	reload = reloadVape,
+	copyserver = handleCopyServer
+}
+
+-- ============================================================================
+-- options
+-- ============================================================================
+
 local toggles = {
-	{Name = 'ShareCommand', Tooltip = 'Allows whitelisted users to directly access chat commands.\nPrivate members always have access.'},
+	-- off by default and renamed from ShareCommand on purpose: profiles saved the old
+	-- default (on) under that key, and a renamed option has no saved value
+	{Name = 'ShareCommands', Default = false, Tooltip = 'Allows whitelisted users to directly access chat commands.\nPrivate members always have access.'},
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
 		if not enabled then stopFollow() end
@@ -398,93 +524,25 @@ local toggles = {
 	{Name = 'CopyServer', Tooltip = '.copyserver\nCopies the discord invite and opens discord over rpc'}
 }
 
-local commands = {
-	tp = handleTP,
-	follow = handleFollow,
-	unfollow = handleUnfollow,
-	view = handleView,
-	unview = restoreCamera,
-	wl = function(args)
-		handleWhitelist(args, false)
-	end,
-	unwl = function(args)
-		handleWhitelist(args, true)
-	end,
-	target = function(args)
-		handleTargets(args, false)
-	end,
-	untarget = function(args)
-		handleTargets(args, true)
-	end,
-	addskid = function(args)
-		handleCheater(args, false)
-	end,
-	delskid = function(args)
-		handleCheater(args, true)
-	end,
-	hop = function()
-		enableModule('ServerHop', 'ServerHop')
-	end,
-	rj = function()
-		enableModule('Rejoin', 'Rejoin')
-	end,
-	fling = function(args)
-		handleFling(args, false)
-	end,
-	kick = function(args)
-		handleFling(args, true)
-	end,
-	bang = function(args)
-		handleFling(args, true)
-	end,
-	reload = handleReload,
-	copyserver = handleCopyServer
-}
-
-for alias, name in {
-	whitelist = 'wl',
-	unwhitelist = 'unwl',
-	blacklist = 'target',
-	unblacklist = 'untarget',
-	serverhop = 'hop',
-	rejoin = 'rj'
-} do
-	commands[alias] = commands[name]
-end
+-- ============================================================================
+-- sharing / dispatch
+-- ============================================================================
 
 local function canShare(plr)
-	if options.ShareCommand.Enabled and table.find(vape.Categories.Friends.ListEnabled, plr.Name) then
+	if options.ShareCommands.Enabled and table.find(vape.Categories.Friends.ListEnabled, plr.Name) then
 		return true
 	end
 
-	local success, level = pcall(function()
-		return select(1, vape.Libraries.whitelist:get(plr))
-	end)
-
-	return success and level ~= 0
+	-- private members get through whether the toggle is on or not: only they have a level
+	-- above zero, so a missing or failed lookup is a no instead of an accidental yes
+	local success, level = pcall(whitelist.get, whitelist, plr)
+	return success and type(level) == 'number' and level > 0
 end
 
-local function onChatted(message, plr)
-	message = argument(message)
-	local prefix = message and message:sub(1, 1)
-	if prefix ~= '.' and prefix ~= ';' then return end
-	if plr and not canShare(plr) then return end
+-- declared first: trackPlayer closes over it and the definition comes after
+local onChatted
 
-	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
-	command = command and command:lower()
-	if not command then return end
-
-	local handler = commands[command]
-	if handler then
-		handler(args ~= '' and args or nil)
-		return true
-	end
-
-	return false
-end
-
-local sharedConnections = {}
-
+-- one Chatted connection per other player, so a shared command can be heard
 local function trackPlayer(plr)
 	if plr == lplr or sharedConnections[plr] then return end
 
@@ -500,6 +558,29 @@ local function untrackPlayer(plr)
 	connection:Disconnect()
 	sharedConnections[plr] = nil
 end
+
+onChatted = function(message, plr)
+	message = argument(message)
+	if not message then return end
+
+	local prefix = message:sub(1, 1)
+	if prefix ~= '.' and prefix ~= ';' then return end
+	if plr and not canShare(plr) then return end
+
+	local command, args = message:sub(2):match('^(%S+)%s*(.*)$')
+	command = command and command:lower()
+	if not command then return end
+
+	local handler = commands[command]
+	if not handler then return false end
+
+	handler(args ~= '' and args or nil)
+	return true
+end
+
+-- ============================================================================
+-- module
+-- ============================================================================
 
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
@@ -524,9 +605,6 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 				gameCamera.CameraSubject = entity.Humanoid
 			end
 		end))
-		ChatCommand:Clean(lplr.Chatted:Connect(function(message)
-			onChatted(message)
-		end))
 
 		for _, plr in playersService:GetPlayers() do
 			trackPlayer(plr)
@@ -540,6 +618,7 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 
 			table.clear(sharedConnections)
 		end)
+		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
 	end,
 	Tooltip = 'Chat commands, every command is a toggleable option'
 })
@@ -566,7 +645,9 @@ for _, toggle in toggles do
 	options[toggle.Name] = ChatCommand:CreateToggle({
 		Name = toggle.Name,
 		Tooltip = toggle.Tooltip,
-		Default = true,
+		-- ShareCommands is the one that ships off: a friend can drive commands only after
+		-- it is turned on, while private members are let through by canShare either way
+		Default = toggle.Default ~= false,
 		Function = toggle.Function
 	})
 end
