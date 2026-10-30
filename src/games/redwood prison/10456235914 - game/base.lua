@@ -95,19 +95,22 @@ function redwood.invoke(name, ...)
 	return suc and result or nil
 end
 
+-- ignores dead characters so AutoReset does not keep firing at a guard corpse
 function redwood.nearestPlayer(team, range)
-	local character = entitylib.character
-	if not character then return end
+	local character = lplr.Character
+	local root = character and character:FindFirstChild('HumanoidRootPart')
+	if not root then return end
 
-	local root, closest, distance = character.RootPart, nil, range or math.huge
+	local closest, closestDistance = nil, range or math.huge
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr and (not team or redwood.isTeam(plr, team)) then
 			local char = plr.Character
 			local other = char and char:FindFirstChild('HumanoidRootPart')
-			if other then
+			local humanoid = char and char:FindFirstChildOfClass('Humanoid')
+			if other and humanoid and humanoid.Health > 0 then
 				local magnitude = (other.Position - root.Position).Magnitude
-				if magnitude < distance then
-					closest, distance = plr, magnitude
+				if magnitude < closestDistance then
+					closest, closestDistance = plr, magnitude
 				end
 			end
 		end
@@ -127,15 +130,49 @@ local function addressValue(value)
 	return min
 end
 
-function redwood.isTarget(plr)
-	if plr == lplr or isFriend(plr) then return false end
+function redwood.humanoid(character)
+	return character and character:FindFirstChildOfClass('Humanoid') or nil
+end
 
-	local character = plr.Character
-	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
-	if not humanoid or humanoid.Health <= 0 then return false end
+function redwood.isDead(plr)
+	local character = plr and plr.Character
+	local humanoid = redwood.humanoid(character)
+	return humanoid == nil or humanoid.Health <= 0
+end
 
-	local team = plr.Team
-	return not (team and lplr.Team and team == lplr.Team)
+-- Fugitive and Prisoners are both "criminal" teams: guards may attack them, and they may
+-- attack guards. Neutral/Krampus are left alone by the team check so they stay optional.
+local hostileTeams = {
+	[redwood.Teams.Guards] = {[redwood.Teams.Prisoners] = true, [redwood.Teams.Fugitive] = true},
+	[redwood.Teams.Prisoners] = {[redwood.Teams.Guards] = true},
+	[redwood.Teams.Fugitive] = {[redwood.Teams.Guards] = true}
+}
+
+-- strict teams[] table is optional; without it anything not on your own team is a target
+function redwood.isTarget(plr, strict)
+	if not plr or plr == lplr or isFriend(plr) or redwood.isDead(plr) then return false end
+	if redwood.hasState(plr.Character, 'Handcuffed_') then return false end
+
+	local myTeam, team = redwood.team(lplr), redwood.team(plr)
+	if strict and myTeam and team then
+		local allowed = hostileTeams[myTeam]
+		return allowed ~= nil and allowed[team] == true
+	end
+
+	return not (team and myTeam and team == myTeam)
+end
+
+-- entitylib target check: Friend list, dead bodies, handcuffed players and own team
+function redwood.targetCheck(ent)
+	if not ent or ent.NPC then return false end
+
+	local plr = ent.Player
+	if not plr or plr == lplr or isFriend(plr) then return false end
+	if ent.Health and ent.Health <= 0 then return false end
+	if ent.Character and redwood.hasState(ent.Character, 'Handcuffed_') then return false end
+
+	local myTeam, team = redwood.team(lplr), redwood.team(plr)
+	return not (team and myTeam and team == myTeam)
 end
 
 function redwood.meleeTool()
@@ -166,10 +203,11 @@ function redwood.attack(target, partName)
 	local suc, config = pcall(require, frame)
 	if not suc or type(config) ~= 'table' then return false end
 
-	local humanoid = character:FindFirstChildOfClass('Humanoid')
+	local humanoid = redwood.humanoid(character)
 	local root = character:FindFirstChild('HumanoidRootPart')
-	local part = character:FindFirstChild(partName) or character:FindFirstChild('Head') or root
+	local part = (partName and character:FindFirstChild(partName)) or character:FindFirstChild('Head') or root
 	if not (part and humanoid and root) then return false end
+	if humanoid.Health <= 0 then return false end
 
 	local combo = tool:FindFirstChild('Combo')
 
@@ -250,6 +288,8 @@ run(function()
 end)
 
 run(function()
+	entitylib.targetCheck = redwood.targetCheck
+
 	entitylib.getEntityColor = function(ent)
 		if not (ent.Player and vape.Settings.Modules.Options['Use team color'].Enabled) then return end
 		if isFriend(ent.Player, true) then
