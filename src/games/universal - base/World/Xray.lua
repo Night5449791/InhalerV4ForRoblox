@@ -9,8 +9,6 @@ local originals = setmetatable({}, {
 local skip = {}
 local scanToken = 0
 
--- the part-name list is checked for every descendant added, so it is turned into a hash set
--- instead of a linear table.find scan; rebuilt whenever the module is toggled on
 local function rebuildSkip()
 	table.clear(skip)
 	for _, name in List.ListEnabled do
@@ -19,11 +17,8 @@ local function rebuildSkip()
 end
 
 local function modifyPart(part)
-	-- a part is only ever recorded once; a reparent re-fires DescendantAdded and re-writing the
-	-- same property on every one of those would be wasted work
 	if modified[part] then return end
 
-	-- remember a non-zero modifier so disabling restores it instead of flattening it to 0
 	local current = part.LocalTransparencyModifier
 	if current ~= 0 then
 		originals[part] = current
@@ -33,8 +28,6 @@ local function modifyPart(part)
 	part.LocalTransparencyModifier = 0.5
 end
 
--- sweeping every BasePart of a large map in one frame hitches, so the sweep is spread over
--- frames and cancelled through the token when the module is toggled off mid-sweep
 local function startScan()
 	scanToken = scanToken + 1
 	local token = scanToken

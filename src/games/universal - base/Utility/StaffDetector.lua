@@ -66,9 +66,6 @@ StaffDetector = vape.Categories.Utility:CreateModule({
 			if Group.Value == '' or Role.Value == '' then
 				local placeinfo = {Creator = {CreatorTargetId = tonumber(Group.Value)}}
 				if Group.Value == '' then
-					-- the engine only has the Async method now. A client that lacks it, or
-					-- a lookup that fails, must fall through to the "no group detected"
-					-- path below instead of erroring out of the module
 					local ok, info = pcall(function()
 						return marketplaceService:GetProductInfoAsync(game.PlaceId)
 					end)
@@ -78,8 +75,6 @@ StaffDetector = vape.Categories.Utility:CreateModule({
 					end
 
 					if placeinfo.Creator.CreatorType ~= 'Group' then
-						-- a failed lookup leaves no Description: scan only when there is text,
-						-- then let the group check below report the failure
 						local description = type(placeinfo.Description) == 'string' and placeinfo.Description or ''
 						local desc = description:split('\n')
 						for _, str in desc do

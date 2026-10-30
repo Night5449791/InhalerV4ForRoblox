@@ -38,7 +38,6 @@ AimAssist = vape.Categories.Combat:CreateModule({
 		local clickgui = vape.gui.ScaledGui.ClickGui
 		local mouseScale
 		if not cameraMode then
-			-- hoisted so the per-frame path never touches UserSettings or allocates a new scale vector
 			mouseScale = moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity
 		end
 
@@ -81,7 +80,6 @@ AimAssist = vape.Categories.Combat:CreateModule({
 			local alpha = math.min(Speed.Value * dt, 1)
 
 			if cameraMode then
-				-- mobile method - only the local camera CFrame is written, no mouse input at all
 				local blended = camCF.LookVector:Lerp(target, alpha)
 				local magnitude = blended.Magnitude
 				if magnitude < 0.01 then return end
@@ -102,7 +100,6 @@ AimAssist = vape.Categories.Combat:CreateModule({
 		end
 
 		if cameraMode then
-			-- the default camera scripts write at RenderPriority.Camera, so step right after them
 			runService:BindToRenderStep('InhalerAimAssist', Enum.RenderPriority.Camera.Value + 1, step)
 			AimAssist:Clean(function()
 				runService:UnbindFromRenderStep('InhalerAimAssist')

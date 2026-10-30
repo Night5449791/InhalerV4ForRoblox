@@ -5,7 +5,9 @@
 
 ## 1. Commands
 
-Build happens only in CI. `.github/workflows/build.yaml` on push to `main`: clone this repo, `InhalerCompiled` and `InhalerBundler`; move `.github/workflows/workflowConfig.json` to `InhalerBundler/config.json` (`SRC_PATH=./src`, `PROD_PATH=./InhalerCompiled`); `npm i`; `node ./InhalerBundler/index.js prod` (Node 24.15.0); commit and push the output. Bundling rules live in InhalerBundler, not here.
+The Vape build happens only in CI. `.github/workflows/build.yaml` on push/PR to `main` runs a read-only `verify` job, then (push and manual only, gated by `needs: verify`) a `build` job: clone this repo, `InhalerCompiled` and `InhalerBundler`; move `.github/workflows/workflowConfig.json` to `InhalerBundler/config.json` (`SRC_PATH=./src`, `PROD_PATH=./InhalerCompiled`); `npm i`; `node ./InhalerBundler/index.js prod` (Node 24.15.0); commit and push the output. Bundling rules live in InhalerBundler, not here.
+
+The Obsidian build is **local-only** and has its own bundler repo/folder, `InhalerBundlerObsidian` (cloned as a sibling of this repo; `SRC_PATH=../InhalerV4ForRoblox/src`, `PROD_PATH=./InhalerObsidianCompiled`). CI never builds or pushes it. Run it with `node index.js prod` there, after `bash scripts/fetch-obsidian.sh` once to populate `vendor/Obsidian`.
 
 There is no lint, formatter or test suite (no selene/stylua config, no `package.json`, no Makefile). Do not add tooling unless asked. Syntax-only check of one file — rewrite Luau-only spellings, then parse with Lua 5.4:
 

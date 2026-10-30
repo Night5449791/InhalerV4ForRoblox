@@ -8,6 +8,7 @@ Fork of Vape V4: a Roblox executor script written in **Luau**, not standard Lua 
 
 - **No local build, lint, or test suite.** No `package.json`, Makefile, or selene/stylua config. Don't add tooling unless asked.
 - Build is push-only: `.github/workflows/build.yaml` runs on `main`, clones `InhalerBundler` + `InhalerCompiled`, copies `workflowConfig.json` to the bundler's `config.json`, runs `node ./InhalerBundler/index.js prod`, and pushes the output. Bundling behavior lives in InhalerBundler, not this repo.
+- The Obsidian target is **not** in CI and is not part of InhalerBundler: it lives in the separate `InhalerBundlerObsidian` folder/repo and is built locally. Its output (`InhalerObsidianCompiled`) is never pushed.
 - Syntax-check one file (no Luau compiler installed; rewrite Luau-only syntax first, then parse with Lua 5.4):
   ```bash
   sed -E -e 's/[[:space:]]+continue([[:space:]]|$)/ break\1/g' \
