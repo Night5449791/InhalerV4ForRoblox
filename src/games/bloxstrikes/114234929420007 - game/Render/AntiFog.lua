@@ -82,18 +82,15 @@ end
 -- a smoke grenade is a VoxelSmoke_ folder in Workspace.Debris holding SmokeVoxel parts, which is
 -- also the two names the game's own aim assist and mobile auto shoot use to test line of sight
 local function hideSmoke(instance)
-	if smokeSaved[instance] then
-		return
-	end
-
 	-- named first: Debris churns with pooled ragdolls, so this runs for far more parts than the
-	-- clouds it is after and the name is the cheapest thing to reject on
-	if instance.Name ~= 'SmokeVoxel' or not instance:IsA('BasePart') then
+	-- clouds it is after and the name is the cheapest thing to reject on. A plain find keeps the
+	-- prefix test allocation free, where sub would build a string per part it rejects.
+	if instance.Name ~= 'SmokeVoxel' or smokeSaved[instance] or not instance:IsA('BasePart') then
 		return
 	end
 
-	local folder = instance.Parent
-	if not folder or folder.Name:sub(1, 11) ~= 'VoxelSmoke_' then
+	local parent = instance.Parent
+	if not parent or parent.Name:find('VoxelSmoke_', 1, true) ~= 1 then
 		return
 	end
 

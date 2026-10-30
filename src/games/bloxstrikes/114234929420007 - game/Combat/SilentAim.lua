@@ -4,8 +4,8 @@ local Mode
 local HitChance
 local HeadshotChance
 local Range
-local Wallbang
 local ShowTarget
+local AutoFire
 local OriginalCreate
 local rand = Random.new()
 
@@ -19,6 +19,9 @@ run(function()
 	local suc, Bullet = pcall(require, module)
 	if not suc or typeof(Bullet.create) ~= 'function' then return end
 
+	local entityMouse = entitylib.EntityMouse
+	local entityPosition = entitylib.EntityPosition
+
 	-- the shot packet is built on the client: Weapon picks the muzzle, asks Bullet:create for
 	-- one {Origin, Direction, Distance, Hits} per bullet and ships Direction to the server
 	-- through Inventory.ShootWeapon, which raycasts along it. Rewriting Direction where the
@@ -31,7 +34,7 @@ run(function()
 
 		local targetPart = rand:NextNumber(0, 100) < HeadshotChance.Value and 'Head' or 'RootPart'
 		local fromMouse = Mode.Value == 'Mouse'
-		local entity = entitylib[fromMouse and 'EntityMouse' or 'EntityPosition']({
+		local entity = (fromMouse and entityMouse or entityPosition)({
 			Part = targetPart,
 			Range = Range.Value,
 			MouseOrigin = fromMouse and gameCamera.ViewportSize / 2 or nil,
@@ -46,7 +49,94 @@ run(function()
 	-- reused every shot so the wall check does not allocate a fresh ignore table
 	local ignore = {}
 
-	local function hookBullet(self, aimingOptions, isAiming)
+	-- Autofire pulls the trigger through the weapon's own shoot(): it runs the ammo,
+	-- cooldown and sequence bookkeeping a mouse1 press runs, so the packet is the same one
+	-- a real click produces and SilentAim still rewrites Direction inside Bullet.create.
+	local weapon, hookBullet
+
+	-- Bullet.create is handed the weapon's own bullet instance, which points back at the
+	-- weapon, so a real shot refreshes the reference without a collector scan
+	local function findWeapon()
+		if typeof(getgc) ~= 'function' then return end
+
+		for _, v in getgc(true) do
+			if type(v) == 'table' and rawget(v, 'IsEquipped') == true and type(rawget(v, 'Identifier')) == 'string' then
+				return v
+			end
+		end
+	end
+
+	local function currentWeapon()
+		local active = weapon
+		if active and rawget(active, 'IsEquipped') == true and rawget(active, 'IsDestroyed') ~= true then
+			return active
+		end
+
+		-- the inventory rebuilds the weapon on a respawn or a loadout change
+		weapon = findWeapon()
+		return weapon
+	end
+
+	-- the trigger only goes down when there is something to hit: the closest target in
+	-- range whose body the bullet can reach, wood only like the shot itself
+	local gateIgnore = {}
+
+	local function reachable()
+		local localEntity = entitylib.character
+		if not (entitylib.isAlive and localEntity) then return false end
+
+		local root = localEntity.RootPart
+		if not root then return false end
+
+		local origin = root.Position
+		local entity = entityPosition({
+			Part = 'RootPart',
+			Range = Range.Value,
+			Origin = origin,
+			Players = Targets.Players.Enabled,
+			NPCs = Targets.NPCs.Enabled
+		})
+
+		if not entity or not entity.RootPart then return false end
+
+		gateIgnore[1] = localEntity.Character
+		gateIgnore[2] = entity.Character
+
+		-- the trigger only goes down on a clear line
+		return entitylib.Wallcheck(origin, entity.RootPart.Position, gateIgnore) == nil
+	end
+
+	-- the look-for-a-target pass is the expensive half (an entity sweep and a raycast), so
+	-- it runs on its own clock while the trigger itself is pulled every frame
+	local GATE_SECONDS = 0.15
+
+	local function autoFireLoop()
+		local gateUntil, gateOk = 0, false
+
+		repeat
+			task.wait()
+
+			-- the hook being ours is what proves this loop still belongs to a live module:
+			-- a re-inject installs its own, and this copy then stops shooting for good
+			if AutoFire.Enabled and SilentAim.Enabled and Bullet.create == hookBullet then
+				local now = os.clock()
+				if now >= gateUntil then
+					gateOk = reachable()
+					gateUntil = now + GATE_SECONDS
+				end
+
+				local active = gateOk and currentWeapon()
+				if active then
+					pcall(active.shoot, active)
+				end
+			end
+		until not AutoFire.Enabled
+	end
+
+	hookBullet = function(self, aimingOptions, isAiming)
+		-- every real shot hands the weapon over, so the autofire reference survives a respawn
+		weapon = rawget(self, 'Weapon') or weapon
+
 		local bullet = OriginalCreate(self, aimingOptions, isAiming)
 		if not SilentAim.Enabled or type(bullet) ~= 'table' then return bullet end
 
@@ -59,10 +149,8 @@ run(function()
 		local position = part.Position
 		ignore[1] = entity.Character
 
-		-- Wallbang only lets the shot through wood (penetrable) surfaces; metal/stone still
-		-- block, and with Wallbang off only a clear line of sight shoots
-		local hit = entitylib.Wallcheck(origin, position, ignore)
-		if hit and not (Wallbang.Enabled and (hit.Material == Enum.Material.Wood or hit.Material == Enum.Material.WoodPlanks)) then
+		-- a clear line only: anything the ray hits keeps the shot where the player pointed it
+		if entitylib.Wallcheck(origin, position, ignore) then
 			return bullet
 		end
 
@@ -159,12 +247,17 @@ run(function()
 			return val == 1 and 'stud' or 'studs'
 		end
 	})
-	Wallbang = SilentAim:CreateToggle({
-		Name = 'Wallbang',
-		Default = true,
-		Tooltip = 'Redirects the shot through wood walls only'
-	})
 	ShowTarget = SilentAim:CreateToggle({
 		Name = 'Show target info'
+	})
+	AutoFire = SilentAim:CreateToggle({
+		Name = 'Auto Fire',
+		Tooltip = 'Fires while a target is in range; the weapon keeps its own ammo and fire rate',
+		Function = function(callback)
+			if not callback then return end
+
+			weapon = weapon or findWeapon()
+			task.spawn(autoFireLoop)
+		end
 	})
 end)
