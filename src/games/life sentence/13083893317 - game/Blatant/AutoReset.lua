@@ -1,6 +1,7 @@
 local AutoReset
 local ResetDistance
 local ResetWhileDowned
+local guards = nil
 
 -- the reset button is wired to WeaponEvent:FireServer('Reset'), which is also the cheapest way
 -- out of an arrest: a downed player that respawns cannot be handcuffed any more
@@ -9,11 +10,16 @@ AutoReset = vape.Categories.Blatant:CreateModule({
 	Function = function(callback)
 		if not callback then return end
 
+		guards = sentence.Teams.Guards
+
 		repeat
 			local reset = ResetWhileDowned.Enabled and sentence.status(lplr, 'Downed') == true
 
-			if not reset and ResetDistance.Value > 0 then
-				reset = sentence.nearestPlayer(sentence.Teams.Guards, ResetDistance.Value) ~= nil
+			if not reset then
+				local distance = ResetDistance.Value
+				if distance > 0 then
+					reset = sentence.nearestPlayer(guards, distance) ~= nil
+				end
 			end
 
 			if reset then

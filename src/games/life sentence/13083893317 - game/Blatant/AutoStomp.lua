@@ -15,12 +15,17 @@ AutoStomp = vape.Categories.Blatant:CreateModule({
 			local root = sentence.root(lplr)
 
 			if root then
+				-- the options are read once per pass, not once per player
+				local range = StompRange.Value
+				local teamCheck = StompTeamCheck.Enabled
+				local origin = root.Position
+
 				for _, plr in playersService:GetPlayers() do
 					if plr == lplr or not sentence.isDowned(plr) then continue end
-					if StompTeamCheck.Enabled and not sentence.isTarget(plr) then continue end
+					if teamCheck and not sentence.isTarget(plr) then continue end
 
 					local other = sentence.root(plr)
-					if other and (other.Position - root.Position).Magnitude <= StompRange.Value then
+					if other and (other.Position - origin).Magnitude <= range then
 						sentence.fire('CarryStompEvent', 'EPress')
 						break
 					end

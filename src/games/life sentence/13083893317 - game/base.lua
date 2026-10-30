@@ -22,6 +22,15 @@ local whitelist = vape.Libraries.whitelist
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
 
+-- the option objects are created once when the gui loads and profiles only flip Enabled, so
+-- they are resolved here instead of hashing the same names on every per-player check
+local friends = vape.Categories.Friends
+local useFriends = friends.Options['Use friends']
+local recolorFriends = friends.Options['Recolor visuals']
+local friendsColor = friends.Options['Friends color']
+local teamsByServer = vape.Settings.Modules.Options['Teams by server']
+local useTeamColor = vape.Settings.Modules.Options['Use team color']
+
 local sentence = {
 	Teams = {
 		Guards = 'Guards',
@@ -32,14 +41,14 @@ local sentence = {
 }
 
 local function isFriend(plr, recolor)
-	if vape.Categories.Friends.Options['Use friends'].Enabled then
-		local friend = table.find(vape.Categories.Friends.ListEnabled, plr.Name) and true
-		if recolor then
-			friend = friend and vape.Categories.Friends.Options['Recolor visuals'].Enabled
-		end
-		return friend
+	if not useFriends.Enabled then return nil end
+
+	local friend = table.find(friends.ListEnabled, plr.Name) and true
+	if recolor then
+		friend = friend and recolorFriends.Enabled
 	end
-	return nil
+
+	return friend
 end
 
 local playerStatsFolder = replicatedStorage:FindFirstChild('PlayerStats')
@@ -104,18 +113,11 @@ function sentence.root(plr)
 	return character and character:FindFirstChild('HumanoidRootPart') or nil
 end
 
--- ArrestPrompt / SellPrompt are ProximityPrompts parented to the target's HumanoidRootPart and
--- the game only raises their MaxActivationDistance while the target is a valid arrest target
-function sentence.prompt(plr, name)
-	local root = sentence.root(plr)
-	return root and root:FindFirstChild(name) or nil
-end
-
 function sentence.isTarget(plr)
 	if not plr or plr == lplr then return false end
 	if isFriend(plr) then return false end
 	if not select(2, whitelist:get(plr)) then return false end
-	if vape.Settings.Modules.Options['Teams by server'].Enabled then
+	if teamsByServer.Enabled then
 		local team = sentence.team(plr)
 		return team ~= nil and team ~= sentence.team(lplr)
 	end
@@ -201,9 +203,9 @@ run(function()
 	end
 
 	entitylib.getEntityColor = function(entity)
-		if not (entity.Player and vape.Settings.Modules.Options['Use team color'].Enabled) then return end
+		if not (entity.Player and useTeamColor.Enabled) then return end
 		if isFriend(entity.Player, true) then
-			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
+			return Color3.fromHSV(friendsColor.Hue, friendsColor.Sat, friendsColor.Value)
 		end
 
 		local team = entity.Player.Team
@@ -228,10 +230,9 @@ local function instantPrompt(prompt)
 end
 
 run(function()
-	for _, object in workspace:GetDescendants() do
-		if object:IsA('ProximityPrompt') then
-			instantPrompt(object)
-		end
+	-- the selector runs inside the engine instead of walking every descendant of the map
+	for _, object in workspace:QueryDescendants('ProximityPrompt') do
+		instantPrompt(object)
 	end
 
 	vape:Clean(workspace.DescendantAdded:Connect(function(object)
@@ -281,6 +282,4 @@ run(function()
 	end)
 end)
 
-for _, v in {'MurderMystery'} do
-	vape:Remove(v)
-end
+vape:Remove('MurderMystery')

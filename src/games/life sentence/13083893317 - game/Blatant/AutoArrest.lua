@@ -15,15 +15,22 @@ AutoArrest = vape.Categories.Blatant:CreateModule({
 			local root = sentence.root(lplr)
 
 			if root and sentence.isCop(lplr) then
+				-- the sliders are read once per pass, not once per player
+				local range = ArrestRange.Value
+				local origin = root.Position
+
 				for _, plr in playersService:GetPlayers() do
 					if plr == lplr or not sentence.isDowned(plr) or not sentence.isTarget(plr) then continue end
 
 					local other = sentence.root(plr)
-					local prompt = sentence.prompt(plr, 'ArrestPrompt')
-					if not prompt or not other then continue end
-					if (other.Position - root.Position).Magnitude > ArrestRange.Value then continue end
+					if not other or (other.Position - origin).Magnitude > range then continue end
 
-					prompt.MaxActivationDistance = ArrestRange.Value
+					-- the prompt is parented to the root this pass already has, so it is not
+					-- walked to a second time through sentence.root
+					local prompt = other:FindFirstChild('ArrestPrompt')
+					if not prompt then continue end
+
+					prompt.MaxActivationDistance = range
 					prompt.HoldDuration = 0
 					pcall(prompt.InputHoldBegin, prompt)
 					task.wait()

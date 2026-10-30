@@ -1,20 +1,24 @@
 local DownedESP
 local DownedColor
-local highlights = {}
+
+-- keyed by player, not by character: a respawn swaps the body under the same player, and a
+-- character-keyed table would keep the old entry (and its Highlight) alive forever
+local highlights = setmetatable({}, {__mode = 'k'})
 
 local function clearHighlights()
-	for character, highlight in highlights do
-		highlight:Destroy()
-		highlights[character] = nil
+	for _, record in highlights do
+		record.Highlight:Destroy()
 	end
+
+	table.clear(highlights)
 end
 
 local function updateHighlightColor()
 	local color = Color3.fromHSV(DownedColor.Hue, DownedColor.Sat, DownedColor.Value)
 
-	for _, highlight in highlights do
-		highlight.FillColor = color
-		highlight.OutlineColor = color
+	for _, record in highlights do
+		record.Highlight.FillColor = color
+		record.Highlight.OutlineColor = color
 	end
 end
 
@@ -30,24 +34,27 @@ DownedESP = vape.Categories.Render:CreateModule({
 
 			for _, plr in playersService:GetPlayers() do
 				local character = plr.Character
-				if character and character ~= localCharacter then
-					local highlight = highlights[character]
-					local downed = sentence.isDowned(plr)
+				local record = highlights[plr]
+				local downed = character ~= nil and character ~= localCharacter and sentence.isDowned(plr)
 
-					if downed and not highlight then
-						highlight = Instance.new('Highlight')
-						highlight.FillColor = Color3.fromHSV(DownedColor.Hue, DownedColor.Sat, DownedColor.Value)
-						highlight.FillTransparency = 0.65
-						highlight.OutlineColor = highlight.FillColor
-						highlight.OutlineTransparency = 0
-						highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-						highlight.Adornee = character
-						highlight.Parent = character
-						highlights[character] = highlight
-					elseif not downed and highlight then
-						highlight:Destroy()
-						highlights[character] = nil
-					end
+				-- the body is gone, the player is no longer downed, or this is a respawn
+				if record and (not downed or record.Character ~= character) then
+					record.Highlight:Destroy()
+					highlights[plr] = nil
+					record = nil
+				end
+
+				if downed and not record then
+					local color = Color3.fromHSV(DownedColor.Hue, DownedColor.Sat, DownedColor.Value)
+					local highlight = Instance.new('Highlight')
+					highlight.FillColor = color
+					highlight.FillTransparency = 0.65
+					highlight.OutlineColor = color
+					highlight.OutlineTransparency = 0
+					highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+					highlight.Adornee = character
+					highlight.Parent = character
+					highlights[plr] = {Character = character, Highlight = highlight}
 				end
 			end
 
