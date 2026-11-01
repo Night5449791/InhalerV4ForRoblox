@@ -53,9 +53,7 @@ return function(context)
 	local wsconnecting = false
 	local refreshKey
 
-	-- the key is not generated here: the worker mints it and hands it over http, so a
-	-- machine that lost its file asks for a new one instead of inventing a secret the
-	-- server has no reason to trust
+	-- the worker mints the key, not this machine
 	local sessionkey = ''
 
 	local function storedKey()
@@ -73,15 +71,11 @@ return function(context)
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
 
-	-- chat upload rides the socket, so a client that cannot hold one starts with it off.
-	-- The panel turns it on through remote code: shared.inhalerChatLog.enabled = true
+	-- chat upload rides the socket, so a client without one starts with it off
 	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = haswebsockets }
 	shared.inhalerChatLog = chatControl
 
-	-- a game module that just changed its local cheater list fires this to have the
-	-- upload go out now instead of on the next idle tick. an event rather than a
-	-- function field in `shared`, so the table does not keep this chunk's upvalues
-	-- (and the socket) alive after an uninject
+	-- an Instance, not a function field: a function would keep this chunk's upvalues alive
 	local skidPush = typeof(shared.inhalerSkidPush) == 'Instance' and shared.inhalerSkidPush or Instance.new('BindableEvent')
 	shared.inhalerSkidPush = skidPush
 
@@ -112,10 +106,7 @@ return function(context)
 		return placeName
 	end
 
-	-- the worker mints the session key: one http call on boot, and again only when the
-	-- stored key stops matching. it is the only door that can hand out a fresh secret,
-	-- and it follows the same rebind rule as the beacon (409 while the old holder is
-	-- still inside the rebind window)
+	-- the worker mints the key, and a 409 means the old holder is still in the rebind window
 	local function requestSessionKey()
 		if typeof(request) ~= 'function' then return nil end
 
@@ -188,11 +179,8 @@ return function(context)
 		return true
 	end
 
-	-- Remote code execution lives here and nowhere else: it is not in the chat command
-	-- set, so `;execute` does nothing, and the worker hands the script over base64
-	-- encoded so no queue row or socket frame ever carries readable source. A chunk
-	-- from loadstring cannot see this library's upvalues, so the handles worth having
-	-- are parked in `shared` first, and both the decode and the call are guarded.
+	-- the worker hands the script over base64 encoded, and the handles go through `shared`
+	-- because a chunk from loadstring cannot see this library's upvalues
 	local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 	local b64lookup = {}
 	for index = 1, #b64chars do
@@ -384,14 +372,7 @@ return function(context)
 		end)
 	end
 
-	-- ------------------------------------------------------------------ skid list
-	--
-	-- The owner's local cheater database is mirrored on the worker as a read-only list
-	-- that anything holding the url can query; the client itself does not read it back.
-	-- Uploading is opt-in per machine: the token that authorises it lives in a profile
-	-- file, not in this source, because this source is public and the list is what the
-	-- dashboard and whatever else polls the api will act on.
-
+	-- the upload token lives in a profile file, not in this source, because this source is public
 	local SKID_TOKEN_PATH = 'newvape/profiles/skidupload.txt'
 	local SKID_FILE = 'newvape/cheaters.json'
 
@@ -633,11 +614,8 @@ return function(context)
 	-- idle timer only costs a read
 	local SKID_UPLOAD_IDLE = 60
 
-	-- the key this machine holds can go stale (the slot was re-bound elsewhere, or the
-	-- file was replaced). the worker says so by closing the socket with 4401 and by
-	-- marking a beacon `stale`, and both paths land here. a key that cannot be replaced
-	-- yet — the old holder is still inside the rebind window — is retried later, because
-	-- the slot only frees up once that holder goes quiet.
+	-- 4401 and a `stale` beacon both land here; a key that cannot be replaced yet is retried
+	-- later, because the slot only frees up once the old holder goes quiet
 	refreshKey = function(force)
 		local now = os.time()
 		if not force and now - lastrefresh < KEY_CHECK then return end

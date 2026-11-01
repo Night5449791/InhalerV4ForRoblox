@@ -228,15 +228,9 @@ run(function()
 	redwood.Remotes = remotes
 end)
 
--- Adonis bypass, ported from the girls and boys vs zombies base. Adonis keeps every client
--- side check behind a single gc table holding Detected, RLocked, AddDetector, Detectors and
--- Launch, and every detector reports through Detected. Hanging those functions was what made
--- the game's own Anti script run past its 30 second budget and print "Script timeout:
--- exhausted allowed execution time", so nothing is hung here: Detected is replaced by a pass
--- through that reports nothing and returns false, which leaves the core's bookkeeping (and
--- whatever the detectors still do locally) intact while no check can come back positive.
--- rawset is used on purpose, so an __newindex metatable cannot see the write, and the pass is
--- repeated because the core is rebuilt from scratch when the anti script restarts.
+-- Adonis bypass: Detected is replaced by a pass through rather than hung, so the core's
+-- bookkeeping stays intact. rawset keeps an __newindex metatable from seeing the write, and the
+-- pass repeats because the core is rebuilt from scratch when the anti script restarts
 local function gcTables(keys)
 	if typeof(filtergc) == 'function' then
 		return filtergc('table', {Keys = keys}, false)

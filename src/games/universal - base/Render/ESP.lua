@@ -61,7 +61,7 @@ local ESPAdded = {
 			EntityESP.HealthBorder.ZIndex = 1
 			EntityESP.HealthBorder.Color = Color3.new()
 		end
-		
+
 		if Name.Enabled then
 			if Background.Enabled then
 				EntityESP.TextBKG = Drawing.new('Square')
@@ -170,7 +170,7 @@ local ESPUpdated = {
 			if vape.ThreadFix then
 				setthreadidentity(8)
 			end
-			
+
 			if EntityESP.HealthLine then
 				EntityESP.HealthLine.Color = Color3.fromHSV(math.clamp(ent.Health / ent.MaxHealth, 0, 1) / 2.5, 0.89, 0.75)
 			end
@@ -325,7 +325,7 @@ local ESPLoop = {
 				obj.Visible = rootVis
 			end
 			if not rootVis then continue end
-			
+
 			local rigcheck = ent.Humanoid.RigType == Enum.HumanoidRigType.R6
 			pcall(function()
 				local offset = rigcheck and CFrame.new(0, -0.8, 0) or CFrame.identity

@@ -8,8 +8,7 @@
 --   webhook.send(url, payload)               -> bool, err
 --   webhook.sendEmbed(url, embed, 'name')    -> bool, err
 --
--- send and sendEmbed block until discord answers, spawn them from a task or the
--- caller stalls for as long as the request takes
+-- send and sendEmbed block until discord answers, so spawn them from a task
 
 local cloneref = cloneref or function(obj)
 	return obj

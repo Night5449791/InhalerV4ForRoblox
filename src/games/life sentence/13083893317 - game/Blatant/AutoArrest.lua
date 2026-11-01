@@ -2,10 +2,7 @@ local AutoArrest
 local ArrestRange
 local ArrestDelay
 
--- the game sells the arrest itself: every character carries an ArrestPrompt on its root part and
--- ArrestPrompts() raises MaxActivationDistance to 10 while the local player is a cop and the
--- target is downed. Triggering that prompt is the normal arrest, so nothing is spoofed here, the
--- module only walks the prompt through its own hold
+-- triggering the character's own ArrestPrompt is the normal arrest, so nothing is spoofed here
 AutoArrest = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoArrest',
 	Function = function(callback)

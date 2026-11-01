@@ -45,23 +45,8 @@ local function notif(...)
 	return vape:CreateNotification(...)
 end
 
--- Girls&Boys vs ZOMBIES (universe 338943399) is spread over several place ids, so the
--- product keeps one entry per place the way bedwars does:
---   796267492       main game (this base)
---   16868671031     introduction
---   16974742474     factions dedicated server
---   71856608275435  experimental build
---   85911464164622  legacy build
---   102818722798910 reserved
--- The game runs on real Team objects: Survivors, Military Volunteers, Zombies and
--- Choosing (the pre round state everyone sits in until they pick a side).
--- Its client side reporter (RobloxDialogue, fired over ReplicatedStorage['!GetAdmin'])
--- reports WalkSpeed above 50 (code 3) and faked Swimming states (code 1). It catches
--- hooks on the way out, so no hook is used: the reporter itself is a plain table in a
--- closure and its trip() returns early while webhookTripped is set, so that flag is kept
--- pinned. startForCharacter clears the flag on every respawn, hence the loop.
--- filtergc filters in the executor instead of walking the whole gc in lua, which on a
--- heavy game took long enough to look like the client froze while loading
+-- the reporter's webhookTripped flag is pinned so trip() returns early; startForCharacter
+-- clears it on every respawn, hence the loop
 local function gcTables(keys)
 	if typeof(filtergc) == 'function' then
 		return filtergc('table', {Keys = keys}, false)
@@ -108,22 +93,7 @@ run(function()
 	end)
 end)
 
--- the Adonis anti cheat core on top of that: a single gc table holding Detected, RLocked,
--- AddDetector, Detectors and Launch, which every check reports through. This is the same
--- handle Cobalt (gitlab.com/upio/cobalt) uses for its Adonis bypass: hang those functions
--- and no check can finish, so nothing gets kicked or reported from there either.
--- deferred on purpose: hooking their core in the same tick as the injection was the prime
--- suspect for the crash on load, and by the time this runs the game is already settled
--- the Adonis core is deliberately not hooked: hanging Detected/Launch makes the game run its
--- own .Client.Core.Anti past 30 seconds and print "Script timeout: exhausted allowed
--- execution time" over and over, which is what made loading take minutes. The report flag
--- above already keeps the reporter quiet, and the game's own movement report is silenced
--- below, so nothing has to be hung to stay quiet.
-
--- the game measures movement from the character itself: its State Handler runs a loop that
--- reads the root part velocity (95 and 170 are treated as falls) and reports it, so flight,
--- long jumps and teleports all get read as one. Only that loop callback is disabled, not
--- the script, so its ragdoll and get up handling keep working.
+-- only the State Handler loop is disabled, not the script, so ragdoll and get up keep working
 run(function()
 	if typeof(getconnections) ~= 'function' then return end
 
@@ -179,10 +149,7 @@ run(function()
 	end
 end)
 
--- the zombies are npc models in the workspace and the entity library only follows players,
--- so they are registered here: a humanoid model that belongs to nobody becomes an entity,
--- which is what Killaura, SilentAim and the esp read from. Without this every aura module
--- is blind to the actual enemy.
+-- the zombies are npc models, so every aura module is blind to them without this
 run(function()
 	local function scan(container)
 		for _, child in container:GetChildren() do

@@ -1,17 +1,4 @@
--- A [C] at the end of every line in the developer console (F9). Pressing the line
--- copies it, flips the mark to [√] and goes back to [C] after 2.5s.
---
--- The mark is appended to the line itself, so it sits right after the log instead of
--- floating over it — and it is only ever display text: the clipboard always gets the
--- clean message, never the [C] / [√] we added.
---
--- The console lives at
---   CoreGui.DevConsoleMaster.DevConsoleWindow.DevConsoleUI.MainView.ClientLog
--- and every entry in ClientLog holds the text row as `msg`. Both are version
--- dependent. DevConsoleMaster itself persists in CoreGui once the console has been
--- opened (it just sits hidden), so the marks are attached to it as soon as it exists
--- — whether or not F9 is pressed afterwards — and the printed line is only the
--- fallback when that screen is not where we expect it.
+-- a [C] at the end of every console line; pressing it copies the clean message, never the mark
 local ConsoleCopy
 local ColorV
 

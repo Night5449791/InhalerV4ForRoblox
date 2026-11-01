@@ -22,11 +22,8 @@ run(function()
 	local entityMouse = entitylib.EntityMouse
 	local entityPosition = entitylib.EntityPosition
 
-	-- the shot packet is built on the client: Weapon picks the muzzle, asks Bullet:create for
-	-- one {Origin, Direction, Distance, Hits} per bullet and ships Direction to the server
-	-- through Inventory.ShootWeapon, which raycasts along it. Rewriting Direction where the
-	-- bullet object is returned is therefore enough to move the real shot, without touching
-	-- the packet layout or the sequence counters the server checks.
+	-- rewriting Direction where the bullet is returned moves the real shot without touching the
+	-- packet layout or the sequence counters the server checks
 	local function getTarget(origin)
 		-- a failed roll leaves the shot untouched, so the aim lands as often as the chance
 		-- allows and the misses look like ordinary bad aim
@@ -162,10 +159,7 @@ run(function()
 		return bullet
 	end
 
-	-- a re-inject leaves the previous chunk alive, and a hook it left installed would otherwise be
-	-- captured as the "original" and wrapped a second time, which ends with create calling a
-	-- function that no longer exists. The original and the last hook are kept in shared, so a
-	-- later copy of this file can still tell them apart.
+	-- the original and the last hook are kept in shared so a re-inject cannot wrap its own hook
 	local function installHook()
 		if Bullet.create == hookBullet then return end
 

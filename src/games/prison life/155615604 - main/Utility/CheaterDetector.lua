@@ -372,6 +372,27 @@ local function playerAdded(plr)
 	end
 end
 
+local function playerRemoving(plr)
+	if plr == lplr then return end
+
+	for _, other in playersService:GetPlayers() do
+		if other ~= plr and (other.Name == plr.Name or other.DisplayName == plr.DisplayName) then
+			return
+		end
+	end
+
+	if not whitelist.customtags[plr.Name] and not tempTargets[plr.Name] then return end
+
+	local reason = getCheaterReason(plr)
+
+	whitelist.customtags[plr.Name] = nil
+	tempTargets[plr.Name] = nil
+
+	if reason and cheaterOptions.Notifications.Enabled then
+		notify('Logged skid left: '..plr.DisplayName..' ('..reason..')', 15)
+	end
+end
+
 local function autoAddCheater(plr, flagType)
 	if not cheaterOptions.AutomaticAdd.Enabled then return end
 	if flagType ~= 'invalid animation' and flagType:sub(1, 13) ~= 'invalid state'
@@ -408,6 +429,7 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 	Function = function(callback)
 		if callback then
 			CheaterDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
+			CheaterDetector:Clean(playersService.PlayerRemoving:Connect(playerRemoving))
 			CheaterDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(autoAddCheater))
 
 			cheaterOptions.Teleports.Object.Visible = cheaterOptions.AutomaticAdd.Enabled

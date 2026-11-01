@@ -1,11 +1,4 @@
--- Chat commands for every product that does not ship its own. The shape is the same
--- everywhere in this file: one named handler per command, one entry per command name in
--- `commands`, one toggle per command family in `toggles`. A handler only runs while its
--- toggle is on.
---
--- Other players' chat is listened to only while the module runs. A friend may drive these
--- commands when ShareCommands is on, a private member (whitelist level above zero) always
--- may, and this client's own chat and the command box are never gated.
+-- a friend may drive these commands while ShareCommands is on, a private member always may
 
 local ChatCommand
 
@@ -350,12 +343,6 @@ local function startDance()
 	danceTrack.Looped = true
 	danceTrack:Play()
 end
-
--- ============================================================================
--- commands
--- every command name points at one handler; the long names are the same handler as
--- their short form, so the table stays flat and needs no aliasing pass
--- ============================================================================
 
 local commands = {
 	tp = handleTP,

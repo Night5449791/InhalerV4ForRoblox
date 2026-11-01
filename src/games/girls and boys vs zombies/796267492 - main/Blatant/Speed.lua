@@ -2,10 +2,7 @@ local Speed
 local SpeedValue
 local original
 
--- walk speed only: the other modes move the root part and spike AssemblyLinearVelocity,
--- which this game reads as a fall (it reports anything above 95 to the server), while a
--- plain WalkSpeed stays under that and only has to deal with the Adonis check, which the
--- base already neuters
+-- walk speed only: the other modes spike AssemblyLinearVelocity, which this game reads as a fall
 Speed = vape.Categories.Blatant:CreateModule({
 	Name = 'Speed',
 	Function = function(callback)

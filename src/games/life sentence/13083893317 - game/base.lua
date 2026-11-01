@@ -1,10 +1,5 @@
--- Life Sentence (Real Heat Studios). Two per player state holders instead of one:
--- <player>.Backpack.Stats is a Tool whose values are the transient ones (Downed, RagDolled,
--- Carrying, BeingCarried, Dead) and ReplicatedStorage.PlayerStats.<name> holds the persistent
--- ones (Cash, Bounty, Strength, Cop, SolitaryTime). Both are replicated for every player, which
--- is what the game's own client reads, so the product reads them instead of the attributes.
--- Teams are the real Teams service (Guards / Inmates / Escaped) and every remote lives in
--- ReplicatedStorage.Events.
+-- state lives in <player>.Backpack.Stats (transient) and ReplicatedStorage.PlayerStats.<name>
+-- (persistent) instead of attributes
 local run = function(func)
 	func()
 end
@@ -215,11 +210,7 @@ run(function()
 	entitylib.start()
 end)
 
--- jobs, showers, store fronts and the vents are all ProximityPrompts, and the ones that matter
--- carry a hold time between one and five seconds. The hold runs client side, so zeroing it makes
--- the prompt fire on the first frame while the server still sees a normal trigger. It lives here
--- rather than in a module because there is nothing to toggle, and the hold is rewritten every
--- time SetPromptsAndBuildBoards rebuilds a board, hence the loop
+-- the hold is rewritten every time SetPromptsAndBuildBoards rebuilds a board, hence the loop
 local instantPrompts = {}
 
 local function instantPrompt(prompt)

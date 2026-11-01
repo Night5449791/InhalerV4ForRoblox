@@ -235,8 +235,7 @@ local whitelist = {
 	customtags = {},
 	tagcallback = {},
 	data = {WhitelistedUsers = {}},
-	-- the last announcement this machine already showed, so the same text is never
-	-- shown twice (a whitelist edit used to re-fire it, and re-injecting repeated it)
+	-- the last announcement shown on this machine
 	announced = (function()
 		local ok, value = pcall(readfile, 'newvape/profiles/announcement.txt')
 		return ok and type(value) == 'string' and value ~= '' and value or nil
@@ -397,7 +396,7 @@ end)
 
 run(function()
 	function whitelist:hashmatches(v, plrstr)
-		-- a whitelist entry carries either one `hash` or a `hashes` list, never both
+		-- an entry carries either `hash` or `hashes`, never both
 		if v.hash == plrstr then
 			return true
 		end
@@ -485,7 +484,7 @@ run(function()
 	end
 
 	function whitelist:process(msg, plr)
-		-- '.' is accepted as well as ';', so `.chat` works exactly like `;chat`
+		-- '.' works like ';': `.chat` and `;chat` are the same command
 		if msg:sub(1, 1) == '.' then
 			msg = ';'..msg:sub(2)
 		end
@@ -512,9 +511,7 @@ run(function()
 		obj.PrefixText = self:tag(plr, true, true)..(obj.PrefixText or '')
 
 		if not skip and self:process(obj.Text, plr) then
-			-- the legacy chat returns a message object that has Visible; the new
-			-- TextChatService hands us a TextChatMessageProperties, which does not,
-			-- so blank it instead of trying to set a member it lacks
+			-- TextChatMessageProperties has no Visible member
 			if obj:IsA('TextChatMessageProperties') then
 				obj.Text = ''
 				obj.PrefixText = ''
@@ -620,8 +617,6 @@ run(function()
 	end
 
 	function whitelist:announce(text)
-		-- both surfaces on purpose: the roblox toast is what players see in-game, and
-		-- the script's own notification still lands when that path is unavailable
 		pcall(notif, 'Inhaler Announcement', text, 15)
 
 		local success, sendToast = pcall(function()
@@ -776,10 +771,7 @@ run(function()
 		end)
 	end
 
-	-- An announcement is shown when its *text* is new, not when the file changed: a
-	-- whitelist edit used to re-show the same message. The fingerprint is remembered
-	-- on disk, so re-injecting does not repeat it either, and everything is pcall'd
-	-- so a broken toast cannot break the update loop.
+	-- shows an announcement once per text, remembered on disk
 	function whitelist:maybeannounce()
 		local announcement = whitelist.data and whitelist.data.Announcement
 		local active = type(announcement) == 'table'
@@ -788,8 +780,7 @@ run(function()
 			and (tonumber(announcement.expiretime) or 0) > os.time()
 
 		if not active then
-			-- an ended announcement may be created again later with the same text, so
-			-- forget the fingerprint instead of suppressing the next one
+			-- an ended announcement may come back with the same text later
 			whitelist.announced = nil
 			pcall(function()
 				delfile('newvape/profiles/announcement.txt')
@@ -816,17 +807,12 @@ run(function()
 	end
 
 	function whitelist:update(first)
-		-- the whitelist is the github file; the worker is not consulted for it
 		local suc = pcall(function()
 			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/Night5449791/whitelists/main/PlayerWhitelist.json', true)
 		end)
-		-- Always install the chat hook so ;cmd triggers even when the whitelist
-		-- failed to load or the local player isn't matched in it. Without this,
-		-- whitelist:hook() is only reached from playeradded (which only fires when
-		-- get(v) ~= 0), so process() is never called and no command reacts at all.
+		-- hook every time: playeradded only fires for listed players
 		self:hook()
-		-- a failed fetch must not end the loop: it is the same loop that beacons to the
-		-- worker, so returning true here meant no session and no queued commands at all
+		-- returning true here would end the loop that also beacons to the worker
 		if not suc or not hash or not whitelist.get then return false end
 		whitelist.loaded = true
 
@@ -842,7 +828,7 @@ run(function()
 			whitelist.data = suc and type(res) == 'table' and res or whitelist.data
 			whitelist.localprio = whitelist:get(lplr)
 
-			-- a malformed tag colour must not abort the payload handling below
+			-- a malformed tag colour must not abort the rest
 			pcall(function()
 				for _, v in whitelist.data.WhitelistedUsers do
 					if v.tags then
@@ -868,8 +854,7 @@ run(function()
 				entitylib.refresh()
 			end
 
-			-- bookkeeping first: this used to run after the announce, so an announce
-			-- that threw left the payload "new" and the same message fired every poll
+			-- bookkeeping first: an announce that threw would re-fire every poll
 			local changed = whitelist.textdata ~= whitelist.olddata
 			whitelist.olddata = whitelist.textdata
 
@@ -1002,10 +987,7 @@ run(function()
 		end
 	}
 
-	-- the worker transport (session key, beat, websocket, remote dispatch) lives
-	-- in its own library; the command implementations above stay in the client
-	-- backend.lua returns a factory: the first call hands back the constructor,
-	-- the second one builds the table that exposes start/stop/beat
+	-- backend.lua is a factory: it returns a constructor that builds the transport
 	local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')()({
 		vape = vape,
 		whitelist = whitelist,
