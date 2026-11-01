@@ -11,7 +11,6 @@ local ShowWaypoints
 local ShowPrediction
 local PredictionLength
 local PredictionBranches
-local PredictionSpread
 local pathfindingService = cloneref(game:GetService('PathfindingService'))
 local tick = 0.05
 local startPosition, timer, pathFinder, processor = nil, 0, nil, nil
@@ -19,7 +18,8 @@ local waypoints, predictions = {}, {}
 local lineObjects, nodeObjects, predictionObjects = {}, {}, {}
 local rayCheck = RaycastParams.new()
 local controlsModule, oldMoveFunction, currentWaypoint
-local primaryBranch = 1
+local candidates = {}
+local chosenBranch = 1
 
 local function newPathFinder(goal)
 	return {Goal = goal, Done = false, Failed = false, Path = nil, Waypoints = {}}
@@ -114,6 +114,28 @@ local function trackOffPath(finder, proc)
 	proc.OffPath = Vector3.new(offset.X, 0, offset.Z).Magnitude > 25 and proc.OffPath + 1 or 0
 end
 
+-- Build the candidate headings the prediction draws AND the walk actually follows. A full 360 spread means the
+-- arms cover every direction, so the highlighted arm is a real route rather than a line drawn next to one.
+local function buildCandidates()
+	table.clear(candidates)
+
+	local root = getRoot()
+	if not root then return end
+
+	local branches = math.clamp(PredictionBranches.Value, 1, 4)
+	local baseAngle = math.random() * math.pi * 2
+	local radius = Range.Value
+
+	-- Full circle: the arms ring the character so the next goal can be in any direction, not only ahead.
+	for branch = 1, branches do
+		local angle = baseAngle + (branch - 1) / branches * math.pi * 2
+		local guess = root.Position + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		local goal = snapToGround(guess)
+
+		candidates[branch] = {Angle = angle, Origin = root.Position, Goal = goal, Chosen = false}
+	end
+end
+
 -- Re-anchor every few goals. With a single fixed anchor the random ring never moves, so after a while every
 -- goal is somewhere the character has already been; drifting the centre keeps the walk covering new ground.
 local goalsSinceAnchor = 0
@@ -127,11 +149,48 @@ local function nextGoal()
 		goalsSinceAnchor = 0
 	end
 
-	pathFinder = newPathFinder(snapToGround(randomize(startPosition, Range.Value)))
+	-- Pick one of the previewed arms so the walk follows a line the player can actually see. A failed arm falls
+	-- through to the next one instead of throwing the whole pick away.
+	buildCandidates()
+
+	local order = {}
+	for index = 1, #candidates do
+		order[index] = index
+	end
+
+	for index = #order, 2, -1 do
+		local swap = math.random(1, index)
+		order[index], order[swap] = order[swap], order[index]
+	end
+
+	for _, index in order do
+		local candidate = candidates[index]
+		if candidate and candidate.Goal then
+			local finder = newPathFinder(candidate.Goal)
+			think(finder)
+
+			if finder.Done then
+				chosenBranch = index
+				for other, entry in candidates do
+					entry.Chosen = other == index
+				end
+
+				pathFinder = finder
+				processor = {Index = 1, OffPath = 0}
+				timer = 0
+				formatPath(finder)
+				return
+			end
+		end
+	end
+
+	-- every arm failed, so fall back to a plain ring sample
+	local goal = snapToGround(randomize(startPosition, Range.Value))
+	pathFinder = newPathFinder(goal)
 	processor = nil
 	timer = 0
 
-	if not pathFinder.Goal then return end
+	if not goal then return end
 	think(pathFinder)
 
 	if pathFinder.Done then
@@ -207,29 +266,20 @@ local function renderVisuals()
 
 	table.clear(predictions)
 
-	if ShowPrediction.Enabled and #waypoints > 1 then
-		local last, previous = waypoints[#waypoints].Position, waypoints[#waypoints - 1].Position
-		local direction = last - previous
+	if ShowPrediction.Enabled then
+		local root = getRoot()
 
-		if direction.Magnitude > 0.01 then
-			direction = direction.Unit
+		-- A branch is marked Chosen once nextGoal() has committed to it, so the highlighted line is the route
+		-- being walked. Uncommitted arms are still shown as previews of where the next pick could land.
+		if root and #candidates > 0 then
 			local length = math.clamp(PredictionLength.Value, 1, 12)
-			local branches = math.clamp(PredictionBranches.Value, 1, 4)
 
-			-- Fan the current heading out into a few candidate routes instead of drawing one straight line, so
-			-- the preview shows the spread of places the next goal could take us. One branch is picked and
-			-- reported as Primary so the render can highlight it.
-			for branch = 1, branches do
-				local offset = branches > 1 and ((branch - 1) / (branches - 1) - 0.5) * math.rad(PredictionSpread.Value * 2) or 0
-				local heading = CFrame.Angles(0, offset, 0) * direction
-
+			for branch, candidate in candidates do
 				for index = 1, length do
 					predictions[branch] = predictions[branch] or {}
-					predictions[branch][index] = last + heading * (index * 3)
+					predictions[branch][index] = candidate.Origin + Vector3.new(math.cos(candidate.Angle), 0, math.sin(candidate.Angle)) * (index * 3)
 				end
 			end
-
-			primaryBranch = math.random(1, #predictions)
 		end
 	end
 
@@ -237,7 +287,7 @@ local function renderVisuals()
 	local total = 0
 
 	for branch = 1, #predictions do
-		local highlighted = branch == primaryBranch
+		local highlighted = candidates[branch] and candidates[branch].Chosen
 		for index = 1, #predictions[branch] do
 			total = total + 1
 			local dot = ensureDrawing(predictionObjects, total, 'Circle')
@@ -426,7 +476,6 @@ ShowPrediction = AntiAFK:CreateToggle({
 		if not PredictionLength then return end
 		PredictionLength.Object.Visible = callback
 		PredictionBranches.Object.Visible = callback
-		PredictionSpread.Object.Visible = callback and PredictionBranches.Value > 1
 	end,
 	Tooltip = 'Preview the routes the next goal could come from.'
 })
@@ -446,23 +495,7 @@ PredictionBranches = AntiAFK:CreateSlider({
 	Default = 3,
 	Darker = true,
 	Visible = false,
-	Function = function()
-		if PredictionSpread then
-			PredictionSpread.Object.Visible = ShowPrediction.Enabled and PredictionBranches.Value > 1
-		end
-	end,
-	Tooltip = 'How many candidate routes are drawn at once.\nOne of them is highlighted at random.'
-})
-PredictionSpread = AntiAFK:CreateSlider({
-	Name = 'Prediction Spread',
-	Min = 5,
-	Max = 90,
-	Default = 45,
-	Darker = true,
-	Visible = false,
-	Suffix = '°',
-	Tooltip = 'How far the outer prediction lines fan away from your heading.'
+	Tooltip = 'How many routes are drawn around you at once.\nOne of them is picked at random as the next goal.'
 })
 PredictionLength.Object.Visible = ShowPrediction.Enabled
 PredictionBranches.Object.Visible = ShowPrediction.Enabled
-PredictionSpread.Object.Visible = ShowPrediction.Enabled and PredictionBranches.Value > 1
