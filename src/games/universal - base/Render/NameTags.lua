@@ -10,6 +10,7 @@ local DrawingToggle
 local Scale
 local FontOption
 local Teammates
+local FriendBorder
 local DistanceCheck
 local DistanceLimit
 local Strings, Sizes, Reference = {}, {}, {}
@@ -52,6 +53,14 @@ local Added = {
 		nametag.Text = Strings[ent]
 		nametag.TextColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 		nametag.RichText = true
+
+		-- a friendly entity gets an outline over the whole tag, so it reads at a
+		-- glance next to the ones that are fair game
+		if FriendBorder.Enabled and not ent.Targetable then
+			nametag.BorderSizePixel = 2
+			nametag.BorderColor3 = Color3.new(0, 1, 0)
+		end
+
 		nametag.Parent = Folder
 		Reference[ent] = nametag
 	end,
@@ -395,6 +404,16 @@ Teammates = NameTags:CreateToggle({
 	end,
 	Default = true,
 	Tooltip = 'Hides teammates & non targetable entities'
+})
+FriendBorder = NameTags:CreateToggle({
+	Name = 'Friendly Border',
+	Function = function()
+		if NameTags.Enabled then
+			NameTags:Toggle()
+			NameTags:Toggle()
+		end
+	end,
+	Tooltip = 'Apply an outline over the entire nametag signaling a friendly entity.'
 })
 DrawingToggle = NameTags:CreateToggle({
 	Name = 'Drawing',
