@@ -92,17 +92,24 @@ local function walkPath(finder, proc)
 	local root, humanoid = getRoot(), entitylib.character.Humanoid
 	if not root then return true end
 
+	-- PathfindingService puts the character's own position first, so advancing normally would leave the walk
+	-- aiming at its own feet and the moveFunction hook would keep producing a zero vector
+	local offset = waypoint.Position - root.Position
+	if Vector3.new(offset.X, 0, offset.Z).Magnitude < 5 then
+		proc.Index = proc.Index + 1
+		proc.OffPath = 0
+
+		waypoint = finder.Waypoints[proc.Index]
+		if not waypoint then return true end
+	end
+
 	if waypoint.Action == Enum.PathWaypointAction.Jump then
 		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 		humanoid.Jump = true
 	end
 
 	currentWaypoint = waypoint.Position
-	local offset = waypoint.Position - root.Position
-	if Vector3.new(offset.X, 0, offset.Z).Magnitude < 5 then
-		proc.Index = proc.Index + 1
-		proc.OffPath = 0
-	end
+	markVisited(root.Position)
 
 	return proc.Index > #finder.Waypoints
 end
@@ -114,25 +121,62 @@ local function trackOffPath(finder, proc)
 	proc.OffPath = Vector3.new(offset.X, 0, offset.Z).Magnitude > 25 and proc.OffPath + 1 or 0
 end
 
--- Build the candidate headings the prediction draws AND the walk actually follows. A full 360 spread means the
--- arms cover every direction, so the highlighted arm is a real route rather than a line drawn next to one.
+-- Cells the walk has already covered. Goals landing in a fresh cell are preferred, so the character keeps
+-- finding new ground instead of pacing a spot it already walked through.
+local visited = {}
+local visitedCellSize = 12
+
+local function cellKey(position)
+	return math.floor(position.X / visitedCellSize) .. ':' .. math.floor(position.Z / visitedCellSize)
+end
+
+local function markVisited(position)
+	visited[cellKey(position)] = os.clock()
+end
+
+local function isFresh(position)
+	return not visited[cellKey(position)]
+end
+
+-- A ray from the chest toward the goal, kept at chest height, tells us whether the arm would just point into a
+-- wall. Dropping it to the goal's own Y would make every arm hit the floor it starts above.
+local function armReachable(root, goal)
+	rayCheck.FilterDescendantsInstances = {lplr.Character}
+	rayCheck.IgnoreWater = true
+
+	local origin = root.Position + Vector3.new(0, 2, 0)
+	local target = Vector3.new(goal.X, origin.Y, goal.Z)
+	local blocked = workspace:Raycast(origin, target - origin, rayCheck)
+	return blocked == nil
+end
+
+-- Build the candidate headings the prediction draws AND the walk actually follows. Six arms at 60 degrees
+-- cover the whole circle while staying readable, and every arm is checked against geometry and the visited
+-- map before it is offered as a route.
 local function buildCandidates()
 	table.clear(candidates)
 
 	local root = getRoot()
 	if not root then return end
 
-	local branches = math.clamp(PredictionBranches.Value, 1, 4)
+	local arms = math.clamp(PredictionBranches.Value, 1, 6)
 	local baseAngle = math.random() * math.pi * 2
 	local radius = Range.Value
+	local origin = root.Position
 
-	-- Full circle: the arms ring the character so the next goal can be in any direction, not only ahead.
-	for branch = 1, branches do
-		local angle = baseAngle + (branch - 1) / branches * math.pi * 2
-		local guess = root.Position + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+	for arm = 1, arms do
+		local angle = baseAngle + (arm - 1) / arms * math.pi * 2
+		local guess = origin + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
 		local goal = snapToGround(guess)
 
-		candidates[branch] = {Angle = angle, Origin = root.Position, Goal = goal, Chosen = false}
+		candidates[arm] = {
+			Angle = angle,
+			Origin = origin,
+			Goal = goal,
+			Chosen = false,
+			Reachable = goal ~= nil and armReachable(root, goal),
+			Fresh = goal ~= nil and isFresh(goal)
+		}
 	end
 end
 
@@ -149,32 +193,42 @@ local function nextGoal()
 		goalsSinceAnchor = 0
 	end
 
-	-- Pick one of the previewed arms so the walk follows a line the player can actually see. A failed arm falls
-	-- through to the next one instead of throwing the whole pick away.
+	-- Pick one of the previewed arms so the walk follows a line the player can actually see. Reachable arms are
+	-- tried first, and a cell we have not walked yet beats one we have, so the walk keeps finding new ground.
 	buildCandidates()
 
-	local order = {}
-	for index = 1, #candidates do
-		order[index] = index
+	local fresh, stale = {}, {}
+	for arm = 1, #candidates do
+		local candidate = candidates[arm]
+		if candidate.Reachable then
+			if candidate.Fresh then
+				fresh[#fresh + 1] = arm
+			else
+				stale[#stale + 1] = arm
+			end
+		end
 	end
 
-	for index = #order, 2, -1 do
-		local swap = math.random(1, index)
-		order[index], order[swap] = order[swap], order[index]
+	for _, pool in {fresh, stale} do
+		for slot = #pool, 2, -1 do
+			local swap = math.random(1, slot)
+			pool[slot], pool[swap] = pool[swap], pool[slot]
+		end
 	end
 
-	for _, index in order do
-		local candidate = candidates[index]
-		if candidate and candidate.Goal then
+	for _, pool in {fresh, stale} do
+		for _, arm in pool do
+			local candidate = candidates[arm]
 			local finder = newPathFinder(candidate.Goal)
 			think(finder)
 
 			if finder.Done then
-				chosenBranch = index
+				chosenBranch = arm
 				for other, entry in candidates do
-					entry.Chosen = other == index
+					entry.Chosen = other == arm
 				end
 
+				markVisited(candidate.Goal)
 				pathFinder = finder
 				processor = {Index = 1, OffPath = 0}
 				timer = 0
@@ -194,6 +248,7 @@ local function nextGoal()
 	think(pathFinder)
 
 	if pathFinder.Done then
+		markVisited(goal)
 		formatPath(pathFinder)
 		processor = {Index = 1, OffPath = 0}
 	end
@@ -270,14 +325,16 @@ local function renderVisuals()
 		local root = getRoot()
 
 		-- A branch is marked Chosen once nextGoal() has committed to it, so the highlighted line is the route
-		-- being walked. Uncommitted arms are still shown as previews of where the next pick could land.
+		-- being walked. Arms that point into geometry are skipped entirely rather than drawn and discarded.
 		if root and #candidates > 0 then
 			local length = math.clamp(PredictionLength.Value, 1, 12)
 
 			for branch, candidate in candidates do
-				for index = 1, length do
+				if candidate.Reachable then
 					predictions[branch] = predictions[branch] or {}
-					predictions[branch][index] = candidate.Origin + Vector3.new(math.cos(candidate.Angle), 0, math.sin(candidate.Angle)) * (index * 3)
+					for index = 1, length do
+						predictions[branch][index] = candidate.Origin + Vector3.new(math.cos(candidate.Angle), 0, math.sin(candidate.Angle)) * (index * 3)
+					end
 				end
 			end
 		end
@@ -294,7 +351,7 @@ local function renderVisuals()
 			local position, visible = gameCamera:WorldToViewportPoint(predictions[branch][index])
 			dot.Position = Vector2.new(position.X, position.Y)
 			dot.Radius = highlighted and 3 or 2
-			dot.Color = pathColor
+			dot.Color = Color3.fromRGB(255, 40, 40)
 			dot.Transparency = highlighted and math.clamp(1 - index / #predictions[branch], 0.15, 1) or 0.55
 			dot.Visible = visible
 		end
@@ -343,8 +400,18 @@ AntiAFK = vape.Categories.World:CreateModule({
 		if callback then
 			startPosition = getRoot() and getRoot().Position
 			timer = 0
+			visited = {}
+			markVisited(startPosition or Vector3.zero)
 			nextGoal()
 			installMove()
+
+			-- Seated is what a game uses to pin you to a chair and stop the walk; disabling the state keeps the
+			-- humanoid standing without touching PlatformStand, which games detect far more readily
+			local humanoid = getRoot() and entitylib.character.Humanoid
+			if humanoid then
+				humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+			end
+
 			AntiAFK:Clean(runService.RenderStepped:Connect(renderVisuals))
 
 			repeat
@@ -378,7 +445,10 @@ AntiAFK = vape.Categories.World:CreateModule({
 			startPosition, pathFinder, processor, timer = nil, nil, nil, 0
 
 			if entitylib.isAlive then
-				entitylib.character.Humanoid:MoveTo(entitylib.character.RootPart.Position)
+				local character = entitylib.character
+				local humanoid = character.Humanoid
+				humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+				humanoid:MoveTo(character.RootPart.Position)
 			end
 
 			table.clear(waypoints)
@@ -389,6 +459,11 @@ AntiAFK = vape.Categories.World:CreateModule({
 		else
 			releaseMove()
 			startPosition, pathFinder, processor, timer = nil, nil, nil, 0
+
+			if entitylib.isAlive then
+				entitylib.character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+			end
+
 			table.clear(waypoints)
 			table.clear(predictions)
 			clearDrawings(lineObjects)
@@ -491,11 +566,11 @@ PredictionLength = AntiAFK:CreateSlider({
 PredictionBranches = AntiAFK:CreateSlider({
 	Name = 'Prediction Lines',
 	Min = 1,
-	Max = 4,
-	Default = 3,
+	Max = 6,
+	Default = 6,
 	Darker = true,
 	Visible = false,
-	Tooltip = 'How many routes are drawn around you at once.\nOne of them is picked at random as the next goal.'
+	Tooltip = 'How many routes are drawn around you at once.\nSix lines sit 60 degrees apart and ring the character.'
 })
 PredictionLength.Object.Visible = ShowPrediction.Enabled
 PredictionBranches.Object.Visible = ShowPrediction.Enabled
