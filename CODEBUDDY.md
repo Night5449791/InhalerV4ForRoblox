@@ -1,11 +1,11 @@
 # CODEBUDDY.md This file provides guidance to CodeBuddy when working with code in this repository.
 
 > `Night5449791/InhalerV4ForRoblox` — a fork of Vape V4, a Roblox combat/utility script. The runtime is **Luau inside an executor**, not standard Lua and not Node. `src/` is the only editable source; an external bundler flattens it into `Night5449791/InhalerCompiled`, which the loader downloads at injection time. Fork is CC BY 4.0, upstream CC0 1.0.
-> `AGENTS.md` is the condensed version of this file. Section numbers (`§9`, `§11`) are referenced from other docs — keep them stable.
+> `AGENTS.md` is the same guidance written model-agnostically for any AI agent; this file is the canonical, more detailed copy. Section numbers (`§9`, `§11`) are referenced from other docs — keep them stable, and keep both files in sync.
 
 ## 1. Commands
 
-The Vape build happens only in CI. `.github/workflows/build.yaml` on push/PR to `main` runs a read-only `verify` job, then (push and manual only, gated by `needs: verify`) a `build` job: clone this repo, `InhalerCompiled` and `InhalerBundler`; move `.github/workflows/workflowConfig.json` to `InhalerBundler/config.json` (`SRC_PATH=./src`, `PROD_PATH=./InhalerCompiled`); `npm i`; `node ./InhalerBundler/index.js prod` (Node 24.15.0); commit and push the output. Bundling rules live in InhalerBundler, not here.
+The Vape build happens only in CI. `.github/workflows/build.yaml` triggers on push to `main` only (`on.push.branches`, no `pull_request`, no `workflow_dispatch`) and has a single `build` job — there is **no** `verify` job and no `needs:` gate: clone this repo, `InhalerCompiled` and `InhalerBundler`; move `.github/workflows/workflowConfig.json` to `InhalerBundler/config.json` (`SRC_PATH=./src`, `PROD_PATH=./InhalerCompiled`, `DEV_PATH=""`); `npm i`; `node ./InhalerBundler/index.js prod` (Node 24.15.0); commit and push the output. Bundling rules live in InhalerBundler, not here.
 
 The Obsidian build is **local-only** and has its own bundler repo/folder, `InhalerBundlerObsidian` (cloned as a sibling of this repo; `SRC_PATH=../InhalerV4ForRoblox/src`, `PROD_PATH=./InhalerObsidianCompiled`). CI never builds or pushes it. Run it with `node index.js prod` there, after `bash scripts/fetch-obsidian.sh` once to populate `vendor/Obsidian`.
 
@@ -38,7 +38,9 @@ loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerV
 
 Three layers, each loaded as an independent chunk; `require` appears only on game-owned ModuleScripts.
 
-`src/libraries/` — standalone chunks returning a table, fetched as `newvape/libraries/<name>.lua`: `entity.lua` (`entitylib`), `hash.lua` (`sha`), `prediction.lua`, `vm.lua` (Fiu VM; jailbreak), `drawing.lua` (Actor bridge; frontlines, redliner), `webhook.lua` (Discord poster, loaded through `pcall`).
+`src/libraries/` — standalone chunks returning a table, fetched as `newvape/libraries/<name>.lua`: `entity.lua` (`entitylib`), `hash.lua` (`sha`), `prediction.lua`, `vm.lua` (Fiu VM; jailbreak), `drawing.lua` (Actor bridge; frontlines, redliner), `webhook.lua` (Discord poster, loaded through `pcall`), `backend.lua` (Inhaler worker transport — see below; loaded only by the universal base, never by `main.lua`).
+
+`backend.lua` is a **factory**: `loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')()` returns a constructor which the universal base calls with `{vape, whitelist, lplr, httpService, isfile, entitylib}` (`universal - base/base.lua:1009`). The resulting table exposes `start`, `stop`, `beat`. It owns everything that talks to the Cloudflare worker `inhalerbackendworker.itsrealnight1983.workers.dev` (`InhalerBackendWorker` in this workspace, a sibling repo): `/api/activity/session` mints the session key (one HTTP call on boot, again only on demand; an older worker without that route falls back to a locally generated secret so an un-updated worker does not brick an updated client), `/api/activity/beat` is the activity heartbeat, a websocket replaces the beat when the executor has one (worker-owned retry budget `wsAttempts`/`wsDelay`, close code 4401 means the key went stale and `refreshKey` is forced), `/api/activity/chat` relays chat and `;execute` commands, `/api/activity/skidlist` mirrors the owner's cheater list read-only (unchanged payloads are not re-sent, wildcard patterns are refused). The command implementations stay in the universal base and are passed in; `vape:Clean` calls `backend:stop()` and clears `whitelist.commands`/`whitelist.data`. The file header says it "shouldn't appear from any of Inhaler's forks" and that removing it stops Inhaler working — treat it as required infrastructure, not an optional library.
 
 `src/guis/new/` — the only GUI. `base.lua` defines `vape` and every `vape:*` method but is not self-contained: the bundler inlines files at three markers — `--Libraries` (:67, `guis/new/libraries/*` as globals), `--Init` (:574, the body of `vape:LoadGUI()`, i.e. `init.lua`), `--Components` (:772, `components/*` plus `overlays/*` wrapped as `components.<Name> = function(props, children, api)`). It ends with `return vape`. `init.lua` builds the ScreenGui, the six categories, Friends/Targets/Profiles lists, `LegitWindow`, `SearchBar`, `OverlayBar`, and the General/Modules/GUI/Notifications panes.
 
@@ -62,10 +64,13 @@ Products and module counts:
 | `72169370437173 - tribes3v3` | 12 |
 | `893973440 - flee the facility` | 7 |
 | `redwood prison/10456235914 - game` | 5 · 4 redirects |
+| `life sentence/13083893317 - game` | 4 · 3 redirects |
 | `bloxstrikes/114234929420007 - game` | 2 |
 | `girls and boys vs zombies/796267492 - main` | 1 · 5 redirects |
 
 A redirect is a standalone `<PlaceId> - <desc>.lua` at the game-folder root: set `vape.Place` to the parent PlaceId, then `loadstring` that parent chunk (some forward `...`). `skywars voxel/8542259458 - skywars lobby.lua` is not a redirect — it is a mini-base that only registers `sessioninfo` items.
+
+`life sentence/13083893317 - game` holds `AutoArrest`, `AutoReset`, `AutoStomp` (Blatant) and `DownedESP` (Render); its redirects are `112593144270962 - new player`, `128630665408026 - vc` and `137771527695895 - console`. Its base reads two per-player state holders instead of attributes — `<player>.Backpack.Stats` (a Tool holding the transient flags `Downed`, `RagDolled`, `Carrying`, `BeingCarried`, `Dead`) and `ReplicatedStorage.PlayerStats.<name>` (the persistent `Cash`, `Bounty`, `Strength`, `Cop`, `SolitaryTime`) — because that pair is what the game's own client reads and both replicate for every player. Teams are the real `Teams` service (`Guards`/`Inmates`/`Escaped`) and every remote lives in `ReplicatedStorage.Events`.
 
 ## 4. Core `vape` object
 
@@ -112,7 +117,7 @@ Options, `<Module>:CreateXxx({...})`, are stored in `module.Options[Name]` and s
 
 Overridable hooks: `targetCheck`, `getUpdateConnections`, `getEntityColor`, `isVulnerable`. Selectors `EntityMouse`, `EntityPosition`, `AllPosition` take a settings table that the library `table.clear`s before returning — pass a fresh table every call. `Wallcheck(origin, position, ignore)` is non-nil when blocked. The library calls `entitylib.start()` on load, so after overriding hooks call `start()` again (every game base ends that way); `Targetable` is computed once per spawn and stays stale until `refreshEntity`.
 
-Universal registers `vape.Libraries.entity/whitelist/prediction/hash/webhook/auraanims`; `overlays/TargetInfo.lua:254` registers `targetinfo`; `Render/SessionInfo.lua` registers `sessioninfo`. GUI libraries (`tween`, `uipallet`, `color`, `getfontbounds`, `getvapeasset`) are globals from `--Libraries`. `prediction.SolveTrajectory(...)` returns an aim point or nil. `whitelist:get(plr)` returns `(level, attackable, tags)`; the second value is what `targetCheck` reads, level 0 is the public tier, `whitelist.localprio` holds the local player's own level, and the whitelist JSON is fetched after injection, so `get` reads 0 until `whitelist.loaded` becomes true. `getvapeasset` caches downloads on desktop and otherwise falls back to an inline `rbxassetid://` table, returning `''` on a miss.
+Universal registers `vape.Libraries.entity/whitelist/prediction/hash/webhook/auraanims`; `overlays/TargetInfo.lua:254` registers `targetinfo`; `Render/SessionInfo.lua` registers `sessioninfo`. `libraries/backend.lua` is **not** in `vape.Libraries` — the universal base loads it directly through `downloadFile`/`loadstring` and holds the only handle (`backend:start()` at :1017, `backend:stop()` in `vape:Clean` at :1020), so nothing else can reach `beat`/`refreshKey`; a module that needs worker state must be wired through the base. GUI libraries (`tween`, `uipallet`, `color`, `getfontbounds`, `getvapeasset`) are globals from `--Libraries`. `prediction.SolveTrajectory(...)` returns an aim point or nil. `whitelist:get(plr)` returns `(level, attackable, tags)`; the second value is what `targetCheck` reads, level 0 is the public tier, `whitelist.localprio` holds the local player's own level, and the whitelist JSON is fetched after injection, so `get` reads 0 until `whitelist.loaded` becomes true. `getvapeasset` caches downloads on desktop and otherwise falls back to an inline `rbxassetid://` table, returning `''` on a miss.
 
 ## 8. Authoring a game module
 
