@@ -10,6 +10,8 @@ local NodeColor
 local ShowWaypoints
 local ShowPrediction
 local PredictionLength
+local PredictionBranches
+local PredictionSpread
 local pathfindingService = cloneref(game:GetService('PathfindingService'))
 local tick = 0.05
 local startPosition, timer, pathFinder, processor = nil, 0, nil, nil
@@ -17,6 +19,7 @@ local waypoints, predictions = {}, {}
 local lineObjects, nodeObjects, predictionObjects = {}, {}, {}
 local rayCheck = RaycastParams.new()
 local controlsModule, oldMoveFunction, currentWaypoint
+local primaryBranch = 1
 
 local function newPathFinder(goal)
 	return {Goal = goal, Done = false, Failed = false, Path = nil, Waypoints = {}}
@@ -27,9 +30,16 @@ local function getRoot()
 	return entitylib.character.RootPart
 end
 
+-- Polar instead of a square: a cube distribution clusters near the centre, so most goals landed close to the
+-- anchor and the character kept pacing the same spot. The minimum radius also skips goals we are already on.
 local function randomize(base, range)
 	if not base then return end
-	return base + Vector3.new(math.random(0, range * 2) - range, math.random(0, range * 2) - range, math.random(0, range * 2) - range)
+
+	local angle = math.random() * math.pi * 2
+	local distance = range * math.sqrt(0.15 + math.random() * 0.85)
+	local height = math.random(0, range * 2) - range
+
+	return base + Vector3.new(math.cos(angle) * distance, height, math.sin(angle) * distance)
 end
 
 local function snapToGround(position)
@@ -104,7 +114,19 @@ local function trackOffPath(finder, proc)
 	proc.OffPath = Vector3.new(offset.X, 0, offset.Z).Magnitude > 25 and proc.OffPath + 1 or 0
 end
 
+-- Re-anchor every few goals. With a single fixed anchor the random ring never moves, so after a while every
+-- goal is somewhere the character has already been; drifting the centre keeps the walk covering new ground.
+local goalsSinceAnchor = 0
+
 local function nextGoal()
+	local root = getRoot()
+
+	goalsSinceAnchor = goalsSinceAnchor + 1
+	if root and goalsSinceAnchor >= 4 then
+		startPosition = root.Position
+		goalsSinceAnchor = 0
+	end
+
 	pathFinder = newPathFinder(snapToGround(randomize(startPosition, Range.Value)))
 	processor = nil
 	timer = 0
@@ -184,27 +206,51 @@ local function renderVisuals()
 	end
 
 	table.clear(predictions)
+
 	if ShowPrediction.Enabled and #waypoints > 1 then
 		local last, previous = waypoints[#waypoints].Position, waypoints[#waypoints - 1].Position
 		local direction = last - previous
+
 		if direction.Magnitude > 0.01 then
-			for index = 1, math.clamp(PredictionLength.Value, 1, 12) do
-				predictions[index] = last + direction.Unit * (index * 3)
+			direction = direction.Unit
+			local length = math.clamp(PredictionLength.Value, 1, 12)
+			local branches = math.clamp(PredictionBranches.Value, 1, 4)
+
+			-- Fan the current heading out into a few candidate routes instead of drawing one straight line, so
+			-- the preview shows the spread of places the next goal could take us. One branch is picked and
+			-- reported as Primary so the render can highlight it.
+			for branch = 1, branches do
+				local offset = branches > 1 and ((branch - 1) / (branches - 1) - 0.5) * math.rad(PredictionSpread.Value * 2) or 0
+				local heading = CFrame.Angles(0, offset, 0) * direction
+
+				for index = 1, length do
+					predictions[branch] = predictions[branch] or {}
+					predictions[branch][index] = last + heading * (index * 3)
+				end
 			end
+
+			primaryBranch = math.random(1, #predictions)
 		end
 	end
 
-	for index = 1, #predictions do
-		local dot = ensureDrawing(predictionObjects, index, 'Circle')
-		local position, visible = gameCamera:WorldToViewportPoint(predictions[index])
-		dot.Position = Vector2.new(position.X, position.Y)
-		dot.Radius = 3
-		dot.Color = pathColor
-		dot.Transparency = math.clamp(1 - index / #predictions, 0.15, 1)
-		dot.Visible = visible
+	local pathColor = Color3.fromHSV(PathColor.Hue, PathColor.Sat, PathColor.Value)
+	local total = 0
+
+	for branch = 1, #predictions do
+		local highlighted = branch == primaryBranch
+		for index = 1, #predictions[branch] do
+			total = total + 1
+			local dot = ensureDrawing(predictionObjects, total, 'Circle')
+			local position, visible = gameCamera:WorldToViewportPoint(predictions[branch][index])
+			dot.Position = Vector2.new(position.X, position.Y)
+			dot.Radius = highlighted and 3 or 2
+			dot.Color = pathColor
+			dot.Transparency = highlighted and math.clamp(1 - index / #predictions[branch], 0.15, 1) or 0.55
+			dot.Visible = visible
+		end
 	end
 
-	for index = #predictions + 1, #predictionObjects do
+	for index = total + 1, #predictionObjects do
 		predictionObjects[index].Visible = false
 	end
 end
@@ -377,11 +423,12 @@ ShowPrediction = AntiAFK:CreateToggle({
 	Name = 'Prediction',
 	Default = true,
 	Function = function(callback)
-		if PredictionLength then
-			PredictionLength.Object.Visible = callback
-		end
+		if not PredictionLength then return end
+		PredictionLength.Object.Visible = callback
+		PredictionBranches.Object.Visible = callback
+		PredictionSpread.Object.Visible = callback and PredictionBranches.Value > 1
 	end,
-	Tooltip = 'Continue the last heading forward to preview where the next path will go.'
+	Tooltip = 'Preview the routes the next goal could come from.'
 })
 PredictionLength = AntiAFK:CreateSlider({
 	Name = 'Prediction Length',
@@ -390,6 +437,32 @@ PredictionLength = AntiAFK:CreateSlider({
 	Default = 6,
 	Darker = true,
 	Visible = false,
-	Tooltip = 'How many future steps the prediction extends.'
+	Tooltip = 'How many future steps each prediction extends.'
+})
+PredictionBranches = AntiAFK:CreateSlider({
+	Name = 'Prediction Lines',
+	Min = 1,
+	Max = 4,
+	Default = 3,
+	Darker = true,
+	Visible = false,
+	Function = function()
+		if PredictionSpread then
+			PredictionSpread.Object.Visible = ShowPrediction.Enabled and PredictionBranches.Value > 1
+		end
+	end,
+	Tooltip = 'How many candidate routes are drawn at once.\nOne of them is highlighted at random.'
+})
+PredictionSpread = AntiAFK:CreateSlider({
+	Name = 'Prediction Spread',
+	Min = 5,
+	Max = 90,
+	Default = 45,
+	Darker = true,
+	Visible = false,
+	Suffix = '°',
+	Tooltip = 'How far the outer prediction lines fan away from your heading.'
 })
 PredictionLength.Object.Visible = ShowPrediction.Enabled
+PredictionBranches.Object.Visible = ShowPrediction.Enabled
+PredictionSpread.Object.Visible = ShowPrediction.Enabled and PredictionBranches.Value > 1
