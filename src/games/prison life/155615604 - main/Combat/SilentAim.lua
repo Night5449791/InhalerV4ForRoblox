@@ -1,3 +1,4 @@
+local mouseClicked
 run(function()
 	local SilentAim
 	local Target
@@ -16,7 +17,6 @@ run(function()
 	local CircleObject
 	local rand = Random.new()
 	local old
-	local hooked
 
 	local function getMousePosition()
 		if inputService.TouchEnabled then
@@ -27,16 +27,22 @@ run(function()
 	end
 
 	local function getShootTool(range)
-		local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
-		if tool and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and (tool:GetAttribute('Local_CurrentAmmo') or 1) > 0 and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 and (tool:GetAttribute('Range') or 0) > range then
-			return tool
+		local tool = lplr.Character:FindFirstChildWhichIsA('Tool')
+		if tool and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 and (tool:GetAttribute('Local_CurrentAmmo') or 1) > 0 then
+			local dist = tool:GetAttribute('Range') or 0
+			if dist > range then
+				return tool
+			end
 		end
 
 		local backpack = lplr:FindFirstChildWhichIsA('Backpack')
 		if backpack then
 			for _, tool in backpack:GetChildren() do
-				if tool:IsA('Tool') and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 and tool.Name ~= 'Taser' and (tool:GetAttribute('Range') or 0) > range then
-					return tool
+				if tool:IsA('Tool') and tool:GetAttribute('FireRate') and (not tool:GetAttribute('Local_IsShooting')) and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 and tool.Name ~= 'Taser' then
+					local dist = tool:GetAttribute('Range') or 0
+					if dist > range then
+						return tool
+					end
 				end
 			end
 		end
@@ -44,7 +50,7 @@ run(function()
 
 	local function getMaxRange()
 		local mag = 0
-		local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
+		local tool = lplr.Character:FindFirstChildWhichIsA('Tool')
 		if tool and tool:GetAttribute('Range') and (tool:GetAttribute('Local_ReloadSession') or 0) <= 0 then
 			local dist = tool:GetAttribute('Range')
 			if dist > mag then
@@ -89,65 +95,48 @@ run(function()
 			targetinfo.Targets[entity] = os.clock() + 1
 		end
 
-		return entity, entity and entity[targetPart]
+		return entity, entity and entity[targetPart], origin
 	end
 
-	local function replaceOriginOnStack(origin, newOrigin)
-		for level = 4, 8 do
-			local success, stack = pcall(debug.getstack, level)
-			if not success or not stack then break end
-
-			for index, value in stack do
-				if value == origin then
-					pcall(debug.setstack, level, index, newOrigin)
-				end
-			end
-		end
-	end
-
-	local function Hook(origin, direction, ...)
+	local function Hook(...)
+		local origin, direction = ...
 		local gundata = debug.getupvalue(oldshoot or pl.Shoot, 10)
-		local entity, targetPart = getTarget(origin, gundata and gundata.Range or 1000, not gundata or gundata.Behavior ~= 'Taser')
+		local entity, targetPart, origin = getTarget(origin, gundata and gundata.Range or 1000, not gundata or gundata.Behavior ~= 'Taser')
 
 		if not entity then
-			return old(origin, direction, ...)
+			return old(...)
 		end
 
-		local aimPosition = targetPart.Position
+		local args = table.pack(...)
+		args[2] = targetPart.Position
 		aimTimer = os.clock() + 0.3
-		aimVec = aimPosition
+		aimVec = args[2]
 
 		if Wallbang.Enabled then
 			local ray
 			if not OriginScanner.Cache[targetPart] then
-				ray = workspace:Raycast(aimPosition, (origin - aimPosition), OriginScanner.Ray)
+				ray = workspace:Raycast(args[2], (origin - args[2]), OriginScanner.Ray)
 			end
 
-			if OriginScanner.Cache[targetPart] or ray or workspace:Raycast(origin, (aimPosition - origin), OriginScanner.Ray) then
-				local newOrigin, hit, fake = OriginScanner:Scan(
-					entitylib.character.RootPart.Position,
-					aimPosition,
-					ray and ray.Position + ray.Normal * 0.01 or nil,
-					targetPart,
-					entity
-				)
-
-				if fake then
-					return targetPart, hit
-				end
+			if OriginScanner.Cache[targetPart] or ray or workspace:Raycast(origin, (args[2] - origin), OriginScanner.Ray) then
+				local newOrigin, hit = OriginScanner:Scan(entitylib.character.RootPart.Position, args[2], ray and ray.Position + ray.Normal * 0.01 or nil, targetPart, entity)
 
 				if newOrigin then
-					replaceOriginOnStack(origin, newOrigin)
+					for index, value in debug.getstack(3) do
+						if value == origin then
+							debug.setstack(3, index, newOrigin)
+						end
+					end
 
-					origin = newOrigin
-					if hit and hit ~= aimPosition then
+					args[1] = newOrigin
+					if hit then
 						return targetPart, hit
 					end
 				end
 			end
 		end
 
-		return old(origin, aimPosition, ...)
+		return old(unpack(args, 1, args.n))
 	end
 
 	SilentAim = vape.Categories.Combat:CreateModule({
@@ -158,38 +147,32 @@ run(function()
 			end
 
 			if callback then
-				if old and hooked then
-					safeUnhook(hooked, old)
-				end
-
-				hooked = pl.Bullet
-				old = safeHook(hooked, function(...)
+				old = hookfunction(pl.Bullet, function(...)
 					return Hook(...)
 				end)
 
 				local fireDelay = os.clock()
 				repeat
-					if CircleObject and CircleObject.Visible then
+					if CircleObject then
 						CircleObject.Position = getMousePosition()
 					end
 
-					if AutoFire.Enabled and entitylib.isAlive and fireDelay < os.clock() then
+					if AutoFire.Enabled and fireDelay < os.clock() then
 						fireDelay = os.clock() + (1 / AutoFireRate.Value)
 
 						local tool = lplr.Character:FindFirstChildWhichIsA('Tool')
 						local gundata = debug.getupvalue(oldshoot or pl.Shoot, 10)
 						if tool and gundata then
 							local limit = AutoFireSwitch.Enabled and getMaxRange() or gundata.Range or 1000
-							local taser = gundata.Behavior == 'Taser'
-							local headPosition = entitylib.character.Head.Position
+							local taser = gundata and gundata.Behavior == 'Taser'
 							local entity = entitylib['Entity'..Mode.Value]({
 								Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
 								RangePosition = limit,
 								AttackCheck = not taser,
 								Wallcheck = Target.Walls.Enabled and true or nil,
-								Wallbang = Wallbang.Enabled and entitylib.character.RootPart.Position or nil,
+								Wallbang = Wallbang.Enabled and entitylib.isAlive and entitylib.character.RootPart.Position or nil,
 								Part = 'Head',
-								Origin = headPosition,
+								Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
 								Players = Target.Players.Enabled
 							})
 
@@ -197,7 +180,7 @@ run(function()
 								local ammo = (tool:GetAttribute('Local_CurrentAmmo') or 0)
 								local canFire = not tool:GetAttribute('Local_IsShooting') and ammo > 0
 								if AutoFireSwitch.Enabled then
-									local ideal = getShootTool((entity.Head.Position - headPosition).Magnitude)
+									local ideal = getShootTool((entity.Head.Position - entitylib.character.Head.Position).Magnitude)
 									if ideal and tool ~= ideal then
 										entitylib.character.Humanoid:EquipTool(ideal)
 										canFire = false
@@ -217,9 +200,14 @@ run(function()
 					task.wait()
 				until not SilentAim.Enabled
 			else
-				if old and hooked then
-					safeUnhook(hooked, old)
-					old, hooked = nil, nil
+				if old then
+					if restorefunction then
+						restorefunction(pl.Bullet)
+					else
+						hookfunction(pl.Bullet, old)
+					end
+
+					old = nil
 				end
 			end
 		end,
@@ -301,7 +289,7 @@ run(function()
 	})
 	Wallbang = SilentAim:CreateToggle({
 		Name = 'Wallbang',
-		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed, if the shoot position can be moved past walls (eg hugging walls) or if the target is stuck inside geometry)'
+		Tooltip = 'Allow you to shoot people through walls when specific conditions are met.\n(If the entity has a valid hitbox position exposed or if the shoot position can be moved past walls (eg hugging walls))'
 	})
 	SilentAim:CreateToggle({
 		Name = 'Range Circle',

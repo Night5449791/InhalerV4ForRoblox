@@ -3,7 +3,7 @@ local Spread
 local FireRate
 local Automatic
 local olddata, old = {}
-local hookedequip
+local oldhook
 
 local function Modify()
 	local data = debug.getupvalue(oldshoot or pl.Shoot, 10)
@@ -24,8 +24,7 @@ GunModifications = vape.Categories.Blatant:CreateModule({
 	Name = 'GunModifications',
 	Function = function(callback)
 		if callback then
-			hookedequip = pl.Equip
-			oldequip = safeHook(hookedequip, function(...)
+			oldequip = hookfunction(pl.Equip, function(...)
 				local res = table.pack(oldequip(...))
 				Modify()
 				return unpack(res, 1, res.n)
@@ -33,9 +32,12 @@ GunModifications = vape.Categories.Blatant:CreateModule({
 
 			Modify()
 		else
-			if oldequip and hookedequip then
-				safeUnhook(hookedequip, oldequip)
-				hookedequip = nil
+			if oldequip then
+				if restorefunction then
+					restorefunction(pl.Equip)
+				else
+					oldequip = nil
+				end
 			end
 
 			if old then

@@ -122,8 +122,8 @@ discord.MouseButton1Click:Connect(function()
 		local body = httpService:JSONEncode({
 			nonce = httpService:GenerateGUID(false),
 			args = {
-				invite = {code = 'YSzD7f9neR'},
-				code = 'YSzD7f9neR'
+				invite = {code = 'VZEQJxMSnG'},
+				code = 'VZEQJxMSnG'
 			},
 			cmd = 'INVITE_BROWSER'
 		})
@@ -147,7 +147,7 @@ discord.MouseButton1Click:Connect(function()
 
 	task.spawn(function()
 		tooltip.Text = 'Copied!'
-		setclipboard('https://discord.gg/YSzD7f9neR')
+		setclipboard('https://discord.gg/VZEQJxMSnG')
 	end)
 end)
 

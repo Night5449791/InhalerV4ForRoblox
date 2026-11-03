@@ -1,5 +1,6 @@
 local StaffDetector
 local Mode
+local Profile
 local Users
 local Group
 local Role
@@ -55,6 +56,19 @@ local function playerAdded(plr)
 			})
 		elseif Mode.Value == 'ServerHop' then
 			serverHop()
+		elseif Mode.Value == 'Profile' then
+			vape.Save = function() end
+			if vape.Profile ~= Profile.Value then
+				vape.Profile = Profile.Value
+				vape:Load(true, Profile.Value)
+			end
+		elseif Mode.Value == 'AutoConfig' then
+			vape.Save = function() end
+			for _, module in vape.Modules do
+				if module.Enabled then
+					module:Toggle()
+				end
+			end
 		end
 	end
 end
@@ -66,17 +80,9 @@ StaffDetector = vape.Categories.Utility:CreateModule({
 			if Group.Value == '' or Role.Value == '' then
 				local placeinfo = {Creator = {CreatorTargetId = tonumber(Group.Value)}}
 				if Group.Value == '' then
-					local ok, info = pcall(function()
-						return marketplaceService:GetProductInfoAsync(game.PlaceId)
-					end)
-
-					if ok and type(info) == 'table' and info.Creator then
-						placeinfo = info
-					end
-
+					placeinfo = marketplaceService:GetProductInfo(game.PlaceId)
 					if placeinfo.Creator.CreatorType ~= 'Group' then
-						local description = type(placeinfo.Description) == 'string' and placeinfo.Description or ''
-						local desc = description:split('\n')
+						local desc = placeinfo.Description:split('\n')
 						for _, str in desc do
 							local _, begin = str:find('roblox.com/groups/')
 							if begin then
@@ -117,7 +123,18 @@ StaffDetector = vape.Categories.Utility:CreateModule({
 })
 Mode = StaffDetector:CreateDropdown({
 	Name = 'Mode',
-	List = {'Uninject', 'ServerHop', 'Notify'}
+	List = {'Uninject', 'ServerHop', 'Profile', 'AutoConfig', 'Notify'},
+	Function = function(value)
+		if Profile.Object then
+			Profile.Object.Visible = value == 'Profile'
+		end
+	end
+})
+Profile = StaffDetector:CreateTextBox({
+	Name = 'Profile',
+	Default = 'default',
+	Darker = true,
+	Visible = false
 })
 Users = StaffDetector:CreateTextList({
 	Name = 'Users',

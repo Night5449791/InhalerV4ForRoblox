@@ -1,6 +1,6 @@
 local AutoReload
 local HotSwap
-local thread, oldplaysound, hookedplaysound
+local thread, oldplaysound
 local priority = {
 	M4A1 = 1,
 	['AK-47'] = 1,
@@ -53,8 +53,7 @@ AutoReload = vape.Categories.Utility:CreateModule({
 				end))
 
 				-- reimplementation of playsound to get rid of the bad error
-				hookedplaysound = pl.PlaySound
-				oldplaysound = safeHook(hookedplaysound, function(sound)
+				oldplaysound = hookfunction(pl.PlaySound, function(sound)
 					local obj = debug.getupvalue(pl.Shoot, 1)
 					obj = obj and obj:FindFirstChild('Handle')
 					obj = obj and obj:FindFirstChild(sound)
@@ -69,9 +68,14 @@ AutoReload = vape.Categories.Utility:CreateModule({
 				end)
 			end
 		else
-			if oldplaysound and hookedplaysound then
-				safeUnhook(hookedplaysound, oldplaysound)
-				oldplaysound, hookedplaysound = nil, nil
+			if oldplaysound then
+				if restorefunction then
+					restorefunction(pl.PlaySound)
+				else
+					hookfunction(pl.PlaySound, oldplaysound)
+				end
+
+				oldplaysound = nil
 			end
 		end
 	end,

@@ -5,7 +5,6 @@ local Lifetime
 local Fade
 local DrawingToggle
 local drawingobjs = {}
-local drawingpool = {}
 
 BulletTracers = vape.Legit:CreateModule({
 	Name = 'BulletTracers',
@@ -13,36 +12,20 @@ BulletTracers = vape.Legit:CreateModule({
 		if callback then
 			TracerHook:Add('BulletTracers', function(...)
 				local origin, dir = ...
-				local muzzle = vtool and vtool:FindFirstChild('Muzzle')
-				if muzzle then
-					origin = muzzle.Position
+				if vtool then
+					origin = vtool.Muzzle.Position
 				end
 
 				local velocity = CFrame.lookAt(origin, dir).LookVector * 1000
-				local color = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-
 				if DrawingToggle.Enabled then
-					local line = table.remove(drawingpool) or Drawing.new('Line')
-					local from, visibleFrom = gameCamera:WorldToViewportPoint(origin)
-					local to, visibleTo = gameCamera:WorldToViewportPoint(origin + velocity)
-
-					line.Thickness = 2
-					line.Color = color
-					line.Transparency = 1 - Color.Opacity
-					line.From = Vector2.new(from.X, from.Y)
-					line.To = Vector2.new(to.X, to.Y)
-					line.Visible = visibleFrom and visibleTo
-					drawingobjs[line] = {origin, origin + velocity, os.clock()}
-
+					local obj = Drawing.new('Line')
+					obj.Thickness = 2
+					obj.Color = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+					drawingobjs[obj] = {origin, origin + velocity, os.clock()}
 					task.delay(Lifetime.Value, function()
-						drawingobjs[line] = nil
-						line.Visible = false
-
-						if #drawingpool < 64 then
-							table.insert(drawingpool, line)
-						else
-							line:Remove()
-						end
+						drawingobjs[obj] = nil
+						obj.Visible = false
+						obj:Remove()
 					end)
 				else
 					local obj = Instance.new('Part')
@@ -52,19 +35,16 @@ BulletTracers = vape.Legit:CreateModule({
 					obj.CanQuery = false
 					obj.Anchored = true
 					obj.Material = Enum.Material[Material.Value]
-					obj.Color = color
+					obj.Color = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 					obj.Transparency = 1 - Color.Opacity
 					obj.Parent = workspace
-
 					if Fade.Enabled then
 						local tween = tweenService:Create(obj, TweenInfo.new(Lifetime.Value), {
 							Transparency = 1
 						})
-
 						tween.Completed:Connect(function()
 							tween:Destroy()
 						end)
-
 						tween:Play()
 					end
 
@@ -76,26 +56,18 @@ BulletTracers = vape.Legit:CreateModule({
 
 			if DrawingToggle.Enabled then
 				BulletTracers:Clean(runService.RenderStepped:Connect(function()
-					local clock = os.clock()
-					local lifetime = Lifetime.Value
-					local opacity = Color.Opacity
-					local fade = Fade.Enabled
-
-					for line, data in drawingobjs do
-						local from, visibleFrom = gameCamera:WorldToViewportPoint(data[1])
-						local to, visibleTo = gameCamera:WorldToViewportPoint(data[2])
-
-						if visibleFrom and visibleTo then
-							line.Visible = true
-							line.From = Vector2.new(from.X, from.Y)
-							line.To = Vector2.new(to.X, to.Y)
-
-							if fade then
-								local progress = lifetime > 0 and math.clamp((clock - data[3]) / lifetime, 0, 1) or 1
-								line.Transparency = 1 - opacity * (1 - progress)
+					for obj, data in drawingobjs do
+						local from, vis = gameCamera:WorldToViewportPoint(data[1])
+						local to, vis2 = gameCamera:WorldToViewportPoint(data[2])
+						if vis and vis2 then
+							obj.Visible = true
+							obj.From = Vector2.new(from.X, from.Y)
+							obj.To = Vector2.new(to.X, to.Y)
+							if Fade.Enabled then
+								obj.Transparency = Color.Opacity * (1 - math.clamp((os.clock() - data[3]) / Lifetime.Value, 0, 1))
 							end
 						else
-							line.Visible = false
+							obj.Visible = false
 						end
 					end
 				end))
