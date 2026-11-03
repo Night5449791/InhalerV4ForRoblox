@@ -76,6 +76,7 @@ Products and module counts:
 | `redwood prison/10456235914 - game` | 5 · 4 redirects |
 | `life sentence/13083893317 - game` | 4 · 3 redirects |
 | `bloxstrikes/114234929420007 - game` | 2 |
+| `fling things and people/6961824067 - game` | 6 |
 | `girls and boys vs zombies/796267492 - main` | 1 · 5 redirects |
 
 A redirect is a standalone `<PlaceId> - <desc>.lua` at the game-folder root: set `vape.Place` to the parent PlaceId, then `loadstring` that parent chunk (some forward `...`). `skywars voxel/8542259458 - skywars lobby.lua` is not a redirect — it is a mini-base that only registers `sessioninfo` items. `life sentence/13083893317 - game` holds `AutoArrest`, `AutoReset`, `AutoStomp` (Blatant) and `DownedESP` (Render), with redirects `112593144270962 - new player`, `128630665408026 - vc`, `137771527695895 - console`; its base reads `<player>.Backpack.Stats` (transient flags) and `ReplicatedStorage.PlayerStats.<name>` (persistent stats) instead of attributes, uses the real `Teams` service, and keeps every remote in `ReplicatedStorage.Events`.
