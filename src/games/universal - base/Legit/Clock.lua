@@ -1,5 +1,6 @@
 local Clock
 local TwentyFourHour
+local ShowSeconds
 local label
 
 Clock = vape.Legit:CreateModule({
@@ -7,7 +8,7 @@ Clock = vape.Legit:CreateModule({
 	Function = function(callback)
 		if callback then
 			repeat
-				label.Text = DateTime.now():FormatLocalTime('LT', TwentyFourHour.Enabled and 'zh-cn' or 'en-us')
+				label.Text = DateTime.now():FormatLocalTime(ShowSeconds.Enabled and 'LTS' or 'LT', TwentyFourHour.Enabled and 'zh-cn' or 'en-us')
 				task.wait(1)
 			until not Clock.Enabled
 		end
@@ -33,6 +34,9 @@ Clock:CreateColorSlider({
 })
 TwentyFourHour = Clock:CreateToggle({
 	Name = '24 Hour Clock'
+})
+ShowSeconds = Clock:CreateToggle({
+	Name = 'Show seconds'
 })
 label = Instance.new('TextLabel')
 label.Size = UDim2.new(0, 100, 0, 41)
