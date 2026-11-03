@@ -1,5 +1,6 @@
 local AimAssist
 local Targets
+local Mode
 local Part
 local AimAssistMethod
 local FOV
@@ -15,10 +16,7 @@ local ShowTarget
 local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 
 local function wrapAngle(num)
-	num = num % math.pi
-	num -= num >= (math.pi / 2) and math.pi or 0
-	num += num < -(math.pi / 2) and math.pi or 0
-	return num
+	return (num + math.pi % math.tau) - math.pi
 end
 
 AimAssist = vape.Categories.Combat:CreateModule({
@@ -41,6 +39,11 @@ AimAssist = vape.Categories.Combat:CreateModule({
 			mouseScale = moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity
 		end
 
+		-- hoisted out of the frame loop: the mode decides which selector runs and
+		-- whether an origin is handed to it, and neither changes while it is enabled
+		local positionMode = Mode.Value == 'Position'
+		local selector = positionMode and entitylib.EntityPosition or entitylib.EntityMouse
+
 		local function step(dt)
 			if CircleObject then
 				CircleObject.Position = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
@@ -54,13 +57,13 @@ AimAssist = vape.Categories.Combat:CreateModule({
 			local camCF = gameCamera.CFrame
 			local origin, partName = camCF.Position, Part.Value
 
-			entity = entitylib.EntityMouse({
+			entity = selector({
 				Range = FOV.Value,
 				Part = partName,
 				Players = Targets.Players.Enabled,
 				NPCs = Targets.NPCs.Enabled,
 				Wallcheck = Targets.Walls.Enabled,
-				Origin = origin
+				Origin = positionMode and origin or nil
 			})
 
 			if not entity then return end
@@ -127,6 +130,17 @@ AimAssist = vape.Categories.Combat:CreateModule({
 	Tooltip = 'Smoothly aims to closest valid target'
 })
 Targets = AimAssist:CreateTargets({Players = true})
+Mode = AimAssist:CreateDropdown({
+	Name = 'Mode',
+	List = {'Mouse', 'Position'},
+	Function = function()
+		if AimAssist.Enabled then
+			AimAssist:Toggle()
+			AimAssist:Toggle()
+		end
+	end,
+	Tooltip = 'Mouse picks the entity closest to the cursor.\nPosition picks the entity closest to your character'
+})
 AimAssistMethod = AimAssist:CreateDropdown({
 	Name = 'Method',
 	List = {'Mouse', 'Camera'},

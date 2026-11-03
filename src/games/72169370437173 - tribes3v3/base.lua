@@ -37,7 +37,6 @@ local tribes = {}
 local HitboxHook = {Hooks = {}}
 local VelocityTracker = {Entries = setmetatable({}, {__mode = 'k'})}
 local isMatch = false
-local isVolt = false--identifyexecutor and identifyexecutor() == 'Volt' and trampoline_call and true or false
 local clickQueue = {}
 local clickThread = nil
 
@@ -110,8 +109,16 @@ local function clickButton(obj)
 	end
 end
 
+local function getCaller()
+	for i = 1, 7 do
+		if debug.validlevel(i) and not isexecutorclosure(debug.info(i, 'f')) then
+			return debug.info(i, 'ns')
+		end
+	end
+end
+
 local function hideStack()
-	if setstackhidden and (not isVolt) then -- volt automatically hides the stack with hookfunction
+	if setstackhidden then
 		local ffunctions = {debug.info(1, 'f'), debug.info(2, 'f'), debug.info(3, 'f'), debug.info(4, 'f'), debug.info(5, 'f')}
 		for _, func in ffunctions do
 			if isexecutorclosure(func) then
@@ -354,8 +361,6 @@ run(function()
 		return 'None'
 	end, false)
 
-	-- the Lobby object only exists while the matchmaking screen is up; when it is
-	-- gone the client is in a match, and its absence at load means one is running
 	local lobbyObj = workspace:FindFirstChild('Lobby')
 	if lobbyObj then
 		vape:Clean(lobbyObj.Destroying:Once(function()
@@ -365,11 +370,11 @@ run(function()
 		isMatch = true
 	end
 
-	if isMatch then
-		task.delay(1, function()
+	vape:Clean(task.delay(1, function()
+		if isMatch then
 			games:Increment()
-		end)
-	end
+		end
+	end))
 
 	vape:Clean(replicatedStorage.Remotes.HitConfirm.OnClientEvent:Connect(function(data)
 		if data and data.killed and isMatch then
@@ -433,13 +438,13 @@ run(function()
 	local function Hook(...)
 		hideStack()
 
-		local n, s = debug.info(1, 'ns')
+		local n, s = getCaller()
 		if not (not debug.validlevel(2) and argCheck({{'table'}, {'number'}, {'number'}, {'number'}}, ...) and n == '' and s == cmp) then
 			return oldhitbox(...)
 		end
 
 		local self = ...
-		if getrawmetatable(self) == tribes.Melee and type(rawget(self, 'lastSwing')) == 'number' then
+		if getrawmetatable(self) == tribes.Melee and self == tribes.State.handler and type(rawget(self, 'lastSwing')) == 'number' then
 			local args = table.pack(...)
 			for _, v in HitboxHook.Hooks do
 				if v[2](args) then return end
