@@ -114,7 +114,7 @@ Stroke.Parent = Holder
 
 TargetInfoOverlay:CreateFont({
 	Name = 'Font',
-	Default = 'Arial',
+	Default = 'Arimo',
 	Function = function(val)
 		Name.FontFace = val
 	end

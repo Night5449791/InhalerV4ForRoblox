@@ -51,7 +51,7 @@ Sort = TextGUI:CreateDropdown({
 })
 FontOption = TextGUI:CreateFont({
 	Name = 'Font',
-	Default = 'Arial',
+	Default = 'Arimo',
 	Function = function()
 		vape:UpdateTextGUI()
 	end
@@ -192,7 +192,7 @@ CustomTextBox = TextGUI:CreateTextBox({
 })
 CustomTextFont = TextGUI:CreateFont({
 	Name = 'Custom Font',
-	Default = 'Arial',
+	Default = 'Arimo',
 	Function = function()
 		vape:UpdateTextGUI()
 	end,

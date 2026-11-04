@@ -1,8 +1,8 @@
 uipallet = {
 	Main = Color3.fromRGB(26, 25, 26),
 	Text = Color3.fromRGB(200, 200, 200),
-	Font = Font.fromEnum(Enum.Font.Arial),
-	FontSemiBold = Font.fromEnum(Enum.Font.Arial, Enum.FontWeight.SemiBold),
+	Font = Font.fromEnum(Enum.Font.Arimo),
+	FontSemiBold = Font.new('rbxasset://fonts/families/Arimo.json', Enum.FontWeight.SemiBold),
 	Tween = TweenInfo.new(0.15, Enum.EasingStyle.Linear)
 }
 
