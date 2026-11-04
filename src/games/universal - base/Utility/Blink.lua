@@ -116,9 +116,13 @@ Fake = Blink:CreateToggle({
 		updateBoxes()
 
 		-- a respawn swaps entitylib.character, so the boxes have to be rebuilt
-		-- against the new rig; the connection only lives while the toggle is on
+		-- against the new rig. The connection is kept here rather than in the
+		-- module's maid so it can be dropped the moment this toggle goes off.
 		if callback then
-			Fake:Clean(entitylib.Events.LocalAdded:Connect(updateBoxes))
+			Fake.Connection = entitylib.Events.LocalAdded:Connect(updateBoxes)
+		elseif Fake.Connection then
+			Fake.Connection:Disconnect()
+			Fake.Connection = nil
 		end
 	end,
 	Tooltip = 'Spawns chams from where you started/are on the servers side.'
