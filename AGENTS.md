@@ -190,3 +190,26 @@ Prison Life's `Utility/ChatCommand.lua` keeps a shared path next to the local `l
 ````
 
 One line per changed file, `+` added / `-` removed / `~` changed; no mechanics, no multiple lines per file. Universal changes use `[Universal]`; rerunning replaces the earlier message. The script (`./inhaler_send_update.py <WebhookURL>`, or `WEBHOOK_URL`/`UPDATES_FILE`/`PROXY`, proxy default `127.0.0.1:7890`, `off` disables) posts the file, splits entries past Discord's 1024-character field limit into `Name (2)`, keeps the file when sending fails and deletes it on success. Don't run it or post the webhook unless asked.
+
+### Obsidian changes
+
+Anything that touches the Obsidian build (`src/guis/new/`, `ObsidianCompat`, the Obsidian window, its bundler) goes in its own `[Inhaler Obsidian]` section, written **last** — below every `[Universal]` / game section:
+
+````md
+[Universal]
+```diff
+~ [Killaura.lua] target sorting now prefers the closest entity
+```
+
+[Inhaler Obsidian]
+```diff
++ [ObsidianCompat.lua] things for ui or obsidian
+- [init.lua] things for ui or obsidian
+? [base.lua] things for ui or obsidian
+```
+# Obsidian Updated
+````
+
+Only when the Obsidian build actually changed; a Vape-only update leaves both out.
+
+**The footer rule.** `# Obsidian Updated` is the **very last line of the file**, after the `[Inhaler Obsidian]` section and after its closing fence. It is a marker, not an entry: `inhaler_send_update.py` skips it when parsing and instead adds the embed footer `Inhaler Obsidian has been compiled, enjoy.` Write it only when the Obsidian build was compiled in that round; without it the message carries no footer. Never put it above an entry, and never write anything after it.

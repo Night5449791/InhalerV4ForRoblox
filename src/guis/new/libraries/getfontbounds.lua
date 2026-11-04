@@ -1,9 +1,12 @@
 local function getfontbounds(text, size, font)
 	fontsize.Text = text
 	fontsize.Size = size
-	if typeof(font) == 'Font' then
-		fontsize.Font = font
-	end
+	fontsize.Font = typeof(font) == 'Font' and font or uipallet.Font
 
-	return textService:GetTextBoundsAsync(fontsize)
+	local success, bounds = pcall(function()
+		return textService:GetTextBoundsAsync(fontsize)
+	end)
+
+	fontsize.Font = uipallet.Font
+	return success and bounds or Vector2.zero
 end
