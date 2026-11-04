@@ -30,29 +30,37 @@ local whitelist = {
 	RightFoot = true
 }
 
+-- the boxes belong to `Spawn fake` alone: they mark where the server last saw
+-- us, so they have to appear before Blink chokes anything and stay up after it
+-- is turned off, while the choke itself only runs with Blink on
 local function updateBoxes()
-	if Blink.Enabled and Fake.Enabled and entitylib.isAlive then
-		for _, part in entitylib.character.Character:GetChildren() do
-			if part:IsA('BasePart') and whitelist[part.Name] then
-				if not boxes[part.Name] then
-					local box = Instance.new(part.Name == 'Head' and 'SphereHandleAdornment' or 'BoxHandleAdornment')
-					if part.Name == 'Head' then
-						box.Radius = 0.75
-					else
-						box.Size = part.Size
-					end
+	if not (Fake.Enabled and entitylib.isAlive) then
+		Folder:ClearAllChildren()
+		table.clear(boxes)
+		return
+	end
 
-					box.AlwaysOnTop = true
-					box.Adornee = workspace
-					box.ZIndex = 10
-					box.Transparency = 0.5
-					box.Parent = Folder
-					boxes[part.Name] = box
+	local character = entitylib.character.Character
+	for _, part in character:GetChildren() do
+		if part:IsA('BasePart') and whitelist[part.Name] then
+			local box = boxes[part.Name]
+			if not box then
+				box = Instance.new(part.Name == 'Head' and 'SphereHandleAdornment' or 'BoxHandleAdornment')
+				if part.Name == 'Head' then
+					box.Radius = 0.75
+				else
+					box.Size = part.Size
 				end
 
-				local box = boxes[part.Name]
-				box.CFrame = part.CFrame
+				box.AlwaysOnTop = true
+				box.Adornee = workspace
+				box.ZIndex = 10
+				box.Transparency = 0.5
+				box.Parent = Folder
+				boxes[part.Name] = box
 			end
+
+			box.CFrame = part.CFrame
 		end
 	end
 end
@@ -92,9 +100,6 @@ Blink = vape.Categories.Utility:CreateModule({
 				setfflag('DataSenderRate', '60')
 			end
 
-			Folder:ClearAllChildren()
-			table.clear(boxes)
-
 			oldphys, oldsend = nil, nil
 		end
 	end,
@@ -107,7 +112,15 @@ Type = Blink:CreateDropdown({
 })
 Fake = Blink:CreateToggle({
 	Name = 'Spawn fake',
-	Function = updateBoxes,
+	Function = function(callback)
+		updateBoxes()
+
+		-- a respawn swaps entitylib.character, so the boxes have to be rebuilt
+		-- against the new rig; the connection only lives while the toggle is on
+		if callback then
+			Fake:Clean(entitylib.Events.LocalAdded:Connect(updateBoxes))
+		end
+	end,
 	Tooltip = 'Spawns chams from where you started/are on the servers side.'
 })
 AutoSend = Blink:CreateToggle({
