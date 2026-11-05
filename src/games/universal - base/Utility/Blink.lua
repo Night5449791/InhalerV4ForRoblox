@@ -5,6 +5,17 @@ local AutoSend
 local AutoSendLength
 local Folder = Instance.new('Folder')
 Folder.Parent = vape.holder
+-- `Adornee = workspace` only draws while the adornment lives in workspace, so the
+-- boxes need a part of the world to attach to; they are still frozen by hand
+local Anchor = Instance.new('Part')
+Anchor.Name = 'BlinkFakeAnchor'
+Anchor.Anchored = true
+Anchor.CanCollide = false
+Anchor.CanQuery = false
+Anchor.CanTouch = false
+Anchor.Transparency = 1
+Anchor.Size = Vector3.new(1, 1, 1)
+Anchor.Parent = Folder
 local oldphys, oldsend
 local boxes = {}
 local whitelist = {
@@ -33,10 +44,15 @@ local whitelist = {
 -- the boxes belong to `Spawn fake` alone: they mark where the server last saw
 -- us, so they have to appear before Blink chokes anything and stay up after it
 -- is turned off, while the choke itself only runs with Blink on
+local function clearBoxes()
+	Anchor.Parent = Folder
+	Folder:ClearAllChildren()
+	boxes = {}
+end
+
 local function updateBoxes()
 	if not (Fake.Enabled and entitylib.isAlive) then
-		Folder:ClearAllChildren()
-		table.clear(boxes)
+		clearBoxes()
 		return
 	end
 
@@ -53,7 +69,7 @@ local function updateBoxes()
 				end
 
 				box.AlwaysOnTop = true
-				box.Adornee = workspace
+				box.Adornee = Anchor
 				box.ZIndex = 10
 				box.Transparency = 0.5
 				box.Parent = Folder
