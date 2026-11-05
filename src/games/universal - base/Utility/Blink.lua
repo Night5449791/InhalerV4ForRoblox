@@ -44,15 +44,21 @@ local whitelist = {
 }
 
 -- the boxes belong to `Spawn fake` alone: they mark where the server last saw
--- us, so they swallow everything the server misses and disappear with the toggle
+-- us, so they swallow everything the server misses and disappear with the toggle.
+--
+-- the boxes are destroyed one by one, never with `ClearAllChildren`: that destroys
+-- the anchor too, and a destroyed instance cannot be re-parented, so the next
+-- `updateBoxes` would throw "The Parent property of BlinkFakeAnchor is locked"
 local function clearBoxes()
+	for name, box in boxes do
+		box:Destroy()
+		boxes[name] = nil
+	end
+
 	if anchorParented and Anchor.Parent then
 		Anchor.Parent = nil
 		anchorParented = false
 	end
-
-	Folder:ClearAllChildren()
-	table.clear(boxes)
 end
 
 local function updateBoxes()
