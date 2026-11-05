@@ -217,8 +217,10 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 		return notify('Webhook is on but no url is set.', 10, 'warning')
 	end
 
-	local user = plr and plr.Name or name
-	local display = plr and plr.DisplayName or name
+	-- the display name is the one people read, so lead with it and put the
+	-- unique @username in the brackets
+	local label = plr and plr.DisplayName or name
+	local handle = plr and plr.Name or name
 	local id = plr and tostring(plr.UserId) or 'unknown'
 	local fields = {}
 
@@ -235,7 +237,7 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 	task.spawn(function()
 		local sent, err = webhook.sendEmbed(url, {
 			title = removed and '✅ Skid Removed / Unflagged' or '🚨 Detected Skid Target',
-			description = 'User: '..user..' (@'..display..')\nID: '..id,
+			description = 'User: '..label..' (@'..handle..')\nID: '..id,
 			color = removed and EMBED_GREEN or EMBED_RED,
 			fields = fields
 		}, WEBHOOK_NAME)
