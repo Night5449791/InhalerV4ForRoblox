@@ -629,7 +629,7 @@ end)
 -- the local rig is an anchored presentation model with no Humanoid, so the physics-based
 -- universal Blatant modules cannot drive it; drop every one of them, plus the inapplicable
 -- Combat/Utility modules
-for _, v in {'AntiFall', 'DiedTP', 'Fly', 'HighJump', 'HitBoxes', 'Invisible', 'Jesus', 'Killaura', 'LongJump', 'MouseTP', 'Phase', 'Speed', 'SpinBot', 'Spider', 'Swim', 'TargetStrafe', 'Timer', 'Reach', 'AntiRagdoll'} do
+for _, v in {'AntiFall', 'DiedTP', 'Fly', 'HighJump', 'HitBoxes', 'Invisible', 'Jesus', 'Killaura', 'LongJump', 'MouseTP', 'Phase', 'Speed', 'SpinBot', 'Spider', 'Swim', 'TargetStrafe', 'Timer', 'Reach', 'AntiFeature'} do
 	vape:Remove(v)
 end
 

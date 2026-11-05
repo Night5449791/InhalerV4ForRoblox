@@ -676,6 +676,6 @@ do
 	end
 end
 
-for _, v in {'Reach', 'TriggerBot', 'AntiFall', 'Desync', 'HitBoxes', 'Invisible', 'Jesus', 'MouseTP', 'Spider', 'Speed', 'SpinBot', 'Swim', 'TargetStrafe', 'AntiRagdoll', 'Disabler', 'HumSpoofer', 'Parkour', 'SafeWalk', 'MurderMystery'} do
+for _, v in {'Reach', 'TriggerBot', 'AntiFall', 'Desync', 'HitBoxes', 'Invisible', 'Jesus', 'MouseTP', 'Spider', 'Speed', 'SpinBot', 'Swim', 'TargetStrafe', 'AntiFeature', 'Disabler', 'HumSpoofer', 'Parkour', 'SafeWalk', 'MurderMystery'} do
 	vape:Remove(v)
 end

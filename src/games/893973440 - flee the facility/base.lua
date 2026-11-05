@@ -147,6 +147,6 @@ run(function()
 	entitylib.start()
 end)
 
-for _, v in {'AimAssist', 'Reach', 'SilentAim', 'TriggerBot', 'AntiFall', 'Invisible', 'Jesus', 'Killaura', 'AntiRagdoll', 'Disabler', 'MurderMystery'} do
+for _, v in {'AimAssist', 'Reach', 'SilentAim', 'TriggerBot', 'AntiFall', 'Invisible', 'Jesus', 'Killaura', 'AntiFeature', 'Disabler', 'MurderMystery'} do
 	vape:Remove(v)
 end
