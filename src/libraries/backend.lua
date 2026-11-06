@@ -2,10 +2,15 @@
 -- notice this file shouldnt appear from any of Inhaler's forks
 -- removing this file in ur client will cause inhaler to not work
 --
--- Everything that talks to the Inhaler worker lives here: the session key, the
--- activity beat, the websocket that replaces the beat when the executor has one,
--- and the dispatch of the commands the worker hands back. The universal base
--- keeps the command implementations and passes its handles in.
+-- Everything that talks to the Inhaler worker lives here: the session key, the activity
+-- websocket that carries the heartbeat and the commands, and the dispatch of the
+-- commands the worker hands back. The universal base keeps the command implementations
+-- and passes its handles in.
+--
+-- The socket is the only connection. An executor without a `WebSocket` library is told
+-- so once and stays offline; there is no http beacon to fall back to, because a beacon
+-- costs the worker a request per client per interval and it exists only to serve the
+-- clients that cannot hold a socket.
 --
 -- Usage:
 --   local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')()({
@@ -38,8 +43,6 @@ return function(context)
 
 	local stopped = false
 	local socket
-	local beating = false
-	local lastbeat = 0
 	local lastping = 0
 	local lastrefresh = 0
 	local lastkeytry = 0
@@ -71,8 +74,37 @@ return function(context)
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
 
-	-- chat upload rides the socket, so a client without one starts with it off
-	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = haswebsockets }
+	-- Prison Life runs no http fallback any more, so an executor without a socket cannot
+	-- use the product at all: it loads, talks to nothing, and its commands never arrive.
+	-- Rather than leave it looking half-working, those clients are told why and dropped.
+	-- The two place ids are the main place and its voice-chat redirect, which loads this
+	-- same chunk under the parent id.
+	local PRISON_LIFE_PLACES = { [155615604] = true, [135564683255158] = true }
+	local NO_SOCKET_KICK = 'Failed to load Inhaler : Executor missing %websocket lib%'
+
+	-- there is no http fallback: a client without a socket cannot talk to the worker at
+	-- all. The beacon existed so an executor without `WebSocket` still worked, but every
+	-- beacon is a request the worker has to answer and a row it may have to write, and
+	-- the socket is the only path that is cheap on both sides. An executor without the
+	-- library is told so once instead of quietly costing the panel its write budget.
+	local function requireSocket()
+		if haswebsockets then return true end
+
+		-- game.PlaceId, not vape.Place: a redirect sets vape.Place to the parent, and both
+		-- halves of prison life have to be caught
+		if PRISON_LIFE_PLACES[game.PlaceId] then
+			pcall(function()
+				lplr:Kick(NO_SOCKET_KICK)
+			end)
+			return false
+		end
+
+		warn('[inhaler] this executor has no WebSocket library, so the backend cannot connect')
+		return false
+	end
+
+	-- chat upload rides the socket, so it starts off and is turned on when one is up
+	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = false }
 	shared.inhalerChatLog = chatControl
 
 	-- an Instance, not a function field: a function would keep this chunk's upvalues alive
@@ -482,49 +514,6 @@ return function(context)
 		end)
 	end
 
-	local function beat()
-		if beating or sessionkey == '' then return end
-		beating = true
-
-		local ok, response = pcall(function()
-			if typeof(request) ~= 'function' then return nil end
-
-			return request({
-				Method = 'POST',
-				Url = 'https://'..WORKER..'/api/activity/beat',
-				Headers = {
-					['Content-Type'] = 'application/json',
-					['x-inhaler-request'] = '1'
-				},
-				Body = httpService:JSONEncode({
-					username = lplr.Name,
-					userId = tostring(lplr.UserId),
-					jobId = game.JobId,
-					placeId = tostring(game.PlaceId),
-					placeName = resolvePlaceName(),
-					executor = execname,
-					connectionType = socket and 'websocket' or 'http',
-					sessionKey = sessionkey
-				})
-			})
-		end)
-
-		beating = false
-
-		if ok and response and response.Success ~= false and type(response.Body) == 'string' then
-			local decoded, data = pcall(httpService.JSONDecode, httpService, response.Body)
-			if decoded then
-				-- the worker marks a refused key, so an empty answer is not mistaken for
-				-- an empty queue: ask http for a fresh one and keep going
-				if type(data) == 'table' and data.stale then
-					refreshKey()
-				end
-
-				runRemote(data)
-			end
-		end
-	end
-
 	local function buildWsUrl()
 		return 'wss://'..WORKER..'/api/activity/ws?userId='..lplr.UserId
 			..'&username='..httpService:UrlEncode(lplr.Name)
@@ -550,8 +539,10 @@ return function(context)
 
 				wsFailures = wsFailures + 1
 
-				-- the budget is the worker's (wsAttempts / wsDelay): once it is spent the
-				-- beacon carries the commands and the socket is probed again later
+				-- the budget is the worker's (wsAttempts / wsDelay). Once it is spent the
+				-- fast retries stop and the slow probe in `start` takes over: with no
+				-- beacon there is nothing else to fall back to, so the session is marked
+				-- down rather than abandoned and is re-opened after `WS_PROBE`
 				if wsFailures >= wsAttempts then
 					wsFailures = 0
 					wsDown = true
@@ -581,8 +572,8 @@ return function(context)
 					if stopped then return end
 
 					-- a socket that dies right after the handshake is the server refusing
-					-- this key rather than a normal drop: it counts against the budget, so
-					-- a refused key falls back to the beacon instead of spinning here
+					-- this key rather than a normal drop: it counts against the budget, so a
+					-- refused key stops the fast retries instead of spinning here
 					if os.time() - openedAt < 3 then
 						wsFailures = wsFailures + 1
 					else
@@ -606,16 +597,20 @@ return function(context)
 	end
 
 	local PING_INTERVAL = 20
-	local BEAT_IDLE = 20
+	-- how long a socket that cannot be opened is probed again. The beacon used to carry
+	-- the connection when this gave up; with no beacon, giving up means the client is
+	-- offline for the rest of the session, so the probe is the only recovery path and it
+	-- has to keep running
+	local WS_PROBE = 30
 	local KEY_CHECK = 120
 	local KEY_RETRY = 60
-	local WS_PROBE = 300
 	-- the skid mirror: an upload is skipped when the local file did not change, so the
 	-- idle timer only costs a read
 	local SKID_UPLOAD_IDLE = 60
 
-	-- 4401 and a `stale` beacon both land here; a key that cannot be replaced yet is retried
-	-- later, because the slot only frees up once the old holder goes quiet
+	-- a refused key lands here (4401, or a socket that dies right after the handshake);
+	-- a key that cannot be replaced yet is retried later, because the slot only frees up
+	-- once the old holder goes quiet
 	refreshKey = function(force)
 		local now = os.time()
 		if not force and now - lastrefresh < KEY_CHECK then return end
@@ -641,6 +636,10 @@ return function(context)
 
 	local function start()
 		vape:Clean(skidPush.Event:Connect(requestSkidPush))
+
+		-- nothing below can work without a socket, and a client that cannot reach the
+		-- worker must not sit in a retry loop forever pretending it can
+		if not requireSocket() then return end
 
 		task.spawn(function()
 			watchChat()
@@ -690,28 +689,22 @@ return function(context)
 					refreshKey()
 
 					if socket then
-						-- the socket is the main connection: commands arrive through it and
-						-- the beacon is not used at all while it is healthy
+						-- the socket is the only connection: commands arrive through it and
+						-- the ping keeps it from being reaped
 						if now - lastping >= PING_INTERVAL then
 							lastping = now
 							task.spawn(function() pcall(socket.Send, socket, 'ping') end)
 						end
-					elseif haswebsockets and not wsDown then
-						connectActivity()
-					else
-						-- no socket support, or the socket is down for now: the beacon is
-						-- the only way commands still land, and the socket is probed again
-						-- on a slow loop in case the network came back
-						if now - lastbeat >= BEAT_IDLE then
-							lastbeat = now
-							task.spawn(beat)
-						end
-
-						if wsDown and now - lastwsretry >= WS_PROBE then
+					elseif wsDown then
+						-- the retry budget is spent: keep probing, because nothing else can
+						-- carry the session and a lost socket is otherwise permanent
+						if now - lastwsretry >= WS_PROBE then
 							lastwsretry = now
 							wsDown = false
 							connectActivity()
 						end
+					else
+						connectActivity()
 					end
 				end
 
@@ -730,5 +723,7 @@ return function(context)
 		end
 	end
 
-	return {start = start, stop = stop, beat = beat}
+	-- no `beat`: the socket is the only connection now, and nothing called the beacon
+	-- from outside this file anyway
+	return {start = start, stop = stop}
 end
