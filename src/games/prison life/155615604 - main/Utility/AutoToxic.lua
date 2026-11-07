@@ -1,7 +1,27 @@
 local AutoToxic
+local KXUser
 local Presets = {}
 local cloned = {}
 local random = Random.new()
+
+-- One place that sends a bare chat line. `sendMessage` below cannot use it: it also
+-- appends a preset, which is a different call and only exists on the new chat.
+local function say(message)
+	if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+		textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+	else
+		replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+	end
+end
+
+-- `.kxusers` is another script's command: it prints who else in the server is running a
+-- whitelisted injector, which is the only way to learn that without asking. It is a
+-- query, not a greeting, so once per module start is enough.
+local function sayKXUsers()
+	if not KXUser.Enabled then return end
+
+	pcall(say, '.kxusers')
+end
 
 local lines = {
 	'prison life moment | kicked <obj>',
@@ -39,10 +59,19 @@ AutoToxic = vape.Categories.Utility:CreateModule({
 	Name = 'AutoToxic',
 	Function = function(callback)
 		if callback then
+			-- one line as the module comes on, so the answer is in chat before it matters
+			task.spawn(sayKXUsers)
+
 			AutoToxic:Clean(vapeEvents.CheaterKicked.Event:Connect(sendMessage))
 		end
 	end,
 	Tooltip = 'Says a message after a cheater gets kicked with CheatDetector enabled.'
+})
+
+KXUser = AutoToxic:CreateToggle({
+	Name = 'KXUser',
+	Default = true,
+	Tooltip = 'Says .kxusers once when the module starts, so the chat shows who else is injecting'
 })
 
 pcall(function()
