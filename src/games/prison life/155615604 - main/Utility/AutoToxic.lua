@@ -14,19 +14,27 @@ local function say(message)
 	end
 end
 
--- `.kxusers` is another script's command: it prints who else in the server is running a
--- whitelisted injector, which is the only way to learn that without asking. It is a
--- query, not a greeting, so once per module start is enough.
+-- `.kxusers` prints who else in the server is running a whitelisted injector, which is
+-- the only way to learn that without asking. It is a query, not a greeting, so once per
+-- module start is enough.
 --
--- Five seconds after the module comes on, because the game is still loading the chat at
--- that point: sending it the instant the module is enabled is what made it vanish, and a
--- command that never reached the channel looks exactly like one nobody answered.
-local KX_DELAY = 5
-
+-- Five seconds after the module comes on: the game is still loading the chat at that
+-- point, and a command sent before the channel exists never reaches it, which looks the
+-- same as one nobody answered.
 local function sayKXUsers()
-	task.wait(KX_DELAY)
+	task.wait(5)
 
 	if not KXUser.Enabled then return end
+
+	-- one pass over the server answers "is anyone here" for every listed id at once,
+	-- instead of a lookup per id
+	if #KXSkip.ListEnabled > 0 then
+		for _, player in playersService:GetPlayers() do
+			if table.find(KXSkip.ListEnabled, tostring(player.UserId)) then
+				return
+			end
+		end
+	end
 
 	pcall(say, '.kxusers')
 end
@@ -78,9 +86,26 @@ AutoToxic = vape.Categories.Utility:CreateModule({
 
 KXUser = AutoToxic:CreateToggle({
 	Name = 'KXUser',
-	Default = true,
+	Default = false,
+	Function = function(callback)
+		-- the list is created below this toggle, so a profile that already has this on
+		-- fires the Function while it is still nil; the line after the list is what puts
+		-- the control on screen in that case
+		if KXSkip then
+			KXSkip.Object.Visible = callback
+		end
+	end,
 	Tooltip = 'Says .kxusers once when the module starts, so the chat shows who else is injecting'
 })
+
+KXSkip = AutoToxic:CreateTextList({
+	Name = 'Skip userid',
+	Darker = true,
+	Visible = false,
+	Tooltip = 'Stays quiet while any of these user ids is in the server'
+})
+
+KXSkip.Object.Visible = KXUser.Enabled
 
 pcall(function()
 	for _, group in textChatService:GetPresetsAsync().categoryGroups do
