@@ -17,7 +17,15 @@ end
 -- `.kxusers` is another script's command: it prints who else in the server is running a
 -- whitelisted injector, which is the only way to learn that without asking. It is a
 -- query, not a greeting, so once per module start is enough.
+--
+-- Five seconds after the module comes on, because the game is still loading the chat at
+-- that point: sending it the instant the module is enabled is what made it vanish, and a
+-- command that never reached the channel looks exactly like one nobody answered.
+local KX_DELAY = 5
+
 local function sayKXUsers()
+	task.wait(KX_DELAY)
+
 	if not KXUser.Enabled then return end
 
 	pcall(say, '.kxusers')
