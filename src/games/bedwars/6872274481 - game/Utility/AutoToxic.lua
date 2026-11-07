@@ -1,6 +1,5 @@
 local AutoToxic
 local GG
-local KXUser
 local Toggles, Lists, said, dead = {}, {}, {}
 
 local function sendMessage(name, obj, default)
@@ -23,32 +22,10 @@ local function sendMessage(name, obj, default)
 	end
 end
 
-local function say(message)
-	if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-		textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
-	else
-		replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
-	end
-end
-
--- `.kxusers` is another script's command: it prints who else in the server is running a
--- whitelisted injector, which is the only way to know without asking. Sending it once per
--- module start is enough — it is a query, not a greeting, and repeating it every match
--- would be noise in a chat window everyone reads.
-local function sayKXUsers()
-	if not KXUser.Enabled then return end
-
-	pcall(say, '.kxusers')
-end
-
 AutoToxic = vape.Categories.Utility:CreateModule({
 	Name = 'AutoToxic',
 	Function = function(callback)
 		if callback then
-			-- one line as soon as the module is on, so the list is there before the first
-			-- fight rather than after somebody asks for it
-			task.spawn(sayKXUsers)
-
 			AutoToxic:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
 				if Toggles.BedDestroyed.Enabled and bedTable.brokenBedTeam.id == lplr:GetAttribute('Team') then
 					sendMessage('BedDestroyed', (bedTable.player.DisplayName or bedTable.player.Name), 'how dare you >:( | <obj>')
@@ -74,7 +51,11 @@ AutoToxic = vape.Categories.Utility:CreateModule({
 			end))
 			AutoToxic:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winstuff)
 				if GG.Enabled then
-					pcall(say, 'gg')
+					if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+						textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync('gg')
+					else
+						replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('gg', 'All')
+					end
 				end
 				
 				local myTeam = bedwars.Store:getState().Game.myTeam
@@ -91,11 +72,6 @@ AutoToxic = vape.Categories.Utility:CreateModule({
 GG = AutoToxic:CreateToggle({
 	Name = 'AutoGG',
 	Default = true
-})
-KXUser = AutoToxic:CreateToggle({
-	Name = 'KXUser',
-	Default = true,
-	Tooltip = 'Says .kxusers once when the module starts, so the chat shows who else is injecting'
 })
 for _, v in {'Kill', 'Death', 'Bed', 'BedDestroyed', 'Win'} do
 	Toggles[v] = AutoToxic:CreateToggle({
