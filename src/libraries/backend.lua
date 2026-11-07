@@ -47,7 +47,6 @@ return function(context)
 	local lastrefresh = 0
 	local lastkeytry = 0
 	local lastchat = 0
-	local lastskidup = 0
 	local lastwsretry = 0
 	local wsAttempts = 5
 	local wsDelay = 5
@@ -107,9 +106,6 @@ return function(context)
 	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = false }
 	shared.inhalerChatLog = chatControl
 
-	-- an Instance, not a function field: a function would keep this chunk's upvalues alive
-	local skidPush = typeof(shared.inhalerSkidPush) == 'Instance' and shared.inhalerSkidPush or Instance.new('BindableEvent')
-	shared.inhalerSkidPush = skidPush
 
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
@@ -404,115 +400,7 @@ return function(context)
 		end)
 	end
 
-	-- the upload token lives in a profile file, not in this source, because this source is public
-	local SKID_TOKEN_PATH = 'newvape/profiles/skidupload.txt'
-	local SKID_FILE = 'newvape/cheaters.json'
 
-	local function skidToken()
-		if not hasFile(SKID_TOKEN_PATH) then return nil end
-
-		local ok, token = pcall(readfile, SKID_TOKEN_PATH)
-		if not ok or type(token) ~= 'string' then return nil end
-
-		token = token:gsub('^%s+', ''):gsub('%s+$', '')
-		return token ~= '' and token or nil
-	end
-
-	-- the local database stores two shapes: a ByUserId table and a lowercased name map.
-	-- Wildcard patterns are dropped — the worker refuses them too, and a pattern here
-	-- would flag everyone it could match on every client
-	local function skidEntries()
-		if not hasFile(SKID_FILE) then return nil end
-
-		local ok, content = pcall(readfile, SKID_FILE)
-		if not ok or type(content) ~= 'string' or content == '' then return nil end
-
-		local decoded, data = pcall(httpService.JSONDecode, httpService, content)
-		if not decoded or type(data) ~= 'table' then return nil end
-
-		local entries, seen = {}, {}
-
-		for id, user in pairs(type(data.Users) == 'table' and data.Users or {}) do
-			local userId = tostring(id)
-
-			if type(user) == 'table' and userId:match('^%d+$') and not seen['i'..userId] then
-				seen['i'..userId] = true
-				entries[#entries + 1] = {
-					i = userId,
-					u = type(user.Name) == 'string' and user.Name or nil,
-					n = type(user.DisplayName) == 'string' and user.DisplayName or nil,
-					r = type(user.Reason) == 'string' and user.Reason or nil
-				}
-			end
-		end
-
-		for name, reason in pairs(type(data.Names) == 'table' and data.Names or {}) do
-			local lowered = tostring(name):lower()
-
-			if lowered ~= '' and not lowered:find('*', 1, true) and not seen['n'..lowered] then
-				seen['n'..lowered] = true
-				entries[#entries + 1] = {u = lowered, r = type(reason) == 'string' and reason or nil}
-			end
-		end
-
-		return entries
-	end
-
-	-- the last payload accepted by the worker: an unchanged list is not re-sent, and the
-	-- compare happens before the request, so a quiet machine costs nothing
-	local lastskidupload = ''
-
-	local function uploadSkidList()
-		local token = skidToken()
-		if not token or sessionkey == '' or typeof(request) ~= 'function' then return end
-
-		local entries = skidEntries()
-		if not entries then return end
-
-		-- an empty local database is never uploaded: a wiped or freshly recreated
-		-- cheaters.json would otherwise clear the api list for everyone. the global
-		-- list is emptied from the panel, not as a side effect of a client losing its file
-		if #entries == 0 then return end
-
-		local encoded = httpService:JSONEncode(entries)
-		if encoded == lastskidupload then return end
-
-		local ok, response = pcall(function()
-			return request({
-				Method = 'POST',
-				Url = 'https://'..WORKER..'/api/activity/skidlist',
-				Headers = {
-					['Content-Type'] = 'application/json',
-					['x-inhaler-request'] = '1',
-					['x-inhaler-skidtoken'] = token
-				},
-				Body = httpService:JSONEncode({
-					userId = tostring(lplr.UserId),
-					sessionKey = sessionkey,
-					entries = entries
-				})
-			})
-		end)
-
-		if ok and type(response) == 'table' and tonumber(response.StatusCode) == 200 then
-			lastskidupload = encoded
-		end
-	end
-
-	-- a wildcard add changes the list once per matched player: the one second of quiet
-	-- turns that burst into a single upload, and the worker drops it anyway when the
-	-- list it receives is the one it already holds
-	local skidpushtoken = 0
-
-	local function requestSkidPush()
-		skidpushtoken = skidpushtoken + 1
-		local token = skidpushtoken
-
-		task.delay(1, function()
-			if token ~= skidpushtoken then return end
-			uploadSkidList()
-		end)
-	end
 
 	local function buildWsUrl()
 		return 'wss://'..WORKER..'/api/activity/ws?userId='..lplr.UserId
@@ -604,9 +492,6 @@ return function(context)
 	local WS_PROBE = 30
 	local KEY_CHECK = 120
 	local KEY_RETRY = 60
-	-- the skid mirror: an upload is skipped when the local file did not change, so the
-	-- idle timer only costs a read
-	local SKID_UPLOAD_IDLE = 60
 
 	-- a refused key lands here (4401, or a socket that dies right after the handshake);
 	-- a key that cannot be replaced yet is retried later, because the slot only frees up
@@ -635,8 +520,6 @@ return function(context)
 	end
 
 	local function start()
-		vape:Clean(skidPush.Event:Connect(requestSkidPush))
-
 		-- nothing below can work without a socket, and a client that cannot reach the
 		-- worker must not sit in a retry loop forever pretending it can
 		if not requireSocket() then return end
@@ -672,10 +555,6 @@ return function(context)
 					task.spawn(flushChat)
 				end
 
-				if now - lastskidup >= SKID_UPLOAD_IDLE then
-					lastskidup = now
-					task.spawn(uploadSkidList)
-				end
 
 				if sessionkey == '' then
 					-- no key yet: the answer is 409 while another holder is live, so this

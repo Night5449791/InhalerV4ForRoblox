@@ -51,15 +51,6 @@ local function saveCheaters()
 	pcall(writefile, backupPath, content)
 end
 
-local function pushSkidList()
-	local signal = shared.inhalerSkidPush
-	if typeof(signal) == 'Instance' then
-		pcall(function()
-			signal:Fire()
-		end)
-	end
-end
-
 local function readDatabase(path)
 	if not isfile(path) then return end
 
@@ -225,7 +216,7 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 	local fields = {}
 
 	if removed then
-		fields[1] = {name = 'Status', value = 'Removed from skidlist'}
+		fields[1] = {name = 'Status', value = 'Removed from the cheater list'}
 		fields[2] = {name = 'Reason Was', value = previous or 'unknown'}
 	else
 		fields[1] = {name = '⚠️ Reason', value = '`'..(reason or 'manually added')..'`'}
@@ -236,7 +227,7 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 
 	task.spawn(function()
 		local sent, err = webhook.sendEmbed(url, {
-			title = removed and '✅ Skid Removed / Unflagged' or '🚨 Detected Skid Target',
+			title = removed and '✅ Cheater Removed / Unflagged' or '🚨 Detected Cheater',
 			description = 'User: '..label..' (@'..handle..')\nID: '..id,
 			color = removed and EMBED_GREEN or EMBED_RED,
 			fields = fields
@@ -360,7 +351,6 @@ local function editCheater(text, reason, remove)
 	end
 
 	saveCheaters()
-	pushSkidList()
 	sendWebhookLog(plr, name, reason, remove, existing)
 	notify((plr and plr.DisplayName or name)..(remove and ' removed from the cheater list.' or ' added to the cheater list. ('..reason..')'), 10)
 end
@@ -391,7 +381,7 @@ local function playerRemoving(plr)
 	tempTargets[plr.Name] = nil
 
 	if reason and cheaterOptions.Notifications.Enabled then
-		notify('Logged skid left: '..plr.DisplayName..' ('..reason..')', 15)
+		notify('Logged cheater left: '..plr.DisplayName..' ('..reason..')', 15)
 	end
 end
 
@@ -521,7 +511,6 @@ CheaterDetector:CreateButton({
 		table.clear(Cheaters.Names)
 		table.clear(Cheaters.Users)
 		saveCheaters()
-		pushSkidList()
 		notify('Cleared the cheater list.', 10)
 	end
 })
