@@ -18,7 +18,7 @@
 - **This fork** is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): use, modify and redistribute it freely, including commercially, as long as you give appropriate credit to this repository and to the original Vape V4 project.
 
 ## Contacts
-[My Discord](https://discord.com/users/1448308188439904309)
+[My Discord](https://discord.gg/YSzD7f9neR)
 <br/>
 [7GrandDad's Community Discord](https://discord.gg/VZEQJxMSnG)
 <br/>
@@ -57,7 +57,7 @@ If its not the supposed utility at fault, please try some troubleshooting steps.
 1. Deleting the newvape folder (WITH THE GAME CLOSED).
 2. Making sure you have connection to [the main loadstring.](https://raw.githubusercontent.com/Night5449791/InhalerV4ForRoblox/refs/heads/main/loadstring)
 3. Ensuring no external script is conflicting with vape.
-4. Report the issue by using 
+4. Report the issue by [Issues](https://github.com/Night5449791/InhalerV4ForRoblox/issues) or [Discord](https://discord.gg/YSzD7f9neR) with a detailed description of the issue and the steps to reproduce it.
 
 ## Developers & Credits
 [Nighthere123](https://github.com/Night5449791) - discord nightdiamond700 - Fork owner prolly lololololololol
