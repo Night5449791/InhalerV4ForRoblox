@@ -108,8 +108,20 @@ local function scanMic()
 	end
 end
 
+-- The bypass is a sequence of waits, and every one of them has to give up the moment the
+-- module is turned off or vape unloads — otherwise the remaining steps keep driving voice
+-- chat after the user asked it to stop. `step` is what makes that one check instead of
+-- six copies of the same guard.
+local function step(seconds)
+	task.wait(seconds)
+	return vape.Loaded and AntiVoiceChatBan.Enabled
+end
+
+-- The game's own mic button draws its state as a child image named `1`; an empty or
+-- muted image means the user has not confirmed they can speak yet.
 local function micImage()
 	local icon = micIcon and micIcon:FindFirstChild('1')
+
 	return icon and icon.Image or nil
 end
 
@@ -117,8 +129,7 @@ local function waitUnmuted()
 	scanMic()
 	if not micToggle then
 		callVoice('joinVoice')
-		task.wait(1.5)
-		if not vape.Loaded then return end
+		if not step(1.5) then return end
 		scanMic()
 	end
 
@@ -133,16 +144,24 @@ local function waitUnmuted()
 	end
 end
 
+-- One accessor for "the transparency this object draws through", because both the hide
+-- and the restore pass need the same branch and keeping them apart is how they drift.
+local function transparencyOf(object)
+	if object:IsA('ImageLabel') or object:IsA('ImageButton') then
+		return 'ImageTransparency'
+	end
+
+	return (object:IsA('TextLabel') or object:IsA('TextButton')) and 'TextTransparency' or nil
+end
+
 local function hideMicButton()
 	if not micToggle then return end
 
 	for _, object in micToggle:QueryDescendants('GuiObject') do
-		if object:IsA('ImageLabel') or object:IsA('ImageButton') then
-			hidden[object] = object.ImageTransparency
-			object.ImageTransparency = 1
-		elseif object:IsA('TextLabel') or object:IsA('TextButton') then
-			hidden[object] = object.TextTransparency
-			object.TextTransparency = 1
+		local property = transparencyOf(object)
+		if property then
+			hidden[object] = {property = property, value = object[property]}
+			object[property] = 1
 		end
 	end
 end
@@ -210,14 +229,21 @@ local function createController()
 	end)
 	AntiVoiceChatBan:Clean(stateConnection)
 
-	local iconPosition
-	if not micIcon or not micIcon.Parent then
+	-- `micIcon` is the label just created above, so testing it here can never be true:
+	-- what decides whether the scan is needed is whether the game's own mic button was
+	-- ever found, and that is `micToggle`.
+	--
+	-- The scan overwrites `micIcon` with the game's icon, and `syncIcon` below draws into
+	-- `micIcon`, so the custom label has to be put back or the first `setMuted` would
+	-- paint the game's button instead of this one.
+	if not micToggle then
+		local own = micIcon
 		scanMic()
+		micIcon = own
 	end
 
-	if micIcon and micIcon.AbsolutePosition.X > 50 then
-		iconPosition = micIcon.AbsolutePosition
-	elseif micToggle and micToggle.AbsolutePosition.X > 50 then
+	local iconPosition
+	if micToggle and micToggle.AbsolutePosition.X > 50 then
 		iconPosition = micToggle.AbsolutePosition
 	end
 
@@ -252,14 +278,8 @@ local function restore()
 		stateConnection = nil
 	end
 
-	for object, transparency in hidden do
-		if transparency ~= nil then
-			if object:IsA('ImageLabel') or object:IsA('ImageButton') then
-				object.ImageTransparency = transparency
-			elseif object:IsA('TextLabel') or object:IsA('TextButton') then
-				object.TextTransparency = transparency
-			end
-		end
+	for object, entry in hidden do
+		object[entry.property] = entry.value
 	end
 	table.clear(hidden)
 
@@ -309,20 +329,16 @@ local function bypass()
 
 	local ok, result = pcall(function()
 		if not waitUnmuted() then return end
-		task.wait(1)
-		if not vape.Loaded then return end
+		if not step(1) then return end
 
 		callVoice('leaveVoice')
-		task.wait(2)
-		if not vape.Loaded then return end
+		if not step(2) then return end
 
 		disableStateConnections()
-		task.wait(2)
-		if not vape.Loaded then return end
+		if not step(2) then return end
 
 		callVoice('joinVoice')
-		task.wait(1)
-		if not vape.Loaded then return end
+		if not step(1) then return end
 
 		scanMic()
 		hideMicButton()
