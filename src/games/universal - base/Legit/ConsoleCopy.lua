@@ -8,8 +8,8 @@ local LogService = game:GetService('LogService')
 local CoreGui = game:GetService('CoreGui')
 
 local IDLE, DONE = '[C]', '[√]'
-local RESET_AFTER = 2.5
-local MAX_REMEMBERED = 150
+local resetAfter = 2.5
+local maxRemembered = 150
 
 -- what LogService has printed, so a row can be recognised even when the console's
 -- own container is not where we expect it
@@ -31,7 +31,7 @@ local function remember(message)
 	remembered[message] = true
 	table.insert(rememberedOrder, message)
 
-	if #rememberedOrder > MAX_REMEMBERED then
+	if #rememberedOrder > maxRemembered then
 		remembered[table.remove(rememberedOrder, 1)] = nil
 	end
 end
@@ -60,9 +60,7 @@ local function decorate(row)
 	if row.Name == 'ConsoleCopyMark' or marks[row] then return end
 
 	-- the timestamp / icon cells next to a log line are not the message; leave them be
-	if row.Name == 'Timestamp' or row.Name == 'TimestampLabel' or row.Name == 'icon' or row.Name == 'Icon' then
-		return
-	end
+	if row.Name == 'Timestamp' or row.Name == 'TimestampLabel' or row.Name == 'icon' or row.Name == 'Icon' then return end
 
 	local text = row.Text
 	if text == '' then return end
@@ -89,7 +87,7 @@ local function decorate(row)
 		row.Text = text .. '  ' .. DONE
 		row.TextColor3 = Color3.fromRGB(120, 255, 130)
 
-		task.delay(RESET_AFTER, function()
+		task.delay(resetAfter, function()
 			if not row.Parent then return end
 
 			row.Text = text .. '  ' .. IDLE
@@ -120,9 +118,7 @@ local function decorate(row)
 	-- rows are recycled while the console scrolls, so the line under the mark changes
 	-- and we re-append the marker to whatever the console just put there
 	table.insert(connections, row:GetPropertyChangedSignal('Text'):Connect(function()
-		if row.Text:sub(-5) == '  ' .. IDLE or row.Text:sub(-5) == '  ' .. DONE then
-			return
-		end
+		if row.Text:sub(-5) == '  ' .. IDLE or row.Text:sub(-5) == '  ' .. DONE then return end
 
 		text = row.Text
 		originals[row] = text

@@ -38,6 +38,7 @@ TwentyFourHour = Clock:CreateToggle({
 ShowSeconds = Clock:CreateToggle({
 	Name = 'Show seconds'
 })
+
 label = Instance.new('TextLabel')
 label.Size = UDim2.new(0, 100, 0, 41)
 label.BackgroundTransparency = 0.6

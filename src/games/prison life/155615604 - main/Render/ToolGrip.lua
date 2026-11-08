@@ -37,9 +37,7 @@ end
 
 local function EntityAdded()
 	local backpack = lplr:FindFirstChildWhichIsA('Backpack')
-	if not backpack then
-		return
-	end
+	if not backpack then return end
 
 	ToolGrip:Clean(backpack.ChildAdded:Connect(ApplyGrip))
 	for _, tool in backpack:GetChildren() do

@@ -1,5 +1,6 @@
 local AutoToxic
 local KXUser
+local KXSkip
 local Presets = {}
 local cloned = {}
 local random = Random.new()
@@ -30,9 +31,7 @@ local function sayKXUsers()
 	-- instead of a lookup per id
 	if #KXSkip.ListEnabled > 0 then
 		for _, player in playersService:GetPlayers() do
-			if table.find(KXSkip.ListEnabled, tostring(player.UserId)) then
-				return
-			end
+			if table.find(KXSkip.ListEnabled, tostring(player.UserId)) then return end
 		end
 	end
 
@@ -47,9 +46,7 @@ local lines = {
 
 local function sendMessage(obj)
 	local name = (obj or ''):match('^%s*(.-)%s*$')
-	if name == '' or name == lplr.DisplayName or name == lplr.Name then
-		return
-	end
+	if name == '' or name == lplr.DisplayName or name == lplr.Name then return end
 
 	if not next(cloned) then
 		cloned = table.clone(lines)

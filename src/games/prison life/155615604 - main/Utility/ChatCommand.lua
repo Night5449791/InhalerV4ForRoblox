@@ -1,7 +1,7 @@
 -- a friend may drive these commands while ShareCommands is on, a private member always may
 
 local ChatCommand
-local TARGET_COLOR = Color3.new(1, 0, 0)
+local targetColor = Color3.new(1, 0, 0)
 
 local options = {}
 local sharedConnections = {}
@@ -9,10 +9,10 @@ local sharedConnections = {}
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 
-local TP_OFFSET = Vector3.new(0, 2, 0)
+local tpOffset = Vector3.new(0, 2, 0)
 
-local DISCORD_CODE = 'YSzD7f9neR'
-local DISCORD_INVITE = 'https://discord.gg/'..DISCORD_CODE
+local discordCode = 'YSzD7f9neR'
+local discordInvite = 'https://discord.gg/'..discordCode
 
 -- ============================================================================
 -- helpers
@@ -205,7 +205,7 @@ local function handleTP(args)
 		return
 	end
 
-	localRoot.CFrame = target.RootPart.CFrame + TP_OFFSET
+	localRoot.CFrame = target.RootPart.CFrame + tpOffset
 end
 
 local function handleFollow(args)
@@ -285,7 +285,7 @@ local function changeTargets(args, remove)
 
 	local name = player.Name
 	setListValue(list, name, not remove)
-	whitelist.customtags[name] = not remove and {{text = 'Exploiter', color = TARGET_COLOR}} or nil
+	whitelist.customtags[name] = not remove and {{text = 'Exploiter', color = targetColor}} or nil
 	tempTargets[name] = not remove or nil
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
@@ -439,8 +439,8 @@ local function handleCopyServer()
 		return
 	end
 
-	setclipboard(DISCORD_INVITE)
-	openDiscordInvite(DISCORD_CODE)
+	setclipboard(discordInvite)
+	openDiscordInvite(discordCode)
 	notif('ChatCommand', 'Copied the discord invite.', 5)
 end
 

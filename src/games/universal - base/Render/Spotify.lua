@@ -134,6 +134,7 @@ duration.TextColor3 = Color3.fromRGB(170, 170, 170)
 duration.TextSize = 13
 duration.TextXAlignment = Enum.TextXAlignment.Left
 duration.Parent = holder
+
 Spotify:CreateFont({
 	Name = 'Font',
 	Default = 'Arial',
@@ -143,6 +144,7 @@ Spotify:CreateFont({
 		duration.FontFace = value
 	end
 })
+
 stroke = Instance.new('UIStroke')
 stroke.Enabled = false
 stroke.Color = Color3.fromHSV(0.44, 1, 1)

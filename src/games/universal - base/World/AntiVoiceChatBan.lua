@@ -7,10 +7,10 @@ pcall(function()
 	voiceChatService = cloneref(game:GetService('VoiceChatService'))
 	voiceChatInternal = cloneref(game:GetService('VoiceChatInternal'))
 end)
-local MUTED_ICON = 'rbxasset://textures/ui/VoiceChat/MicLight/Muted.png'
-local UNMUTED_ICON = 'rbxasset://textures/ui/VoiceChat/MicLight/Talking0.png'
-local MIC_OFFSET_X, MIC_OFFSET_Y, MIC_SIZE = 14, 13, 35
-local DISABLE_START = 7
+local mutedIcon = 'rbxasset://textures/ui/VoiceChat/MicLight/Muted.png'
+local unmutedIcon = 'rbxasset://textures/ui/VoiceChat/MicLight/Talking0.png'
+local micOffsetX, micOffsetY, micSize = 14, 13, 35
+local disableStart = 7
 local state = {
 	muted = false,
 	busy = false,
@@ -57,7 +57,7 @@ end
 
 local function syncIcon()
 	if micIcon then
-		micIcon.Image = (state.muted and MUTED_ICON or UNMUTED_ICON)
+		micIcon.Image = (state.muted and mutedIcon or unmutedIcon)
 	end
 
 	if redVoiceDot and redVoiceDot.Parent then
@@ -136,7 +136,7 @@ local function waitUnmuted()
 	notif('AntiVoiceChatBan', 'Unmute to continue.', 5)
 	while vape.Loaded do
 		local image = micImage()
-		if image and image ~= '' and image ~= MUTED_ICON then
+		if image and image ~= '' and image ~= mutedIcon then
 			return true
 		end
 
@@ -170,7 +170,7 @@ local function disableStateConnections()
 	if not getConnections or not voiceChatInternal then return end
 
 	local connections = getConnections(voiceChatInternal.StateChanged)
-	for index = DISABLE_START, #connections do
+	for index = disableStart, #connections do
 		local connection = connections[index]
 		if connection then
 			pcall(function()
@@ -202,8 +202,8 @@ local function createController()
 	micButton = Instance.new('TextButton')
 	micButton.Name = 'MicHitArea'
 	micButton.BackgroundTransparency = 1
-	micButton.Position = UDim2.new(0, 150 + MIC_OFFSET_X, 0, 4 + MIC_OFFSET_Y)
-	micButton.Size = UDim2.new(0, MIC_SIZE, 0, MIC_SIZE)
+	micButton.Position = UDim2.new(0, 150 + micOffsetX, 0, 4 + micOffsetY)
+	micButton.Size = UDim2.new(0, micSize, 0, micSize)
 	micButton.Text = ''
 	micButton.Active = true
 	micButton.ZIndex = 10000
@@ -212,7 +212,7 @@ local function createController()
 	micIcon = Instance.new('ImageLabel')
 	micIcon.Name = 'MicIcon'
 	micIcon.BackgroundTransparency = 1
-	micIcon.Image = MUTED_ICON
+	micIcon.Image = mutedIcon
 	micIcon.ScaleType = Enum.ScaleType.Fit
 	micIcon.Size = UDim2.new(1, 0, 1, 0)
 	micIcon.ZIndex = 10001
@@ -248,8 +248,8 @@ local function createController()
 	end
 
 	if iconPosition and iconPosition.X > 0 and iconPosition.Y >= 0 then
-		micButton.Position = UDim2.new(0, iconPosition.X + MIC_OFFSET_X, 0, iconPosition.Y + MIC_OFFSET_Y)
-		micButton.Size = UDim2.new(0, MIC_SIZE, 0, MIC_SIZE)
+		micButton.Position = UDim2.new(0, iconPosition.X + micOffsetX, 0, iconPosition.Y + micOffsetY)
+		micButton.Size = UDim2.new(0, micSize, 0, micSize)
 	end
 
 	setMuted(true)

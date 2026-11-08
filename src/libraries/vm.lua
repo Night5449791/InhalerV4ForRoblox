@@ -6,10 +6,10 @@
 	so other modules reference `vm` directly.
 
 	Usage:
-	  vm.luau_newsettings(...)        -> create VM settings
-	  vm.luau_validatesettings(...)   -> validate settings
-	  vm.luau_deserialize(bytecode)   -> load a Luau function prototype
-	  vm.luau_load(proto)             -> (closure, close) runnable in the VM
+	vm.luau_newsettings(...)        -> create VM settings
+	vm.luau_validatesettings(...)   -> validate settings
+	vm.luau_deserialize(bytecode)   -> load a Luau function prototype
+	vm.luau_load(proto)             -> (closure, close) runnable in the VM
 
 	MIT License
 

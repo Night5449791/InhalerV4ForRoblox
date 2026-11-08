@@ -1,11 +1,11 @@
 local KillNotifications
 local height
 
-local MAX_STACK = 4
-local LIFETIME = 2.5
-local FADE = 0.3
-local FADE_INFO = TweenInfo.new(FADE)
-local ENTRY_W, ENTRY_H, ENTRY_STEP = 460, 22, 25
+local maxStack = 4
+local lifetimeValue = 2.5
+local fadeTime = 0.3
+local fadeInfo = TweenInfo.new(fadeTime)
+local entryW, entryH, entryStep = 460, 22, 25
 local offset
 local positions = {}
 
@@ -60,8 +60,8 @@ KillNotifications = vape.Categories.Render:CreateModule({
 	Function = function(callback)
 		if callback then
 			stack = {}
-			for i = 1, MAX_STACK do
-				positions[i] = UDim2.new(0.5, 0, 1, -offset - (i - 1) * ENTRY_STEP)
+			for i = 1, maxStack do
+				positions[i] = UDim2.new(0.5, 0, 1, -offset - (i - 1) * entryStep)
 			end
 
 			feed = Instance.new('ScreenGui')
@@ -83,7 +83,7 @@ KillNotifications = vape.Categories.Render:CreateModule({
 			prototype.TextStrokeColor3 = Color3.new()
 			prototype.TextStrokeTransparency = 0.7
 			prototype.TextXAlignment = Enum.TextXAlignment.Center
-			prototype.Size = UDim2.new(0, ENTRY_W, 0, ENTRY_H)
+			prototype.Size = UDim2.new(0, entryW, 0, entryH)
 
 			local myName = lplr.Name
 			local myDisp = lplr.DisplayName
@@ -164,13 +164,13 @@ KillNotifications = vape.Categories.Render:CreateModule({
 				entry.TextTransparency = 1
 				entry.TextStrokeTransparency = 1
 				entry.Parent = feed
-				tweenService:Create(entry, FADE_INFO, {
+				tweenService:Create(entry, fadeInfo, {
 					TextTransparency = 0,
 					TextStrokeTransparency = 0.7
 				}):Play()
 
 				table.insert(stack, 1, entry)
-				if #stack > MAX_STACK then
+				if #stack > maxStack then
 					stack[#stack]:Destroy()
 					table.remove(stack)
 				end
@@ -178,15 +178,15 @@ KillNotifications = vape.Categories.Render:CreateModule({
 					stack[i].Position = positions[i]
 				end
 
-				task.delay(LIFETIME - FADE, function()
+				task.delay(lifetimeValue - fadeTime, function()
 					local idx = table.find(stack, entry)
 					if not idx then return end
 
-					tweenService:Create(entry, FADE_INFO, {
+					tweenService:Create(entry, fadeInfo, {
 						TextTransparency = 1,
 						TextStrokeTransparency = 1
 					}):Play()
-					task.wait(FADE)
+					task.wait(fadeTime)
 
 					idx = table.find(stack, entry)
 					if not idx then return end
@@ -219,8 +219,8 @@ height = KillNotifications:CreateSlider({
 	Tooltip = 'killfeed gui y axis',
 	Function = function(value)
 		offset = value
-		for i = 1, MAX_STACK do
-			positions[i] = UDim2.new(0.5, 0, 1, -value - (i - 1) * ENTRY_STEP)
+		for i = 1, maxStack do
+			positions[i] = UDim2.new(0.5, 0, 1, -value - (i - 1) * entryStep)
 		end
 	end
 })

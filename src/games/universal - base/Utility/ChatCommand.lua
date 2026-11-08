@@ -10,11 +10,11 @@ local followModule, followOldMove, followPlayer, followConnection
 local danceTrack
 
 -- built once instead of per call: the follow steering runs on every frame
-local FLAT_MASK = Vector3.new(1, 0, 1)
+local flatMask = Vector3.new(1, 0, 1)
 -- where .tp lands the local character
-local TP_OFFSET = Vector3.new(0, 2, 0)
+local tpOffset = Vector3.new(0, 2, 0)
 -- animation ids per rig, so .dance stops rebuilding two lists every time
-local DANCE_IDS = {
+local danceIds = {
 	R6 = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'},
 	R15 = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
 }
@@ -151,7 +151,7 @@ local function startFollow(player)
 		local targetRoot = target and target.RootPart
 		local root = entitylib.character and entitylib.character.RootPart
 		if targetRoot and root then
-			local direction = (targetRoot.Position - root.Position) * FLAT_MASK
+			local direction = (targetRoot.Position - root.Position) * flatMask
 			if direction.Magnitude > 1 then
 				vec = direction.Unit
 			end
@@ -209,7 +209,7 @@ local function handleTP(args)
 		return
 	end
 
-	localRoot.CFrame = target.RootPart.CFrame + TP_OFFSET
+	localRoot.CFrame = target.RootPart.CFrame + tpOffset
 end
 
 local function handleFollow(args)
@@ -336,7 +336,7 @@ local function startDance()
 
 	stopDance()
 
-	local dances = humanoid.RigType == Enum.HumanoidRigType.R15 and DANCE_IDS.R15 or DANCE_IDS.R6
+	local dances = humanoid.RigType == Enum.HumanoidRigType.R15 and danceIds.R15 or danceIds.R6
 	local animation = Instance.new('Animation')
 	animation.AnimationId = 'rbxassetid://'..dances[math.random(1, #dances)]
 	danceTrack = humanoid:LoadAnimation(animation)

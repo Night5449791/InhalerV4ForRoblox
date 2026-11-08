@@ -29,7 +29,7 @@ local useTeamColor = vape.Settings.Modules.Options['Use team color']
 local ftap = {
 	remotes = nil,
 	toys = {},
-	grabbed = {}
+	grabbed = {},
 }
 
 local function isFriend(plr, recolor)
@@ -92,7 +92,7 @@ run(function()
 			createGrabLine = grabEvents:FindFirstChild('CreateGrabLine'),
 			extendGrabLine = grabEvents:FindFirstChild('ExtendGrabLine'),
 			ragdoll = characterEvents and characterEvents:FindFirstChild('RagdollRemote'),
-			struggle = characterEvents and characterEvents:FindFirstChild('Struggle')
+			struggle = characterEvents and characterEvents:FindFirstChild('Struggle'),
 		}
 	end
 

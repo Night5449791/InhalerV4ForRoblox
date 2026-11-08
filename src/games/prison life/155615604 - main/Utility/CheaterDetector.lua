@@ -3,16 +3,16 @@ local webhookUrl
 local whitelist = vape.Libraries.whitelist
 local jsonEncode, jsonDecode = httpService.JSONEncode, httpService.JSONDecode
 local osDate, osTime = os.date, os.time
-local DB_VERSION = 3
+local dbVersion = 3
 local cheaterOptions = {}
 local filePath = 'newvape/cheaters.json'
 local backupPath = 'newvape/cheaters.json.bak'
 local brokenPath = 'newvape/cheaters.json.broken'
-local Cheaters = {Version = DB_VERSION, Names = {}, Users = {}, Count = 0}
-local TAG_COLOR = Color3.new(1, 0, 0)
-local EMBED_RED = 15548997
-local EMBED_GREEN = 5763911
-local WEBHOOK_NAME = 'Inhaler CheaterDetector'
+local Cheaters = {Version = dbVersion, Names = {}, Users = {}, Count = 0}
+local tagColor = Color3.new(1, 0, 0)
+local embedRed = 15548997
+local embedGreen = 5763911
+local webhookName = 'Inhaler CheaterDetector'
 
 local function countCheaters(names, users)
 	local count = 0
@@ -87,12 +87,12 @@ local function loadCheaters()
 	local version = type(data.Version) == 'number' and data.Version or 1
 	local upgraded = false
 
-	if version > DB_VERSION then
+	if version > dbVersion then
 		Cheaters.Version = version
-		notify('Cheater database is newer (v'..version..') than this script (v'..DB_VERSION..'), using it as is.', 15, 'warning')
+		notify('Cheater database is newer (v'..version..') than this script (v'..dbVersion..'), using it as is.', 15, 'warning')
 	else
-		if version < DB_VERSION then
-			data.Version = DB_VERSION
+		if version < dbVersion then
+			data.Version = dbVersion
 			upgraded = true
 		end
 
@@ -105,7 +105,7 @@ local function loadCheaters()
 
 	if upgraded then
 		saveCheaters()
-		notify('Upgraded cheater database to v'..DB_VERSION..'.', 10)
+		notify('Upgraded cheater database to v'..dbVersion..'.', 10)
 	elseif restored then
 		saveCheaters() -- write the recovered data back over the broken file
 	elseif content and not isfile(backupPath) then
@@ -114,7 +114,7 @@ local function loadCheaters()
 end
 
 local function tagCheater(plr, reason, alert)
-	whitelist.customtags[plr.Name] = reason and {{text = 'Exploiter', color = TAG_COLOR}} or nil
+	whitelist.customtags[plr.Name] = reason and {{text = 'Exploiter', color = tagColor}} or nil
 	tempTargets[plr.Name] = reason and true or nil
 
 	if reason and alert and cheaterOptions.Notifications.Enabled then
@@ -229,9 +229,9 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 		local sent, err = webhook.sendEmbed(url, {
 			title = removed and '✅ Cheater Removed / Unflagged' or '🚨 Detected Cheater',
 			description = 'User: '..label..' (@'..handle..')\nID: '..id,
-			color = removed and EMBED_GREEN or EMBED_RED,
+			color = removed and embedGreen or embedRed,
 			fields = fields
-		}, WEBHOOK_NAME)
+		}, webhookName)
 
 		if not sent then
 			notify('Webhook failed: '..tostring(err), 10, 'warning')
@@ -368,9 +368,7 @@ local function playerRemoving(plr)
 	if plr == lplr then return end
 
 	for _, other in playersService:GetPlayers() do
-		if other ~= plr and (other.Name == plr.Name or other.DisplayName == plr.DisplayName) then
-			return
-		end
+		if other ~= plr and (other.Name == plr.Name or other.DisplayName == plr.DisplayName) then return end
 	end
 
 	if not whitelist.customtags[plr.Name] and not tempTargets[plr.Name] then return end

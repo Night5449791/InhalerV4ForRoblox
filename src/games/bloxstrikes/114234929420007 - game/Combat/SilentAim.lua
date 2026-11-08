@@ -105,7 +105,7 @@ run(function()
 
 	-- the look-for-a-target pass is the expensive half (an entity sweep and a raycast), so
 	-- it runs on its own clock while the trigger itself is pulled every frame
-	local GATE_SECONDS = 0.15
+	local gateSeconds = 0.15
 
 	local function autoFireLoop()
 		local gateUntil, gateOk = 0, false
@@ -119,7 +119,7 @@ run(function()
 				local now = os.clock()
 				if now >= gateUntil then
 					gateOk = reachable()
-					gateUntil = now + GATE_SECONDS
+					gateUntil = now + gateSeconds
 				end
 
 				local active = gateOk and currentWeapon()

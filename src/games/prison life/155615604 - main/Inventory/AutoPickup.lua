@@ -3,7 +3,7 @@ local AutoPickOnDied
 local items = {}
 local PickupList = {}
 local died = false
-local PICKUP_GUN_CFRAME = CFrame.new(816, 98, 2225)
+local pickupGunCF = CFrame.new(816, 98, 2225)
 
 local function AddPickup(pickup)
 	if pickup:IsA('Model') and pickup.Name ~= 'Model' and pickup:GetAttribute('ToolName') then
@@ -44,7 +44,7 @@ local function grabEquipment(destination)
 	local deadline = os.clock() + 2
 
 	repeat
-		root.CFrame = PICKUP_GUN_CFRAME
+		root.CFrame = pickupGunCF
 		root.AssemblyLinearVelocity = Vector3.zero
 		task.wait(0.05)
 

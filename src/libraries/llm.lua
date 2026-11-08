@@ -16,7 +16,7 @@ end
 local httpService = cloneref(game:GetService('HttpService'))
 
 -- a completion can take a while on a slow endpoint, but not forever
-local REQUEST_TIMEOUT = 30
+local requestTimeout = 30
 
 local llm = {}
 
@@ -59,7 +59,7 @@ local function call(options, url, method, body, headers)
 	local payload = {
 		Url = url,
 		Method = method or 'GET',
-		Headers = headers or {}
+		Headers = headers or {},
 	}
 
 	if body ~= nil then
@@ -73,7 +73,7 @@ local function call(options, url, method, body, headers)
 	-- the executor call blocks, so a request that never answers would hold the thread;
 	-- the timeout is advisory: the thread is let go and the reply is ignored
 	local done = false
-	local timer = task.delay(REQUEST_TIMEOUT, function()
+	local timer = task.delay(requestTimeout, function()
 		done = true
 	end)
 
@@ -81,7 +81,7 @@ local function call(options, url, method, body, headers)
 	task.cancel(timer)
 
 	if not ok then return nil, 'request failed: '..tostring(response) end
-	if done then return nil, 'request timed out after '..REQUEST_TIMEOUT..'s' end
+	if done then return nil, 'request timed out after '..requestTimeout..'s' end
 	if typeof(response) ~= 'table' then return nil, 'request returned nothing' end
 
 	local status = tonumber(response.StatusCode or response.Status) or 0

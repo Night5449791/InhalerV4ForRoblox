@@ -213,11 +213,11 @@ run(function()
 		local character = player and player.Character
 		if character and hit.Instance:IsDescendantOf(character) then return nil end
 
-		local excludeTag = constantsTable.RAY_EXCLUDE_TAG
+		local excludeTag = constantsTable.rayExcludeTag
 		if excludeTag and collectionService:HasTag(hit.Instance, excludeTag) then return nil end
 
 		if nonStatic then
-			local nonStaticTag = constantsTable.NON_STATIC_TAG
+			local nonStaticTag = constantsTable.nonStaticTag
 			if nonStaticTag and collectionService:HasTag(hit.Instance, nonStaticTag) then return nil end
 		end
 

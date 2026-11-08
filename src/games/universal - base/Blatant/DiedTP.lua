@@ -6,8 +6,8 @@ local enabled = false
 local generation = 0
 -- how long after `CharacterAdded` the server keeps overwriting the root. The respawn
 -- lands on the spawn location ~1s in, so a write before that is simply replaced
-local SETTLE_TIMEOUT = 2.5
-local SETTLE_STEP = 0.05
+local settleTimeout = 2.5
+local settleStep = 0.05
 
 local function getRoot(char)
 	if not char then return end
@@ -59,7 +59,7 @@ end
 -- `CharacterAdded` fires before the server has placed the body, so a single write is
 -- thrown away: in a measured respawn the root sat at the spawn location until ~1s and
 -- every write before that was overwritten. The position is re-asserted for
--- `SETTLE_TIMEOUT` instead, and the loop stops as soon as it sticks. The velocity is
+-- `settleTimeout` instead, and the loop stops as soon as it sticks. The velocity is
 -- cleared with it or the body keeps falling from wherever it was spawned.
 local function returnToLastDeath(char, currentGeneration)
 	if not enabled or currentGeneration ~= generation or not char then return end
@@ -69,13 +69,11 @@ local function returnToLastDeath(char, currentGeneration)
 	local target = lastDeath
 	if not root or not humanoid or not target then return end
 
-	local deadline = os.clock() + SETTLE_TIMEOUT
+	local deadline = os.clock() + settleTimeout
 	local settled = 0
 
 	repeat
-		if not enabled or currentGeneration ~= generation or lplr.Character ~= char or not root.Parent then
-			return
-		end
+		if not enabled or currentGeneration ~= generation or lplr.Character ~= char or not root.Parent then return end
 
 		if not lastDeath then return end
 
@@ -91,7 +89,7 @@ local function returnToLastDeath(char, currentGeneration)
 			settled = settled + 1
 		end
 
-		task.wait(SETTLE_STEP)
+		task.wait(settleStep)
 	until settled >= 3 or os.clock() > deadline
 
 	if enabled and currentGeneration == generation and lplr.Character == char and settled >= 3 then

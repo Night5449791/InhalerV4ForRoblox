@@ -102,9 +102,7 @@ local function removeTags(str)
 end
 
 local function safeHook(target, replacement)
-	if typeof(target) ~= 'function' then
-		return
-	end
+	if typeof(target) ~= 'function' then return end
 
 	if restorefunction then
 		pcall(restorefunction, target)
@@ -114,9 +112,7 @@ local function safeHook(target, replacement)
 end
 
 local function safeUnhook(target, original)
-	if typeof(target) ~= 'function' then
-		return
-	end
+	if typeof(target) ~= 'function' then return end
 
 	if restorefunction then
 		pcall(restorefunction, target)

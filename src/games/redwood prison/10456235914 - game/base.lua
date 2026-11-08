@@ -23,7 +23,7 @@ local redwood = {
 		Neutral = 'Neutral',
 		Prisoners = 'Prisoners',
 		Krampus = 'Krampus',
-		Military = 'Military'
+		Military = 'Military',
 	}
 }
 

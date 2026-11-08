@@ -12,11 +12,7 @@ do
 		uipallet.Main = data.Main and Color3.fromRGB(unpack(data.Main)) or uipallet.Main
 		uipallet.Text = data.Text and Color3.fromRGB(unpack(data.Text)) or uipallet.Text
 		if data.Font then
-			local success, font = pcall(Font.new,
-				data.Font:find('rbxasset') and data.Font
-				or string.format('rbxasset://fonts/families/%s.json', data.Font)
-			)
-
+			local success, font = pcall(Font.new, data.Font:find('rbxasset') and data.Font or string.format('rbxasset://fonts/families/%s.json', data.Font))
 			if success then
 				uipallet.Font = font
 			end

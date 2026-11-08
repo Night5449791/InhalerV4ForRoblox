@@ -10,9 +10,7 @@ Folder.Parent = vape.holder
 
 local function Removed(c4)
 	local cham = Reference[c4]
-	if not cham then
-		return
-	end
+	if not cham then return end
 
 	if vape.ThreadFix then
 		setthreadidentity(8)
@@ -23,9 +21,7 @@ local function Removed(c4)
 end
 
 local function Added(c4)
-	if Reference[c4] then
-		return
-	end
+	if Reference[c4] then return end
 
 	local cham = Instance.new('Highlight')
 	cham.Adornee = c4
@@ -67,9 +63,7 @@ FillColor = C4ESP:CreateColorSlider({
 	Name = 'Color',
 	Function = function(hue, sat, val)
 		local color = Color3.fromHSV(hue, sat, val)
-		if color == lastFill then
-			return
-		end
+		if color == lastFill then return end
 
 		lastFill = color
 
@@ -83,9 +77,7 @@ OutlineColor = C4ESP:CreateColorSlider({
 	DefaultSat = 0,
 	Function = function(hue, sat, val)
 		local color = Color3.fromHSV(hue, sat, val)
-		if color == lastOutline then
-			return
-		end
+		if color == lastOutline then return end
 
 		lastOutline = color
 

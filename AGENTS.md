@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for any AI agent (Claude, Codex, Gemini, Copilot, Cursor, …) working in this repository. `CODEBUDDY.md` is the canonical, fuller version of this file; if the two disagree, `CODEBUDDY.md` wins and this file should be corrected. Section numbers are shared between both files and referenced from other docs — keep them stable.
+Guidance for any AI agent (Claude, Codex, Gemini, Copilot, Cursor, …) working in this repository. This file is the single source of truth — `CODEBUDDY.md` only points here. Section numbers are referenced from other docs — keep them stable.
 
 ## 0. What this repo is
 
@@ -16,8 +16,6 @@ Rules for agents:
 ## 1. Commands
 
 The Vape build happens only in CI. `.github/workflows/build.yaml` triggers on push to `main` only (`on.push.branches`, no `pull_request`, no `workflow_dispatch`) and has a single `build` job — there is **no** `verify` job and no `needs:` gate. It clones this repo, `InhalerCompiled` and `InhalerBundler`; moves `.github/workflows/workflowConfig.json` to `InhalerBundler/config.json` (`SRC_PATH=./src`, `PROD_PATH=./InhalerCompiled`, `DEV_PATH=""`); runs `npm i`; runs `node ./InhalerBundler/index.js prod` (Node 24.15.0); then commits and pushes the output. Bundling rules live in InhalerBundler, not here.
-
-The Obsidian build is **local-only** with its own bundler folder, `InhalerBundlerObsidian` (cloned as a sibling of this repo; `SRC_PATH=../InhalerV4ForRoblox/src`, `PROD_PATH=./InhalerObsidianCompiled`). CI never builds or pushes it. Run `node index.js prod` there, after `bash scripts/fetch-obsidian.sh` once to populate `vendor/Obsidian`.
 
 There is no lint, formatter or test suite (no selene/stylua config, no `package.json`, no Makefile). The only check available is a syntax-only parse of one file — rewrite Luau-only spellings, then parse with Lua 5.4:
 
@@ -168,15 +166,51 @@ Prison Life's `Utility/ChatCommand.lua` keeps a shared path next to the local `l
 
 ## 10. Conventions
 
-1. Tabs, no semicolons; don't collapse multi-argument calls onto one line (`CONTRIBUTING.md`).
-2. Localize aggressively — never index a field or call a function twice in a loop; hoist per-frame constants.
-3. New modules go in `src/games/<game>/<PlaceId> - <desc>/<Category>/<Name>.lua` with no `require` and the base's locals; top-level names only have to be unique against `base.lua` and the other unwrapped files, since a wrapped file keeps its own scope (§9).
-4. Route all cleanup through `vape:Clean(...)` / `<Module>:Clean(...)`; raw `:Connect()` leaks across reinjection.
-5. Module loops: `repeat ... task.wait() until not Module.Enabled`; the framework already spawns `Function`.
-6. Cross-file forward declarations: the base declares `local Reach = {}`, the module assigns without `local`.
-7. Hot restart an option change: `if Module.Enabled then Module:Toggle(); Module:Toggle() end`.
-8. Prefer guarded executor calls (`typeof(x) == 'function'`, `pcall`) over raw calls with live game objects.
-9. When asked to optimize, touch only code the assistant wrote in that file; upstream and maintainer code stays unless explicitly requested.
+Measured against upstream `7GrandDadPGN/VapeV4ForRoblox` (402 of 410 Lua files use tabs). Match upstream, not personal taste.
+
+**Layout**
+
+1. Tabs, one level per block. Never spaces.
+2. No semicolons as statement terminators. The only `;` in the tree sits in `libraries/vm.lua` (VM port inherited from upstream) — never add one.
+3. Single quotes for strings: `'Killaura'` (6845 single vs 282 double upstream, ~96%). Double quotes survive only in inherited code (`vm.lua`, `Spotify.lua`, `guis/new/init.lua`'s older lines) — leave those alone.
+4. Assignment and comparison operators are spaced: `x = y`, `a == b`. String concat is the exception — `..` has no surrounding spaces: `'...'..readfile(...)..'/'..select(...)`.
+5. Comments start with `--` plus one space.
+6. Table literals put one field per line, every field except the **last** carries a comma, and the last one does not (upstream: plain tables 144:8, component arguments 1212:6 — both overwhelmingly omit the final comma). Never collapse a multi-argument call onto one line (`CONTRIBUTING.md`).
+7. No compound assignment: `+=`, `-=`, `*=` appear zero times upstream. Write `x = x + y`.
+8. Files end with a newline; do not stop at the final `end` without one.
+
+**Naming**
+
+9. camelCase for locals and fields: `local suc, res`, `local gameCamera`, `readfile`, `cloneref`. snake_case is rare and only in inherited code.
+10. Business constants are camelCase (`settleTimeout`, `maxRemembered`, `tpOffset`). Upstream reserves SCREAMING_SNAKE_CASE for VM and bytecode work (`TWO_POW_*`, `LUA_*`). Roblox enum strings such as `'INVITE_BROWSER'` are values, not names — leave them.
+11. Service locals are `cloneref(game:GetService('X'))` at the top of a base, named after the service in lowerCamel with the `Service` suffix kept (`playersService`, `replicatedStorage`, `runService`, `inputService`, `tweenService`).
+12. Shim blocks are re-declared at the top of a chunk (`local loadstring = function(...)`, `local isfile = isfile or function(file)`, `local run = function(func)`, `local queue_on_teleport = queue_on_teleport or function() end`, `local cloneref = cloneref or function(obj)`); no blank lines inside the block, one blank line after it.
+13. Helpers are `local function name(...)` (486 upstream); `local name = function()` is for shims and closures such as `run`.
+
+**Module shape**
+
+14. A module file forward-declares every module and option as `local Name` at the top, one per line with no blank lines between them, then a blank line, then shared locals, then `Name = vape.Categories.X:CreateModule({ ... })`. Options are created after the module (`Targets = Killaura:CreateTargets({...})`). Category files never write `local vape = shared.vape`.
+15. Option callbacks keep upstream's parameter names: `Function = function(callback)` for modules (454 upstream), `(val)` for colour sliders and sliders (104), `()` for dropdowns, `(enter)` / `(args)` for buttons.
+16. Module loops are `if callback then` → `repeat` → body → `task.wait()` → `until not Module.Enabled` → `end`; the framework already spawns `Function`, so never spawn another thread.
+17. Single-statement early returns stay on one line: `if not isfolder(path) then return end` (224 upstream vs 25 multi-line).
+18. Instances shared across functions (`Folder`, `Part`, `Highlight`) are declared at file scope with `Instance.new` and get their properties and `Parent` set there, not scattered through functions.
+19. `continue` is a last resort; filter with `if ... then ... end` or an early `return` instead.
+
+**Practice**
+
+20. Localize aggressively — never index a field or call a function twice in a loop; hoist per-frame constants above the loop (`CONTRIBUTING.md`).
+21. Route all cleanup through `vape:Clean(...)` / `<Module>:Clean(...)` (422 upstream); raw `:Connect()` leaks across reinjection.
+22. Cross-file forward declarations: the base declares `local Reach = {}`, the module assigns without `local`.
+23. Hot restart an option change: `if Module.Enabled then Module:Toggle(); Module:Toggle() end`.
+24. Prefer guarded executor calls (`typeof(x) == 'function'`, `pcall`) over raw calls with live game objects.
+25. New modules go in `src/games/<game>/<PlaceId> - <desc>/<Category>/<Name>.lua` with no `require` and the base's locals; top-level names only have to be unique against `base.lua` and the other unwrapped files, since a wrapped file keeps its own scope (§9).
+26. When asked to optimize, touch only code the assistant wrote in that file; upstream and maintainer code stays unless explicitly requested.
+
+**Change boundary**
+
+- Restyle only code Inhaler added or rewrote. Lines identical to upstream stay byte-for-byte, never reformatted.
+- Pure branding replacements (`VapeCompiled` → `InhalerCompiled`, `vape` → `inhaler` in the watermark) count as no code change — leave them alone.
+- Verify with the Lua 5.4 syntax check in §1 after editing.
 
 ## 11. Changelog via Discord webhook
 
@@ -190,26 +224,3 @@ Prison Life's `Utility/ChatCommand.lua` keeps a shared path next to the local `l
 ````
 
 One line per changed file, `+` added / `-` removed / `~` changed; no mechanics, no multiple lines per file. Universal changes use `[Universal]`; rerunning replaces the earlier message. The script (`./inhaler_send_update.py <WebhookURL>`, or `WEBHOOK_URL`/`UPDATES_FILE`/`PROXY`, proxy default `127.0.0.1:7890`, `off` disables) posts the file, splits entries past Discord's 1024-character field limit into `Name (2)`, keeps the file when sending fails and deletes it on success. Don't run it or post the webhook unless asked.
-
-### Obsidian changes
-
-Anything that touches the Obsidian build (`src/guis/new/`, `ObsidianCompat`, the Obsidian window, its bundler) goes in its own `[Inhaler Obsidian]` section, written **last** — below every `[Universal]` / game section:
-
-````md
-[Universal]
-```diff
-~ [Killaura.lua] target sorting now prefers the closest entity
-```
-
-[Inhaler Obsidian]
-```diff
-+ [ObsidianCompat.lua] things for ui or obsidian
-- [init.lua] things for ui or obsidian
-? [base.lua] things for ui or obsidian
-```
-# Obsidian Updated
-````
-
-Only when the Obsidian build actually changed; a Vape-only update leaves both out.
-
-**The footer rule.** `# Obsidian Updated` is the **very last line of the file**, after the `[Inhaler Obsidian]` section and after its closing fence. It is a marker, not an entry: `inhaler_send_update.py` skips it when parsing and instead adds the embed footer `Inhaler Obsidian has been compiled, enjoy.` Write it only when the Obsidian build was compiled in that round; without it the message carries no footer. Never put it above an entry, and never write anything after it.

@@ -98,9 +98,7 @@ DamageIndicator = vape.Legit:CreateModule({
 		if callback then
 			TracerHook:Add('DamageIndicator', function()
 				local part = debug.getstack(4, 13)
-				if typeof(part) ~= 'Instance' then
-					return
-				end
+				if typeof(part) ~= 'Instance' then return end
 
 				local clock = os.clock()
 
@@ -118,9 +116,7 @@ DamageIndicator = vape.Legit:CreateModule({
 			end)
 
 			DamageIndicator:Clean(entitylib.Events.EntityUpdated:Connect(function(entity)
-				if entity ~= tentity or ttimer <= os.clock() then
-					return
-				end
+				if entity ~= tentity or ttimer <= os.clock() then return end
 
 				if entity ~= lentity then
 					if indi then

@@ -8,15 +8,15 @@
 	marker, so other modules reference `prediction` directly.
 
 	Usage:
-	  prediction.SolveTrajectory(
-	    origin,          -- Vector3, muzzle/world position of the shot
-	    projectileSpeed, -- number, muzzle speed
-	    gravity,         -- number, world gravity
-	    targetPos,       -- Vector3, current target position
-	    targetVelocity,  -- Vector3, current target velocity
-	    playerGravity, playerHeight, playerJump, params
-	  )
-	    -> predicted intercept Vector3, or nil if no solution
+	prediction.SolveTrajectory(
+		origin,          -- Vector3, muzzle/world position of the shot
+		projectileSpeed, -- number, muzzle speed
+		gravity,         -- number, world gravity
+		targetPos,       -- Vector3, current target position
+		targetVelocity,  -- Vector3, current target velocity
+		playerGravity, playerHeight, playerJump, params
+	)
+		-> predicted intercept Vector3, or nil if no solution
 ]]
 local module = {}
 local eps = 1e-9
