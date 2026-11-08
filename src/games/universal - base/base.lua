@@ -831,7 +831,9 @@ run(function()
 		end)
 		-- hook every time: playeradded only fires for listed players
 		self:hook()
-		-- returning true here would end the loop that also beacons to the worker
+		-- a failed fetch returns false so the caller's loop tries again: the whitelist is
+		-- the only thing that decides who is private, and giving up on one bad poll would
+		-- leave every member untagged until the game is rejoined
 		if not suc or not hash or not whitelist.get then return false end
 		whitelist.loaded = true
 
@@ -1006,22 +1008,27 @@ run(function()
 		end
 	}
 
-	-- backend.lua is a factory: it returns a constructor that builds the transport
-	local backend = loadstring(downloadFile('newvape/libraries/backend.lua'), 'backend')()({
-		vape = vape,
-		whitelist = whitelist,
-		lplr = lplr,
-		httpService = httpService,
-		isfile = isfile,
-		entitylib = entitylib
-	})
-	backend:start()
-
 	vape:Clean(function()
-		backend:stop()
 		table.clear(whitelist.commands)
 		table.clear(whitelist.data)
 		table.clear(whitelist)
+	end)
+
+	-- The whitelist is a file on github and nothing else reads it for us, so this loop is
+	-- what keeps it current: a tag added from the panel, a blacklist entry, an
+	-- announcement, or a member being removed all only take effect once something polls.
+	--
+	-- It replaces the poll the removed backend used to run. `update` returns true when it
+	-- has dealt with the file itself (a blacklist kick, or KillVape uninjecting), which is
+	-- the only reason to stop — anything else, including a github outage, must keep
+	-- looping or the whitelist would never load again after one failed fetch.
+	task.spawn(function()
+		repeat
+			local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)
+			if ok and done then return end
+
+			task.wait(30)
+		until vape.Loaded == nil
 	end)
 end)
 entitylib.start()
