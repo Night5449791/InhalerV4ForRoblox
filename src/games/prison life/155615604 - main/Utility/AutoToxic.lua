@@ -88,14 +88,11 @@ KXUser = AutoToxic:CreateToggle({
 	Name = 'KXUser',
 	Default = false,
 	Function = function(callback)
-		-- the list is created below this toggle, so a profile that already has this on
-		-- fires the Function while it is still nil; the line after the list is what puts
-		-- the control on screen in that case
 		if KXSkip then
 			KXSkip.Object.Visible = callback
 		end
 	end,
-	Tooltip = 'Says .kxusers once when the module starts, so the chat shows who else is injecting'
+	Tooltip = 'auto check kx users'
 })
 
 KXSkip = AutoToxic:CreateTextList({
