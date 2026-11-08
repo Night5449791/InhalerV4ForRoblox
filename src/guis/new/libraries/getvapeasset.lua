@@ -95,7 +95,7 @@ do
 			end
 
 			if path:find('.lua') then
-				data = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..data
+				data = '--This watermark is used to delete the file if its cached, remove it to make the file persist after inhaler updates.\n'..data
 			end
 
 			writefile(path, data)
