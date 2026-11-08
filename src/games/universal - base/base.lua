@@ -242,12 +242,6 @@ local webhookLoaded, webhook = pcall(function()
 	return loadstring(downloadFile('newvape/libraries/webhook.lua'), 'webhook')()
 end)
 
--- same rule for the language model client: a deploy that has not pushed the file yet
--- must only cost the modules that use it, not every game
-local llmLoaded, llm = pcall(function()
-	return loadstring(downloadFile('newvape/libraries/llm.lua'), 'llm')()
-end)
-
 local whitelist = {
 	alreadychecked = {},
 	customtags = {},
@@ -273,7 +267,6 @@ vape.Libraries.whitelist = whitelist
 vape.Libraries.prediction = prediction
 vape.Libraries.hash = hash
 vape.Libraries.webhook = webhookLoaded and webhook or nil
-vape.Libraries.llm = llmLoaded and llm or nil
 vape.Libraries.auraanims = {
 	Normal = {
 		{CFrame = CFrame.new(-0.17, -0.14, -0.12) * CFrame.Angles(math.rad(-53), math.rad(50), math.rad(-64)), Time = 0.1},
