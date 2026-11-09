@@ -163,15 +163,18 @@ FakeKXUser = AutoToxic:CreateToggle({
 	Name = 'Fake KXUser',
 	Default = true,
 	Function = function(callback)
-		if not callback then return end
-
-		pcall(connectFake)
+		if callback then
+			pcall(connectFake)
+		end
 	end,
 	Tooltip = 'Answers .kxusers with the text picked below'
 })
 
-FakeText = FakeKXUser:CreateDropdown({
-	Name = 'Text',
+-- a toggle is a leaf, it cannot host a dropdown, so this sits under the module next to
+-- Fake KXUser
+FakeText = AutoToxic:CreateDropdown({
+	Name = 'Fake Text',
+	Darker = true,
 	List = {'Inhaler V4', 'KX ADMIN'},
 	Tooltip = 'What the answer to .kxusers claims to be running'
 })
