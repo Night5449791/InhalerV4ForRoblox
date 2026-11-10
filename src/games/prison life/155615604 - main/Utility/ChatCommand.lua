@@ -265,6 +265,35 @@ local function whitelistRemove(args)
 	return changeWhitelist(args, true)
 end
 
+-- adds every player whose DisplayName matches, since several accounts can share one
+local function bulkWhitelistAdd(args)
+	if not options.Whitelist.Enabled then return end
+
+	local display = argument(args)
+	if not display then
+		notif('Whitelist', 'No display name given.', 5, 'warning')
+		return
+	end
+
+	display = display:lower()
+
+	local list = vape.Categories.Friends
+	local count = 0
+	for _, plr in playersService:GetPlayers() do
+		if plr.DisplayName:lower() == display then
+			setListValue(list, plr.Name, true)
+			count = count + 1
+		end
+	end
+
+	if count == 0 then
+		notif('Whitelist', 'No player with that display name.', 5, 'warning')
+		return
+	end
+
+	notif('Whitelist', count..' player'..(count == 1 and '' or 's')..' with that display name whitelisted.', 5)
+end
+
 local function changeTargets(args, remove)
 	if not options.Blacklist.Enabled then return end
 
@@ -456,6 +485,8 @@ local commands = {
 	whitelist = whitelistAdd,
 	unwl = whitelistRemove,
 	unwhitelist = whitelistRemove,
+	bulkwl = bulkWhitelistAdd,
+	bulkwhitelist = bulkWhitelistAdd,
 
 	target = targetAdd,
 	blacklist = targetAdd,
@@ -496,7 +527,7 @@ local toggles = {
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
 	{Name = 'Fling', Tooltip = '.kick / ;bang <plr/all> flings the target with a vehicle seat'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
-	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
+	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>\n.bulkwl/.bulkwhitelist <display name> whitelists every player with that display name'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
 	{Name = 'CopyServer', Tooltip = '.copyserver\nCopies the discord invite and opens discord over rpc'}
