@@ -2,15 +2,6 @@ local AntiFeature
 local Ragdoll
 local GameplayPaused
 
--- one module, one line in the list: AntiRagdoll used to be its own module beside this
--- one, and two entries that both answer "stop the game disabling my states" is a
--- distinction nobody reads. It is folded in here as an option, and the module carries
--- the name the games remove.
---
--- The module owns the humanoid, the options only record intent: an option toggled while
--- the module is off must not touch the character, which is why every write below goes
--- through `apply` and `apply` asks the module first. A new character starts with the
--- default states, so the states are re-applied on every respawn.
 local function apply()
 	if not (AntiFeature.Enabled and entitylib.isAlive) then return end
 
@@ -18,10 +9,6 @@ local function apply()
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not Ragdoll.Enabled)
 end
 
--- the loading box is a CoreScript the client drops into `RobloxGui` every time the
--- network stalls, so it has to be caught as it arrives and not just once; the copy
--- already present is destroyed on the same pass, because a paused client can hand it
--- back right after the connection is made
 local function clearGameplayPaused()
 	if not (AntiFeature.Enabled and GameplayPaused.Enabled) then return end
 
@@ -50,8 +37,6 @@ end
 AntiFeature = vape.Categories.Utility:CreateModule({
 	Name = 'AntiFeature',
 	Function = function(callback)
-		-- turning the module off restores the state the game expects, whatever the
-		-- option says: the option is not a live setting, it is an intent
 		if not callback then
 			disconnectGameplayPaused()
 

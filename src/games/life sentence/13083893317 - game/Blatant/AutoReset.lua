@@ -3,8 +3,6 @@ local ResetDistance
 local ResetWhileDowned
 local guards = nil
 
--- the reset button is wired to WeaponEvent:FireServer('Reset'), which is also the cheapest way
--- out of an arrest: a downed player that respawns cannot be handcuffed any more
 AutoReset = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoReset',
 	Function = function(callback)

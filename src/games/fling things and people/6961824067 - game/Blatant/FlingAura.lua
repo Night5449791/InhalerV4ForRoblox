@@ -1,9 +1,5 @@
 local FlingAura
 
--- Fling Aura is Player Fling without a chosen target: every valid entity inside the
--- radius gets its network claimed and written to, on the same 0.1s rhythm. The source
--- runs one thread per target; one loop over all of them is cheaper and produces the
--- same replicated result.
 FlingAura = vape.Categories.Blatant:CreateModule({
 	Name = 'Fling Aura',
 	Function = function(callback)

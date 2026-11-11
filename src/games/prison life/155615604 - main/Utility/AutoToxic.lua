@@ -6,6 +6,11 @@ local FakeText
 local Presets = {}
 local cloned = {}
 local random = Random.new()
+local lines = {
+	'prison life moment | kicked <obj>',
+	'do you also want an antifling? | kicked <obj>',
+	'i wonder why you got kicked | kicked <obj>'
+}
 local fakeMessages = {
 	['Inhaler V4'] = 'I use the script Inhaler V4',
 	['KX ADMIN'] = 'I use the script KX-ADMIN'
@@ -66,12 +71,6 @@ local function sendMessage(obj)
 		replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
 	end
 end
-
-local lines = {
-	'prison life moment | kicked <obj>',
-	'do you also want an antifling? | kicked <obj>',
-	'i wonder why you got kicked | kicked <obj>',
-}
 
 local function connectFake()
 	if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
@@ -155,7 +154,7 @@ FakeText = AutoToxic:CreateDropdown({
 	Name = 'Fake Text',
 	Darker = true,
 	List = {'Inhaler V4', 'KX ADMIN'},
-	Tooltip = 'What the answer to .kxusers claims to be running'
+	Tooltip = '.kxusers spoofing'
 })
 
 pcall(function()

@@ -4,9 +4,6 @@ local Part
 local Delay
 local TeamCheck
 
--- picks the closest valid target once per tick instead of attacking everyone in range:
--- one InflictTarget per swing is what the server expects, extra calls are wasted
--- bandwidth and trip the Adonis rate checks
 local function closestTarget(root, range, teamCheck)
 	local best, bestDistance
 	for _, plr in playersService:GetPlayers() do

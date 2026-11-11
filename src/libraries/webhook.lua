@@ -1,15 +1,3 @@
--- Webhook library: minimal discord webhook poster.
--- Validates a webhook url, encodes the payload and posts it with whatever http
--- request function the executor happens to expose.
---
--- Usage (loaded as its own chunk):
---   local webhook = loadstring(downloadFile('newvape/libraries/webhook.lua'), 'webhook')()
---   webhook.validate(url)                    -> bool
---   webhook.send(url, payload)               -> bool, err
---   webhook.sendEmbed(url, embed, 'name')    -> bool, err
---
--- send and sendEmbed block until discord answers, so spawn them from a task
-
 local cloneref = cloneref or function(obj)
 	return obj
 end
@@ -17,14 +5,11 @@ local httpService = cloneref(game:GetService('HttpService'))
 
 local webhook = {}
 
--- discord.com, canary.discord.com and the older discordapp.com are all valid
 function webhook.validate(url)
 	local host = type(url) == 'string' and url:match('^https://([%w%.%-]+)/api/webhooks/%d+/%S+$')
 	return host ~= nil and (host:match('discord%.com$') or host:match('discordapp%.com$')) ~= nil
 end
 
--- the chunk env is not always the executor env, so getgenv is tried before the plain
--- globals; an executor never swaps these out while running, so it is resolved once
 local requestFunction
 local requestResolved = false
 
@@ -46,7 +31,6 @@ local function getRequestFunction()
 	return requestFunction
 end
 
--- payload is the raw table the discord api expects, true when discord took it
 function webhook.send(url, payload)
 	if not webhook.validate(url) then return false, 'Invalid webhook url' end
 
@@ -62,7 +46,6 @@ function webhook.send(url, payload)
 		Body = body,
 		Headers = {
 			['Content-Type'] = 'application/json',
-			-- discord turns away some of the default executor user agents
 			['User-Agent'] = 'Mozilla/5.0'
 		}
 	})
@@ -75,14 +58,11 @@ function webhook.send(url, payload)
 	return true
 end
 
--- discord drops the whole embed when a single part is too long, so clamp it
 local function clamp(text, limit)
 	text = tostring(text or '')
 	return #text > limit and text:sub(1, limit) or text
 end
 
--- embed is a plain discord embed table {title, description, color, fields}
--- every field is {name = text, value = text, inline = bool}
 function webhook.sendEmbed(url, embed, username)
 	local fields = {}
 	local source = type(embed.fields) == 'table' and embed.fields or {}
@@ -103,7 +83,6 @@ function webhook.sendEmbed(url, embed, username)
 		color = embed.color
 	}
 
-	-- an empty array makes discord reject the payload, leave the key out
 	if fields[1] then built.fields = fields end
 
 	return webhook.send(url, {username = username, embeds = {built}})

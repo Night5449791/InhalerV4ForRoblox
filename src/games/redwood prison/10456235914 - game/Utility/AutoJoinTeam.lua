@@ -2,8 +2,6 @@ local AutoJoinTeam
 local Team
 local Retry
 
--- the team chooser buttons carry an ObjectValue named Team pointing at game.Teams.<name>,
--- and the game invokes ChangeTeam:InvokeServer(team, button name)
 local function teamButtonName(teamName)
 	local gui = lplr.PlayerGui:FindFirstChild('IntroGui')
 	local intro = gui and gui:FindFirstChild('IntroFrame')

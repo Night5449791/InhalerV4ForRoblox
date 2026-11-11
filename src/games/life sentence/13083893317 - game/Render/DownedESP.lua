@@ -1,8 +1,6 @@
 local DownedESP
 local DownedColor
 
--- keyed by player, not by character: a respawn swaps the body under the same player, and a
--- character-keyed table would keep the old entry (and its Highlight) alive forever
 local highlights = setmetatable({}, {__mode = 'k'})
 
 local function clearHighlights()
@@ -37,7 +35,6 @@ DownedESP = vape.Categories.Render:CreateModule({
 				local record = highlights[plr]
 				local downed = character ~= nil and character ~= localCharacter and sentence.isDowned(plr)
 
-				-- the body is gone, the player is no longer downed, or this is a respawn
 				if record and (not downed or record.Character ~= character) then
 					record.Highlight:Destroy()
 					highlights[plr] = nil

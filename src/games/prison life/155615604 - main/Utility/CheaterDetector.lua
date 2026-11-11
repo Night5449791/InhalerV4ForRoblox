@@ -208,8 +208,6 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 		return notify('Webhook is on but no url is set.', 10, 'warning')
 	end
 
-	-- the display name is the one people read, so lead with it and put the
-	-- unique @username in the brackets
 	local label = plr and plr.DisplayName or name
 	local handle = plr and plr.Name or name
 	local id = plr and tostring(plr.UserId) or 'unknown'

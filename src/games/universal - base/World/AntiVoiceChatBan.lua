@@ -108,17 +108,11 @@ local function scanMic()
 	end
 end
 
--- The bypass is a sequence of waits, and every one of them has to give up the moment the
--- module is turned off or vape unloads — otherwise the remaining steps keep driving voice
--- chat after the user asked it to stop. `step` is what makes that one check instead of
--- six copies of the same guard.
 local function step(seconds)
 	task.wait(seconds)
 	return vape.Loaded and AntiVoiceChatBan.Enabled
 end
 
--- The game's own mic button draws its state as a child image named `1`; an empty or
--- muted image means the user has not confirmed they can speak yet.
 local function micImage()
 	local icon = micIcon and micIcon:FindFirstChild('1')
 
@@ -144,8 +138,6 @@ local function waitUnmuted()
 	end
 end
 
--- One accessor for "the transparency this object draws through", because both the hide
--- and the restore pass need the same branch and keeping them apart is how they drift.
 local function transparencyOf(object)
 	if object:IsA('ImageLabel') or object:IsA('ImageButton') then
 		return 'ImageTransparency'
@@ -229,13 +221,6 @@ local function createController()
 	end)
 	AntiVoiceChatBan:Clean(stateConnection)
 
-	-- `micIcon` is the label just created above, so testing it here can never be true:
-	-- what decides whether the scan is needed is whether the game's own mic button was
-	-- ever found, and that is `micToggle`.
-	--
-	-- The scan overwrites `micIcon` with the game's icon, and `syncIcon` below draws into
-	-- `micIcon`, so the custom label has to be put back or the first `setMuted` would
-	-- paint the game's button instead of this one.
 	if not micToggle then
 		local own = micIcon
 		scanMic()

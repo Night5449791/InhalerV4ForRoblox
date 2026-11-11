@@ -3,9 +3,6 @@ local Fog
 local Smoke
 local lightingService = cloneref(game:GetService('Lighting'))
 
--- the game ships its lighting per map as a whole property table, so the fog is not set once and
--- forgotten: every value is written back whenever something else moves it (Lighting.FogStart and
--- FogEnd, or the Atmosphere under Lighting), and an Atmosphere added later is caught on ChildAdded
 local fogProperties = {
 	FogStart = 100000,
 	FogEnd = 100000
@@ -77,8 +74,6 @@ local function startFog()
 	end))
 end
 
--- a smoke grenade is a VoxelSmoke_ folder in Workspace.Debris holding SmokeVoxel parts, which is
--- also the two names the game's own aim assist and mobile auto shoot use to test line of sight
 local function hideSmoke(instance)
 	-- named first: Debris churns with pooled ragdolls, so this runs for far more parts than the
 	-- clouds it is after and the name is the cheapest thing to reject on. A plain find keeps the
@@ -94,8 +89,6 @@ local function hideSmoke(instance)
 		LocalTransparencyModifier = instance.LocalTransparencyModifier
 	}
 
-	-- the modifier keeps the cloud hidden while the game fades the part itself, and the query
-	-- flag is what makes the aura and the aim casts look straight through it
 	instance.CanCollide = false
 	instance.CanQuery = false
 	instance.LocalTransparencyModifier = 1

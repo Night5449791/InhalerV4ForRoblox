@@ -2,7 +2,6 @@ local Speed
 local SpeedValue
 local original
 
--- walk speed only: the other modes spike AssemblyLinearVelocity, which this game reads as a fall
 Speed = vape.Categories.Blatant:CreateModule({
 	Name = 'Speed',
 	Function = function(callback)

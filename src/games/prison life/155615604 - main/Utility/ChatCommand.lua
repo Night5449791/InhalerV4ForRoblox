@@ -1,6 +1,3 @@
--- a friend may drive these commands while ShareCommands is on, a private member is skipped
--- because their own client already ran it
-
 local ChatCommand
 local targetColor = Color3.new(1, 0, 0)
 
@@ -15,11 +12,6 @@ local tpOffset = Vector3.new(0, 2, 0)
 local discordCode = 'YSzD7f9neR'
 local discordInvite = 'https://discord.gg/'..discordCode
 
--- ============================================================================
--- helpers
--- ============================================================================
-
--- nil when the text is missing or only whitespace
 local function argument(text)
 	text = text and text:match('^%s*(.-)%s*$') or nil
 	return text ~= '' and text or nil
@@ -37,7 +29,6 @@ local function setListValue(list, value, enabled)
 	end
 end
 
--- returns how many entries were dropped
 local function clearListValues(list)
 	if not list or not list.List then return 0 end
 
@@ -50,8 +41,6 @@ local function clearListValues(list)
 	return count
 end
 
--- entries are either entities, which expose their player, or plain players. filter drops
--- entries, an exact match wins over a wildcard match, which wins over a prefix match
 local function search(list, lowered, filter)
 	local partial, wildcardMatch
 	local pattern
@@ -85,13 +74,11 @@ local function findEntity(prefix, includeDead)
 	local text = argument(prefix)
 	if not text then return end
 
-	-- npcs carry no player and dead characters only count when asked for
 	return search(entitylib.List, text:lower(), function(entity)
 		return entity.Player and (includeDead or entity.Humanoid.Health > 0)
 	end)
 end
 
--- spawned players first, then everyone still in the server when allowLeft is set
 local function findPlayer(prefix, allowLeft)
 	local entity = findEntity(prefix, true)
 	if entity then
@@ -103,10 +90,6 @@ local function findPlayer(prefix, allowLeft)
 
 	return search(playersService:GetPlayers(), text:lower())
 end
-
--- ============================================================================
--- camera / follow / other modules
--- ============================================================================
 
 local function restoreCamera()
 	viewPlayer = nil
@@ -182,7 +165,6 @@ local function startFollow(player)
 	end)
 end
 
--- enables another product module when its toggle here allows it
 local function enableModule(name)
 	if not options[name].Enabled then return end
 
@@ -191,10 +173,6 @@ local function enableModule(name)
 		module:Toggle()
 	end
 end
-
--- ============================================================================
--- command handlers
--- ============================================================================
 
 local function handleTP(args)
 	if not options.PlayerTP.Enabled then return end
@@ -243,7 +221,6 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
--- the two whitelist commands share this body; the handlers below pick the direction
 local function changeWhitelist(args, remove)
 	if not options.Whitelist.Enabled then return end
 
@@ -265,7 +242,6 @@ local function whitelistRemove(args)
 	return changeWhitelist(args, true)
 end
 
--- adds every player whose DisplayName matches, since several accounts can share one
 local function bulkWhitelistAdd(args)
 	if not options.Whitelist.Enabled then return end
 
@@ -360,7 +336,6 @@ local function rejoinServer()
 	enableModule('Rejoin')
 end
 
--- .kick <plr/all> flings the target, the module has no kick mode of its own
 local function startFling(args)
 	if not options.Fling.Enabled then return end
 
@@ -508,13 +483,7 @@ local commands = {
 	copyserver = handleCopyServer
 }
 
--- ============================================================================
--- options
--- ============================================================================
-
 local toggles = {
-	-- off by default and renamed from ShareCommand on purpose: profiles saved the old
-	-- default (on) under that key, and a renamed option has no saved value
 	{Name = 'ShareCommands', Default = false, Tooltip = 'Allows whitelisted users to directly access chat commands.'},
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
@@ -533,13 +502,7 @@ local toggles = {
 	{Name = 'CopyServer', Tooltip = '.copyserver\nCopies the discord invite and opens discord over rpc'}
 }
 
--- ============================================================================
--- sharing / dispatch
--- ============================================================================
-
 local function canShare(plr)
-	-- a private member is not shared with: their line would run the command twice, once
-	-- for their own client and again here
 	local success, level = pcall(whitelist.get, whitelist, plr)
 	if success and type(level) == 'number' and level > 0 then
 		return false
@@ -548,10 +511,8 @@ local function canShare(plr)
 	return options.ShareCommands.Enabled and table.find(vape.Categories.Friends.ListEnabled, plr.Name) ~= nil
 end
 
--- declared first: trackPlayer closes over it and the definition comes after
 local onChatted
 
--- one Chatted connection per other player, so a shared command can be heard
 local function trackPlayer(plr)
 	if plr == lplr or sharedConnections[plr] then return end
 
@@ -586,10 +547,6 @@ onChatted = function(message, plr)
 	handler(args ~= '' and args or nil)
 	return true
 end
-
--- ============================================================================
--- module
--- ============================================================================
 
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
@@ -654,8 +611,6 @@ for _, toggle in toggles do
 	options[toggle.Name] = ChatCommand:CreateToggle({
 		Name = toggle.Name,
 		Tooltip = toggle.Tooltip,
-		-- ShareCommands is the one that ships off: a friend can drive commands only after
-		-- it is turned on
 		Default = toggle.Default ~= false,
 		Function = toggle.Function
 	})

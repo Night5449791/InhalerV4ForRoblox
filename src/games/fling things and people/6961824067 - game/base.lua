@@ -23,9 +23,6 @@ local friendsColor = friends.Options['Friends color']
 local teamsByServer = vape.Settings.Modules.Options['Teams by server']
 local useTeamColor = vape.Settings.Modules.Options['Use team color']
 
--- everything this product reaches into the game through. the grab system is the whole
--- game: a player drags a toy to their plot, grabs a part or another player with it, and
--- flings whatever is attached by fighting the network owner
 local ftap = {
 	remotes = nil,
 	toys = {},
@@ -47,8 +44,6 @@ local function notif(...)
 	return vape:CreateNotification(...)
 end
 
--- a grabbed player is ragdolled and rides on the grabber's network ownership, so the
--- two things every module asks about are "is this thing being held" and "who holds it"
 function ftap.isGrabbed(ent)
 	if not ent or not ent.Character then return false end
 
@@ -61,7 +56,6 @@ end
 function ftap.isToy(obj)
 	if typeof(obj) ~= 'Instance' then return false end
 
-	-- a toy is a model the game tags when it spawns it, in the plot of whoever bought it
 	return obj:IsA('Model') and (obj:GetAttribute('ToyName') ~= nil or obj.Name:find('SpawnedInToys') ~= nil)
 end
 
@@ -72,8 +66,6 @@ function ftap.resetRemotes()
 end
 
 run(function()
-	-- the game loads its remotes a moment after the character spawns, so this waits with a
-	-- bound instead of blocking the whole product on a slow server
 	local function grabRemotes()
 		local menuToys = replicatedStorage:WaitForChild('MenuToys', 15)
 		local grabEvents = replicatedStorage:WaitForChild('GrabEvents', 15)
@@ -105,8 +97,6 @@ run(function()
 		until ftap.remotes or not vape.Loaded
 	end)
 
-	-- a toy is anything the game tags once it exists in the world; the tag is what the
-	-- plot uses to clean up, so it is stable across updates
 	local function trackToy(obj)
 		if not obj:IsA('Model') then return end
 		ftap.toys[obj] = true
@@ -126,8 +116,6 @@ run(function()
 	end
 end)
 
--- the game hands out a plot per player; a module that spawns toys needs the plot the local
--- player owns, and the name is always "<Name>SpawnedInToys"
 function ftap.plot()
 	return workspace:FindFirstChild(lplr.Name .. 'SpawnedInToys')
 end
@@ -152,9 +140,6 @@ function ftap.destroyToy(obj)
 	end)
 end
 
--- The fling itself: the grabber owns the network of what it holds, so handing that
--- ownership back and forth with a large velocity is what throws the target. The game
--- keeps the grab alive through SetNetworkOwner, so every fling re-asserts it.
 function ftap.setOwner(part, camera)
 	if not ftap.remotes or not ftap.remotes.setNetworkOwner then return false end
 	if not part then return false end
@@ -175,8 +160,6 @@ end
 
 vape:Clean(entitylib.Events.LocalAdded:Connect(updateVelocity))
 
--- every entity that is not the local player is a candidate: the game has no teams, so
--- "targetable" is decided by the friend list and the whitelist alone
 entitylib.targetCheck = function(ent)
 	if ent == entitylib.character then return false end
 	if ent.Player and isFriend(ent.Player) then return false end
@@ -208,9 +191,6 @@ entitylib.start()
 
 vape:Clean(ftap.resetRemotes)
 
--- universal ships modules that either do nothing here or would collide with this
--- product's own: `Reach` is the important one, since GamepassReach replaces it and two
--- modules under one name overwrite each other in vape.Modules
 for _, module in {'AutoClicker', 'TriggerBot', 'HitBoxes', 'Killaura', 'Jesus', 'AutoRejoin', 'Disabler', 'MurderMystery', 'Parkour', 'Wallhop', 'Reach'} do
 	vape:Remove(module)
 end

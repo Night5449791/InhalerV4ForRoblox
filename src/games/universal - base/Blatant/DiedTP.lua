@@ -2,16 +2,22 @@ local DiedTP
 local lastDeath
 local connections = {}
 local characterConnection
+local rootConnection
 local enabled = false
 local generation = 0
--- how long after `CharacterAdded` the server keeps overwriting the root. The respawn
--- lands on the spawn location ~1s in, so a write before that is simply replaced
-local settleTimeout = 2.5
-local settleStep = 0.05
+local settleFrames = 90
+local verifyTimeout = 0.35
+local verifyDistance = 3
 
 local function getRoot(char)
 	if not char then return end
 	return char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
+end
+
+local function isNear(char, target)
+	local root = getRoot(char or lplr.Character)
+	if not root or not target then return true end
+	return (root.CFrame.Position - target.Position).Magnitude <= verifyDistance
 end
 
 local function captureDeathPosition(char)
@@ -31,12 +37,14 @@ local function disconnectConnections()
 		characterConnection:Disconnect()
 		characterConnection = nil
 	end
+
+	if rootConnection then
+		rootConnection:Disconnect()
+		rootConnection = nil
+	end
 	lastDeath = nil
 end
 
--- the humanoid is in `Dead` while the server is still tearing the old body down, and
--- that is the only moment the death CFrame is still readable; a character that is
--- already gone keeps the last value `Died` stored
 local function captureIfDead(char)
 	local humanoid = char and char:FindFirstChildOfClass('Humanoid')
 	if humanoid and humanoid.Health > 0 then return end
@@ -56,11 +64,6 @@ local function watchCharacter(char)
 	DiedTP:Clean(characterConnection)
 end
 
--- `CharacterAdded` fires before the server has placed the body, so a single write is
--- thrown away: in a measured respawn the root sat at the spawn location until ~1s and
--- every write before that was overwritten. The position is re-asserted for
--- `settleTimeout` instead, and the loop stops as soon as it sticks. The velocity is
--- cleared with it or the body keeps falling from wherever it was spawned.
 local function returnToLastDeath(char, currentGeneration)
 	if not enabled or currentGeneration ~= generation or not char then return end
 
@@ -69,13 +72,17 @@ local function returnToLastDeath(char, currentGeneration)
 	local target = lastDeath
 	if not root or not humanoid or not target then return end
 
-	local deadline = os.clock() + settleTimeout
-	local settled = 0
+	local frames, settled = 0, 0
 
-	repeat
+	if rootConnection then
+		rootConnection:Disconnect()
+		rootConnection = nil
+	end
+
+	rootConnection = runService.PreSimulation:Connect(function()
+		local connection = rootConnection
 		if not enabled or currentGeneration ~= generation or lplr.Character ~= char or not root.Parent then return end
-
-		if not lastDeath then return end
+		if not lastDeath or humanoid.Health <= 0 then return end
 
 		if humanoid.SeatPart then
 			humanoid.Sit = false
@@ -89,12 +96,14 @@ local function returnToLastDeath(char, currentGeneration)
 			settled = settled + 1
 		end
 
-		task.wait(settleStep)
-	until settled >= 3 or os.clock() > deadline
+		frames = frames + 1
 
-	if enabled and currentGeneration == generation and lplr.Character == char and settled >= 3 then
-		lastDeath = nil
-	end
+		if settled >= 2 or frames >= settleFrames then
+			lastDeath = nil
+			connection:Disconnect()
+		end
+	end)
+	DiedTP:Clean(rootConnection)
 end
 
 DiedTP = vape.Categories.Blatant:CreateModule({
@@ -107,22 +116,26 @@ DiedTP = vape.Categories.Blatant:CreateModule({
 
 		if not callback then return end
 
-		local addedConnection = entitylib.Events.LocalAdded:Connect(function(entity)
+		local addedConnection = lplr.CharacterAdded:Connect(function(char)
 			if not enabled or currentGeneration ~= generation then return end
-			watchCharacter(entity and entity.Character)
+			watchCharacter(char)
+			task.spawn(returnToLastDeath, char, currentGeneration)
 		end)
 		table.insert(connections, addedConnection)
 		DiedTP:Clean(addedConnection)
 
-		local respawnConnection = lplr.CharacterAdded:Connect(function(char)
-			task.spawn(returnToLastDeath, char, currentGeneration)
-		end)
-		table.insert(connections, respawnConnection)
-		DiedTP:Clean(respawnConnection)
+		local verifyConnection = lplr.CharacterAdded:Connect(function(char)
+			local target = lastDeath
+			if not target then return end
 
-		-- the root is normally gone by the time `LocalRemoved` fires, so this is only
-		-- the fallback for rigs where `Died` never ran; the check keeps it from
-		-- overwriting the death spot with a spawn position
+			task.delay(verifyTimeout, function()
+				if not enabled or currentGeneration ~= generation or not isNear(char, target) then return end
+				if lastDeath ~= target then return end
+				lastDeath = nil
+			end)
+		end)
+		DiedTP:Clean(verifyConnection)
+
 		local removedConnection = entitylib.Events.LocalRemoved:Connect(function(entity)
 			if enabled and currentGeneration == generation and entity and entity.Character and not lastDeath then
 				captureIfDead(entity.Character)
@@ -131,8 +144,8 @@ DiedTP = vape.Categories.Blatant:CreateModule({
 		table.insert(connections, removedConnection)
 		DiedTP:Clean(removedConnection)
 
-		if entitylib.isAlive and entitylib.character then
-			watchCharacter(entitylib.character.Character)
+		if lplr.Character then
+			watchCharacter(lplr.Character)
 		end
 	end,
 	Tooltip = 'Returns you to your last death position when you respawn.'

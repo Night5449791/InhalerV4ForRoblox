@@ -45,8 +45,6 @@ local function notif(...)
 	return vape:CreateNotification(...)
 end
 
--- the reporter's webhookTripped flag is pinned so trip() returns early; startForCharacter
--- clears it on every respawn, hence the loop
 local function gcTables(keys)
 	if typeof(filtergc) == 'function' then
 		return filtergc('table', {Keys = keys}, false)
@@ -93,7 +91,6 @@ run(function()
 	end)
 end)
 
--- only the State Handler loop is disabled, not the script, so ragdoll and get up keep working
 run(function()
 	if typeof(getconnections) ~= 'function' then return end
 
@@ -119,7 +116,7 @@ run(function()
 	end
 
 	task.spawn(function()
-		task.wait(5) -- let the character and its scripts exist before touching connections
+		task.wait(5)
 
 		while shared.vape and shared.vape.Loaded do
 			silence()
@@ -139,7 +136,6 @@ run(function()
 		local team, targetTeam = lplr.Team, entity.Player.Team
 		if not team or not targetTeam then return true end
 
-		-- nobody picked a side yet, so Choosing is not a team to respect
 		if targetTeam.Name == 'Choosing' then return true end
 		if vape.Settings.Modules.Options['Teams by server'].Enabled then
 			return team ~= targetTeam
@@ -149,7 +145,6 @@ run(function()
 	end
 end)
 
--- the zombies are npc models, so every aura module is blind to them without this
 run(function()
 	local function scan(container)
 		for _, child in container:GetChildren() do
@@ -179,9 +174,6 @@ run(function()
 	end)
 end)
 
--- the anti cheat strips RaycastParams.new once it notices the executor, which makes the
--- blaster's castRays throw on every shot and stops it from ever reaching the server. The
--- same raycast is done here without RaycastParams so the gun keeps working normally.
 run(function()
 	if typeof(hookfunction) ~= 'function' then return end
 

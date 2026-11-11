@@ -174,7 +174,7 @@ Measured against upstream `7GrandDadPGN/VapeV4ForRoblox` (402 of 410 Lua files u
 2. No semicolons as statement terminators. The only `;` in the tree sits in `libraries/vm.lua` (VM port inherited from upstream) — never add one.
 3. Single quotes for strings: `'Killaura'` (6845 single vs 282 double upstream, ~96%). Double quotes survive only in inherited code (`vm.lua`, `Spotify.lua`, `guis/new/init.lua`'s older lines) — leave those alone.
 4. Assignment and comparison operators are spaced: `x = y`, `a == b`. String concat is the exception — `..` has no surrounding spaces: `'...'..readfile(...)..'/'..select(...)`.
-5. Comments start with `--` plus one space.
+5. Comments start with `--` plus one space — but there should be almost none. **Do not write comments.** The only exceptions are (a) a comment that already exists in upstream Vape and is kept byte-for-byte, and (b) a `--` note for code that is VERY VERY VERY confusing, i.e. even a careful reader cannot work out why it must be written that way (an engine quirk, an event-ordering trap, a workaround for a server behaviour). Everything else is deleted, not shortened: no section banners (`-- ====` / `-- helpers`), no restating what the next line does, no history ("used to be…"), no rationale essays. When in doubt, delete it. Edits to a file should normally *remove* comments, never add them.
 6. Table literals put one field per line, every field except the **last** carries a comma, and the last one does not (upstream: plain tables 144:8, component arguments 1212:6 — both overwhelmingly omit the final comma). Never collapse a multi-argument call onto one line (`CONTRIBUTING.md`).
 7. No compound assignment: `+=`, `-=`, `*=` appear zero times upstream. Write `x = x + y`.
 8. Files end with a newline; do not stop at the final `end` without one.
@@ -209,6 +209,7 @@ Measured against upstream `7GrandDadPGN/VapeV4ForRoblox` (402 of 410 Lua files u
 **Change boundary**
 
 - Restyle only code Inhaler added or rewrote. Lines identical to upstream stay byte-for-byte, never reformatted.
+- Comment cleanup (§10.5) is the one exception to "change only what was asked": a comment Inhaler added is deleted even in a file whose logic is untouched. Never delete an upstream comment, and never delete a comment that documents a genuinely confusing workaround — those stay as they are.
 - Pure branding replacements (`VapeCompiled` → `InhalerCompiled`, `vape` → `inhaler` in the watermark) count as no code change — leave them alone.
 - Verify with the Lua 5.4 syntax check in §1 after editing.
 

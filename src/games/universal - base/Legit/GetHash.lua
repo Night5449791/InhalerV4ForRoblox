@@ -8,7 +8,6 @@ GetHash = vape.Legit:CreateModule({
 			local name, userid
 
 			if input == '' then
-				-- self hash
 				name = lplr.Name
 				userid = lplr.UserId
 			else
@@ -21,7 +20,6 @@ GetHash = vape.Legit:CreateModule({
 				userid = id
 			end
 
-			-- matches whitelist:get() -> hash.sha512(Name..UserId..'SelfReport')
 			local h = hash.sha512(name..userid..'SelfReport')
 			pcall(setclipboard, h)
 			notif('GetHash', 'copied hash for '..name..'\n'..h, 10)

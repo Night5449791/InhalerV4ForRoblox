@@ -22,11 +22,7 @@ run(function()
 	local entityMouse = entitylib.EntityMouse
 	local entityPosition = entitylib.EntityPosition
 
-	-- rewriting Direction where the bullet is returned moves the real shot without touching the
-	-- packet layout or the sequence counters the server checks
 	local function getTarget(origin)
-		-- a failed roll leaves the shot untouched, so the aim lands as often as the chance
-		-- allows and the misses look like ordinary bad aim
 		if rand:NextNumber(0, 100) > HitChance.Value then return end
 
 		local targetPart = rand:NextNumber(0, 100) < HeadshotChance.Value and 'Head' or 'RootPart'
@@ -43,16 +39,10 @@ run(function()
 		return entity, entity and entity[targetPart]
 	end
 
-	-- reused every shot so the wall check does not allocate a fresh ignore table
 	local ignore = {}
 
-	-- Autofire pulls the trigger through the weapon's own shoot(): it runs the ammo,
-	-- cooldown and sequence bookkeeping a mouse1 press runs, so the packet is the same one
-	-- a real click produces and SilentAim still rewrites Direction inside Bullet.create.
 	local weapon, hookBullet
 
-	-- Bullet.create is handed the weapon's own bullet instance, which points back at the
-	-- weapon, so a real shot refreshes the reference without a collector scan
 	local function findWeapon()
 		if typeof(getgc) ~= 'function' then return end
 
@@ -69,13 +59,10 @@ run(function()
 			return active
 		end
 
-		-- the inventory rebuilds the weapon on a respawn or a loadout change
 		weapon = findWeapon()
 		return weapon
 	end
 
-	-- the trigger only goes down when there is something to hit: the closest target in
-	-- range whose body the bullet can reach, wood only like the shot itself
 	local gateIgnore = {}
 
 	local function reachable()
@@ -99,12 +86,9 @@ run(function()
 		gateIgnore[1] = localEntity.Character
 		gateIgnore[2] = entity.Character
 
-		-- the trigger only goes down on a clear line
 		return entitylib.Wallcheck(origin, entity.RootPart.Position, gateIgnore) == nil
 	end
 
-	-- the look-for-a-target pass is the expensive half (an entity sweep and a raycast), so
-	-- it runs on its own clock while the trigger itself is pulled every frame
 	local gateSeconds = 0.15
 
 	local function autoFireLoop()
@@ -113,8 +97,6 @@ run(function()
 		repeat
 			task.wait()
 
-			-- the hook being ours is what proves this loop still belongs to a live module:
-			-- a re-inject installs its own, and this copy then stops shooting for good
 			if AutoFire.Enabled and SilentAim.Enabled and Bullet.create == hookBullet then
 				local now = os.clock()
 				if now >= gateUntil then
@@ -131,7 +113,6 @@ run(function()
 	end
 
 	hookBullet = function(self, aimingOptions, isAiming)
-		-- every real shot hands the weapon over, so the autofire reference survives a respawn
 		weapon = rawget(self, 'Weapon') or weapon
 
 		local bullet = OriginalCreate(self, aimingOptions, isAiming)
@@ -146,7 +127,6 @@ run(function()
 		local position = part.Position
 		ignore[1] = entity.Character
 
-		-- a clear line only: anything the ray hits keeps the shot where the player pointed it
 		if entitylib.Wallcheck(origin, position, ignore) then
 			return bullet
 		end
@@ -159,7 +139,6 @@ run(function()
 		return bullet
 	end
 
-	-- the original and the last hook are kept in shared so a re-inject cannot wrap its own hook
 	local function installHook()
 		if Bullet.create == hookBullet then return end
 
@@ -232,8 +211,6 @@ run(function()
 		Max = 1000,
 		Default = 300,
 		Suffix = function(val)
-			-- the same slider drives the entity lookup: pixels around the crosshair in
-			-- Mouse mode, studs around the character in Position mode
 			if Mode.Value == 'Mouse' then
 				return val == 1 and 'pixel' or 'pixels'
 			end

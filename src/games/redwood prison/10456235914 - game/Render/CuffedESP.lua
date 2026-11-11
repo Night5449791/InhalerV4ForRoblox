@@ -43,8 +43,6 @@ CuffedESP = vape.Categories.Render:CreateModule({
 
 		if not callback then return end
 
-		-- characters that die or respawn leave the world without notifying us, so the
-		-- per character highlight is dropped as soon as its adornee is gone
 		local removed = workspace.ChildRemoved:Connect(function(child)
 			removeHighlight(child)
 		end)

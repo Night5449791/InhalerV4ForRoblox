@@ -3,9 +3,6 @@ local StompRange
 local StompDelay
 local StompTeamCheck
 
--- E is the stomp key, the client sends CarryStompEvent:FireServer('EPress') from both the
--- StompButton and the keyboard binding, so the module repeats that call while a downed player is
--- close enough to be finished
 AutoStomp = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoStomp',
 	Function = function(callback)
@@ -15,7 +12,6 @@ AutoStomp = vape.Categories.Blatant:CreateModule({
 			local root = sentence.root(lplr)
 
 			if root then
-				-- the options are read once per pass, not once per player
 				local range = StompRange.Value
 				local teamCheck = StompTeamCheck.Enabled
 				local origin = root.Position

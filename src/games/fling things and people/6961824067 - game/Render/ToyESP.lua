@@ -1,12 +1,5 @@
 local ToyESP
 
--- The game already tags every spawned toy, so an ESP over them is a highlight on the
--- tagged models rather than a scan of the workspace. Player ESP stays with the universal
--- module; this only covers toys, which is what this game is about.
---
--- The color slider is created before the module is ever enabled, so the values live in
--- module-level locals that both the callback and the adornment path read. That way a
--- color picked while the module is off is already in place when it is enabled.
 local hue, sat, val = 0.5, 1, 1
 local boxes = {}
 
@@ -21,8 +14,6 @@ ToyESP = vape.Categories.Render:CreateModule({
 	Name = 'Toy ESP',
 	Function = function(callback)
 		if callback then
-			-- a model's own size is useless for a highlight, so the part it is built
-			-- around is what gets adorned
 			local function partOf(obj)
 				if obj:IsA('BasePart') then return obj end
 
@@ -52,8 +43,6 @@ ToyESP = vape.Categories.Render:CreateModule({
 				add(obj)
 			end
 
-			-- toys spawn and despawn constantly; the tag signals follow them without
-			-- polling the whole workspace
 			ToyESP:Clean(collectionService:GetInstanceAddedSignal('Toy'):Connect(add))
 			ToyESP:Clean(collectionService:GetInstanceAddedSignal('SpawnedToy'):Connect(add))
 

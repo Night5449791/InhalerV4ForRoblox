@@ -39,8 +39,6 @@ AimAssist = vape.Categories.Combat:CreateModule({
 			mouseScale = moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity
 		end
 
-		-- hoisted out of the frame loop: the mode decides which selector runs and
-		-- whether an origin is handed to it, and neither changes while it is enabled
 		local positionMode = Mode.Value == 'Position'
 		local selector = positionMode and entitylib.EntityPosition or entitylib.EntityMouse
 

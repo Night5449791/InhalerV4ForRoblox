@@ -53,8 +53,6 @@ local function waitForChildOfType(obj, name, timeout, prop)
 	return returned
 end
 
--- every character lives under Workspace.Characters and keeps its per player state in
--- <character>.AttributeFolder (Handcuffed_, Inside, ArrestCurrent, plus the stat values)
 function redwood.attributeFolder(char)
 	return char and char:FindFirstChild('AttributeFolder') or nil
 end
@@ -95,7 +93,6 @@ function redwood.invoke(name, ...)
 	return suc and result or nil
 end
 
--- ignores dead characters so AutoReset does not keep firing at a guard corpse
 function redwood.nearestPlayer(team, range)
 	local character = lplr.Character
 	local root = character and character:FindFirstChild('HumanoidRootPart')
@@ -119,8 +116,6 @@ function redwood.nearestPlayer(team, range)
 	return closest
 end
 
--- Adonis watches __namecall, so melee calls are built from the weapon's own Setting module
--- instead of being intercepted. BaseDamage is a {min, max} pair the game rolls per hit.
 local function addressValue(value)
 	if type(value) ~= 'table' then return tonumber(value) or 0 end
 
@@ -140,15 +135,12 @@ function redwood.isDead(plr)
 	return humanoid == nil or humanoid.Health <= 0
 end
 
--- Fugitive and Prisoners are both "criminal" teams: guards may attack them, and they may
--- attack guards. Neutral/Krampus are left alone by the team check so they stay optional.
 local hostileTeams = {
 	[redwood.Teams.Guards] = {[redwood.Teams.Prisoners] = true, [redwood.Teams.Fugitive] = true},
 	[redwood.Teams.Prisoners] = {[redwood.Teams.Guards] = true},
 	[redwood.Teams.Fugitive] = {[redwood.Teams.Guards] = true}
 }
 
--- strict teams[] table is optional; without it anything not on your own team is a target
 function redwood.isTarget(plr, strict)
 	if not plr or plr == lplr or isFriend(plr) or redwood.isDead(plr) then return false end
 	if redwood.hasState(plr.Character, 'Handcuffed_') then return false end
@@ -162,7 +154,6 @@ function redwood.isTarget(plr, strict)
 	return not (team and myTeam and team == myTeam)
 end
 
--- entitylib target check: Friend list, dead bodies, handcuffed players and own team
 function redwood.targetCheck(ent)
 	if not ent or ent.NPC then return false end
 
@@ -189,7 +180,6 @@ function redwood.meleeTool()
 	end
 end
 
--- builds the same InflictTarget call the melee script sends, with the weapon's own numbers
 function redwood.attack(target, partName)
 	local tool = redwood.meleeTool()
 	if not tool then return false end
@@ -228,9 +218,6 @@ run(function()
 	redwood.Remotes = remotes
 end)
 
--- Adonis bypass: Detected is replaced by a pass through rather than hung, so the core's
--- bookkeeping stays intact. rawset keeps an __newindex metatable from seeing the write, and the
--- pass repeats because the core is rebuilt from scratch when the anti script restarts
 local function gcTables(keys)
 	if typeof(filtergc) == 'function' then
 		return filtergc('table', {Keys = keys}, false)
@@ -263,7 +250,6 @@ run(function()
 		task.spawn(function()
 			local patched = {}
 
-			-- Loaded is false while the gui loads and nil after Uninject, so only nil ends this
 			while shared.vape and shared.vape.Loaded ~= nil do
 				for _, core in gcTables({'Detected', 'RLocked', 'AddDetector', 'Detectors'}) do
 					if not patched[core] and type(core.Detectors) == 'table' and typeof(core.Detected) == 'function' then

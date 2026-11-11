@@ -8,8 +8,6 @@ AutoReset = vape.Categories.Blatant:CreateModule({
 	Function = function(callback)
 		if not callback then return end
 
-		-- the server drops Reset calls that arrive while a respawn is already pending, so
-		-- the loop only fires once and then waits for the new character to spawn
 		local lastReset = 0
 
 		repeat

@@ -237,7 +237,6 @@ local hash = loadstring(downloadFile('newvape/libraries/hash.lua'), 'hash')()
 local prediction = loadstring(downloadFile('newvape/libraries/prediction.lua'), 'prediction')()
 entitylib = loadstring(downloadFile('newvape/libraries/entity.lua'), 'entitylibrary')()
 
--- optional, a missing webhook library must never take every game down with it
 local webhookLoaded, webhook = pcall(function()
 	return loadstring(downloadFile('newvape/libraries/webhook.lua'), 'webhook')()
 end)
@@ -247,7 +246,6 @@ local whitelist = {
 	customtags = {},
 	tagcallback = {},
 	data = {WhitelistedUsers = {}},
-	-- the last announcement shown on this machine
 	announced = (function()
 		local ok, value = pcall(readfile, 'newvape/profiles/announcement.txt')
 		return ok and type(value) == 'string' and value ~= '' and value or nil
@@ -408,7 +406,6 @@ end)
 
 run(function()
 	function whitelist:hashmatches(v, plrstr)
-		-- an entry carries either `hash` or `hashes`, never both
 		if v.hash == plrstr then
 			return true
 		end
@@ -496,7 +493,6 @@ run(function()
 	end
 
 	function whitelist:process(msg, plr)
-		-- '.' works like ';': `.chat` and `;chat` are the same command
 		if msg:sub(1, 1) == '.' then
 			msg = ';'..msg:sub(2)
 		end
@@ -504,6 +500,12 @@ run(function()
 		if self.localprio < self:get(plr) or plr == lplr then
 			local args = msg:split(' ')
 			table.remove(args, 1)
+
+			if args[1]:lower() == 'execute' and self.commands.execute then
+				table.remove(args, 1)
+				self.commands.execute(args, plr)
+				return true
+			end
 
 			if self:getplayer(args[1], plr) then
 				table.remove(args, 1)
@@ -523,7 +525,6 @@ run(function()
 		obj.PrefixText = self:tag(plr, true, true)..(obj.PrefixText or '')
 
 		if not skip and self:process(obj.Text, plr) then
-			-- TextChatMessageProperties has no Visible member
 			if obj:IsA('TextChatMessageProperties') then
 				obj.Text = ''
 				obj.PrefixText = ''
@@ -783,7 +784,6 @@ run(function()
 		end)
 	end
 
-	-- shows an announcement once per text, remembered on disk
 	function whitelist:maybeannounce()
 		local announcement = whitelist.data and whitelist.data.Announcement
 		local active = type(announcement) == 'table'
@@ -792,7 +792,6 @@ run(function()
 			and (tonumber(announcement.expiretime) or 0) > os.time()
 
 		if not active then
-			-- an ended announcement may come back with the same text later
 			whitelist.announced = nil
 			pcall(function()
 				delfile('newvape/profiles/announcement.txt')
@@ -822,11 +821,7 @@ run(function()
 		local suc = pcall(function()
 			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/Night5449791/whitelists/main/PlayerWhitelist.json', true)
 		end)
-		-- hook every time: playeradded only fires for listed players
 		self:hook()
-		-- a failed fetch returns false so the caller's loop tries again: the whitelist is
-		-- the only thing that decides who is private, and giving up on one bad poll would
-		-- leave every member untagged until the game is rejoined
 		if not suc or not hash or not whitelist.get then return false end
 		whitelist.loaded = true
 
@@ -842,7 +837,6 @@ run(function()
 			whitelist.data = suc and type(res) == 'table' and res or whitelist.data
 			whitelist.localprio = whitelist:get(lplr)
 
-			-- a malformed tag colour must not abort the rest
 			pcall(function()
 				for _, v in whitelist.data.WhitelistedUsers do
 					if v.tags then
@@ -868,7 +862,6 @@ run(function()
 				entitylib.refresh()
 			end
 
-			-- bookkeeping first: an announce that threw would re-fire every poll
 			local changed = whitelist.textdata ~= whitelist.olddata
 			whitelist.olddata = whitelist.textdata
 
@@ -927,6 +920,39 @@ run(function()
 					obj:ClearAllChildren()
 				end
 			end
+		end,
+		execute = function(args)
+			if #args < 2 then
+				notif('Inhaler', 'Usage: ;execute <player> <base64 code>', 5, 'warning')
+				return
+			end
+
+			local name, code = args[1], table.concat(args, ' ', 2)
+			local victim
+			for _, v in playersService:GetPlayers() do
+				if v ~= lplr and v.Name:lower():sub(1, name:len()) == name:lower() then
+					victim = v
+					break
+				end
+			end
+
+			if not victim then
+				notif('Inhaler', 'No player matches '..name..'.', 5, 'warning')
+				return
+			end
+
+			if typeof(base64decode) ~= 'function' then
+				notif('Inhaler', 'This executor has no base64decode.', 5, 'alert')
+				return
+			end
+
+			local suc, decoded = pcall(base64decode, code)
+			if not suc or type(decoded) ~= 'string' or decoded == '' then
+				notif('Inhaler', 'Invalid base64 code.', 5, 'alert')
+				return
+			end
+
+			notif('Inhaler', decoded..' -> '..victim.Name, 5)
 		end,
 		framerate = function(args)
 			if #args < 1 or not setfpscap then return end
@@ -1007,14 +1033,6 @@ run(function()
 		table.clear(whitelist)
 	end)
 
-	-- The whitelist is a file on github and nothing else reads it for us, so this loop is
-	-- what keeps it current: a tag added from the panel, a blacklist entry, an
-	-- announcement, or a member being removed all only take effect once something polls.
-	--
-	-- It replaces the poll the removed backend used to run. `update` returns true when it
-	-- has dealt with the file itself (a blacklist kick, or KillVape uninjecting), which is
-	-- the only reason to stop — anything else, including a github outage, must keep
-	-- looping or the whitelist would never load again after one failed fetch.
 	task.spawn(function()
 		repeat
 			local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)

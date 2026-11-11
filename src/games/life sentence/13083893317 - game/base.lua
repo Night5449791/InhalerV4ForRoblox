@@ -1,5 +1,3 @@
--- state lives in <player>.Backpack.Stats (transient) and ReplicatedStorage.PlayerStats.<name>
--- (persistent) instead of attributes
 local run = function(func)
 	func()
 end
@@ -17,8 +15,6 @@ local whitelist = vape.Libraries.whitelist
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
 
--- the option objects are created once when the gui loads and profiles only flip Enabled, so
--- they are resolved here instead of hashing the same names on every per-player check
 local friends = vape.Categories.Friends
 local useFriends = friends.Options['Use friends']
 local recolorFriends = friends.Options['Recolor visuals']
@@ -48,7 +44,6 @@ end
 
 local playerStatsFolder = replicatedStorage:FindFirstChild('PlayerStats')
 
--- ReplicatedStorage.PlayerStats.<name>, the persistent value folder of one player
 function sentence.playerStats(plr)
 	if not plr then return end
 
@@ -56,8 +51,6 @@ function sentence.playerStats(plr)
 	return playerStatsFolder and playerStatsFolder:FindFirstChild(plr.Name) or nil
 end
 
--- the "Stats" tool, normally inside the backpack and only moved into the character when it is
--- equipped, so both parents are checked
 function sentence.stats(plr)
 	if not plr then return end
 
@@ -69,7 +62,6 @@ function sentence.stats(plr)
 	return character and character:FindFirstChild('Stats') or nil
 end
 
--- persistent value, e.g. sentence.value(plr, 'Cash')
 function sentence.value(plr, name)
 	local folder = sentence.playerStats(plr)
 	local value = folder and folder:FindFirstChild(name)
@@ -78,7 +70,6 @@ function sentence.value(plr, name)
 	end
 end
 
--- transient value, e.g. sentence.status(plr, 'Downed')
 function sentence.status(plr, name)
 	local stats = sentence.stats(plr)
 	local value = stats and stats:FindFirstChild(name)
@@ -139,7 +130,6 @@ function sentence.nearestPlayer(team, range)
 	return closest
 end
 
--- ReplicatedStorage.Events.<name>:FireServer, guarded because the folder is rebuilt on teleport
 function sentence.fire(name, ...)
 	local events = sentence.Events
 	local remote = events and events:FindFirstChild(name)
@@ -169,7 +159,6 @@ run(function()
 		return sentence.isTarget(entity.Player)
 	end
 
-	-- the downed flag decides whether a player is arrestable, so render/targeting updates on it
 	entitylib.getUpdateConnections = function(entity)
 		local humanoid = entity.Humanoid
 		local connections = {
@@ -210,7 +199,6 @@ run(function()
 	entitylib.start()
 end)
 
--- the hold is rewritten every time SetPromptsAndBuildBoards rebuilds a board, hence the loop
 local instantPrompts = {}
 
 local function instantPrompt(prompt)
@@ -221,7 +209,6 @@ local function instantPrompt(prompt)
 end
 
 run(function()
-	-- the selector runs inside the engine instead of walking every descendant of the map
 	for _, object in workspace:QueryDescendants('ProximityPrompt') do
 		instantPrompt(object)
 	end

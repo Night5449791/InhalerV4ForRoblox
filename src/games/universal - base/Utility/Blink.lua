@@ -5,8 +5,6 @@ local AutoSend
 local AutoSendLength
 local Folder = Instance.new('Folder')
 Folder.Parent = vape.holder
--- `Adornee = workspace` only draws while the adornment lives in workspace, so the
--- boxes need a part of the world to attach to; they are still frozen by hand
 local Anchor = Instance.new('Part')
 Anchor.Name = 'BlinkFakeAnchor'
 Anchor.Anchored = true
@@ -16,7 +14,6 @@ Anchor.CanTouch = false
 Anchor.Transparency = 1
 Anchor.Size = Vector3.new(1, 1, 1)
 Anchor.Parent = Folder
--- nothing is drawn unless the anchor sits in the world
 local anchorParented = false
 local oldphys, oldsend
 local boxes = {}
@@ -43,12 +40,6 @@ local whitelist = {
 	RightFoot = true
 }
 
--- the boxes belong to `Spawn fake` alone: they mark where the server last saw
--- us, so they swallow everything the server misses and disappear with the toggle.
---
--- the boxes are destroyed one by one, never with `ClearAllChildren`: that destroys
--- the anchor too, and a destroyed instance cannot be re-parented, so the next
--- `updateBoxes` would throw "The Parent property of BlinkFakeAnchor is locked"
 local function clearBoxes()
 	for name, box in boxes do
 		box:Destroy()
@@ -146,9 +137,6 @@ Type = Blink:CreateDropdown({
 Fake = Blink:CreateToggle({
 	Name = 'Spawn fake',
 	Function = function(callback)
-		-- a respawn swaps entitylib.character, so the boxes have to be rebuilt
-		-- against the new rig. The connection is kept here rather than in the
-		-- module's maid so it can be dropped the moment this toggle goes off.
 		if callback then
 			updateBoxes()
 			Fake.Connection = entitylib.Events.LocalAdded:Connect(updateBoxes)

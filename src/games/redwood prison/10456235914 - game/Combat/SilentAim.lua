@@ -11,8 +11,6 @@ local function disconnectAll()
 	end
 end
 
--- entities carry their target part, so a renamed or missing part degrades to the root
--- instead of erroring inside EntityMouse
 local function aimEntity()
 	local part = Part.Value
 	local entity = entitylib.EntityMouse({

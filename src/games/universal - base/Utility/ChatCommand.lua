@@ -1,6 +1,3 @@
--- a friend may drive these commands while ShareCommands is on, a private member is skipped
--- because their own client already ran it
-
 local ChatCommand
 
 local options = {}
@@ -10,21 +7,13 @@ local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
 local danceTrack
 
--- built once instead of per call: the follow steering runs on every frame
 local flatMask = Vector3.new(1, 0, 1)
--- where .tp lands the local character
 local tpOffset = Vector3.new(0, 2, 0)
--- animation ids per rig, so .dance stops rebuilding two lists every time
 local danceIds = {
 	R6 = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'},
 	R15 = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
 }
 
--- ============================================================================
--- helpers
--- ============================================================================
-
--- nil when the text is missing or only whitespace
 local function argument(text)
 	text = text and text:match('^%s*(.-)%s*$') or nil
 	return text ~= '' and text or nil
@@ -42,7 +31,6 @@ local function setListValue(list, value, enabled)
 	end
 end
 
--- returns how many entries were dropped
 local function clearListValues(list)
 	if not list or not list.List then return 0 end
 
@@ -55,8 +43,6 @@ local function clearListValues(list)
 	return count
 end
 
--- entries are either entities, which expose their player, or plain players. filter drops
--- entries, an exact match wins over the first prefix match
 local function search(list, lowered, filter)
 	local partial
 
@@ -81,13 +67,11 @@ local function findEntity(prefix, includeDead)
 	local text = argument(prefix)
 	if not text then return end
 
-	-- npcs carry no player and dead characters only count when asked for
 	return search(entitylib.List, text:lower(), function(entity)
 		return entity.Player and (includeDead or entity.Humanoid.Health > 0)
 	end)
 end
 
--- spawned players first, then everyone still in the server when allowLeft is set
 local function findPlayer(prefix, allowLeft)
 	local entity = findEntity(prefix, true)
 	if entity then
@@ -99,10 +83,6 @@ local function findPlayer(prefix, allowLeft)
 
 	return search(playersService:GetPlayers(), text:lower())
 end
-
--- ============================================================================
--- camera / follow / dance / other modules
--- ============================================================================
 
 local function restoreCamera()
 	viewPlayer = nil
@@ -186,7 +166,6 @@ local function stopDance()
 	end
 end
 
--- enables another product module when its toggle here allows it
 local function enableModule(name)
 	if not options[name].Enabled then return end
 
@@ -195,10 +174,6 @@ local function enableModule(name)
 		module:Toggle()
 	end
 end
-
--- ============================================================================
--- command handlers
--- ============================================================================
 
 local function handleTP(args)
 	if not options.PlayerTP.Enabled then return end
@@ -247,7 +222,6 @@ local function handleView(args)
 	gameCamera.CameraSubject = entity.Humanoid
 end
 
--- the two whitelist commands share this body; the handlers below pick the direction
 local function changeWhitelist(args, remove)
 	if not options.Whitelist.Enabled then return end
 
@@ -372,13 +346,7 @@ local commands = {
 	undance = stopDance
 }
 
--- ============================================================================
--- options
--- ============================================================================
-
 local toggles = {
-	-- off by default: a friend may only drive these commands after it is turned on, a
-	-- private member is skipped by canShare
 	{Name = 'ShareCommands', Default = false, Tooltip = 'Allows whitelisted users to directly access chat commands.'},
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
 	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
@@ -395,13 +363,7 @@ local toggles = {
 	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
 }
 
--- ============================================================================
--- sharing / dispatch
--- ============================================================================
-
 local function canShare(plr)
-	-- a private member is not shared with: their line would run the command twice, once
-	-- for their own client and again here
 	local success, level = pcall(whitelist.get, whitelist, plr)
 	if success and type(level) == 'number' and level > 0 then
 		return false
@@ -410,10 +372,8 @@ local function canShare(plr)
 	return options.ShareCommands.Enabled and table.find(vape.Categories.Friends.ListEnabled, plr.Name) ~= nil
 end
 
--- declared first: trackPlayer closes over it and the definition comes after
 local onChatted
 
--- one Chatted connection per other player, so a shared command can be heard
 local function trackPlayer(plr)
 	if plr == lplr or sharedConnections[plr] then return end
 
@@ -447,10 +407,6 @@ onChatted = function(message, plr)
 	handler(args ~= '' and args or nil)
 	return true
 end
-
--- ============================================================================
--- module
--- ============================================================================
 
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
@@ -517,8 +473,6 @@ for _, toggle in toggles do
 	options[toggle.Name] = ChatCommand:CreateToggle({
 		Name = toggle.Name,
 		Tooltip = toggle.Tooltip,
-		-- ShareCommands is the one that ships off: a friend can drive commands only after
-		-- it is turned on
 		Default = toggle.Default ~= false,
 		Function = toggle.Function
 	})

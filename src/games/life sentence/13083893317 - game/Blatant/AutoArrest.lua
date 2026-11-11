@@ -2,7 +2,6 @@ local AutoArrest
 local ArrestRange
 local ArrestDelay
 
--- triggering the character's own ArrestPrompt is the normal arrest, so nothing is spoofed here
 AutoArrest = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoArrest',
 	Function = function(callback)
@@ -12,7 +11,6 @@ AutoArrest = vape.Categories.Blatant:CreateModule({
 			local root = sentence.root(lplr)
 
 			if root and sentence.isCop(lplr) then
-				-- the sliders are read once per pass, not once per player
 				local range = ArrestRange.Value
 				local origin = root.Position
 
@@ -22,8 +20,6 @@ AutoArrest = vape.Categories.Blatant:CreateModule({
 					local other = sentence.root(plr)
 					if not other or (other.Position - origin).Magnitude > range then continue end
 
-					-- the prompt is parented to the root this pass already has, so it is not
-					-- walked to a second time through sentence.root
 					local prompt = other:FindFirstChild('ArrestPrompt')
 					if not prompt then continue end
 

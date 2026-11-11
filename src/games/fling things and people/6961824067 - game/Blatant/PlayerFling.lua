@@ -1,13 +1,5 @@
 local PlayerFling
 
--- The grab system is what makes this game fling: whoever holds a part owns its network,
--- and the server trusts that owner's CFrame. So a fling is a loop that keeps claiming
--- ownership of the target and writes a velocity far past what the game expects; the
--- server replicates the result to everybody, which is the throw.
---
--- The loop has to keep running: the game re-claims ownership on its own rhythm, and one
--- write is undone before it replicates. 0.1s is the source's cadence and it is what the
--- server tolerates without dropping the grab.
 local spinCFrame = CFrame.new(150, 307, 332)
 
 local function primaryOf(obj)
@@ -56,10 +48,8 @@ PlayerFling = vape.Categories.Blatant:CreateModule({
 
 				if target then
 					if immediate.Enabled then
-						-- one shot: claim, write, and let the server replicate the throw
 						flingTarget(target)
 					else
-						-- keep claiming until the grab drops or the target leaves
 						repeat
 							flingTarget(target)
 							task.wait(0.1)

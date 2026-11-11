@@ -10,7 +10,6 @@ local lplr = game:GetService('Players').LocalPlayer
 local loadstring = function(...)
 	local res, err = loadstring(...)
 	if err and vape then
-		-- vape:CreateNotification('Vape', 'Failed to load : '..err, 30, 'alert')
 		lplr:Kick(('Failed to load Inhaler : '..tostring(err)):sub(1, 300))
 	end
 	return res

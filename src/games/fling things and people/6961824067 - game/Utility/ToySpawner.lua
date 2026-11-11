@@ -1,9 +1,5 @@
 local ToySpawner
 
--- The game only lets you spawn what you have bought, and the check is a CanSpawnToy
--- remote the client is free to skip: the spawn function itself takes a toy name and a
--- position and does not re-check ownership. So the dropdown is simply the list of names
--- the request accepts.
 local TOYS = {
 	'Campfire',
 	'CreatureBlobman',
