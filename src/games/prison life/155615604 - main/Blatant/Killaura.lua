@@ -13,81 +13,6 @@ local ParticleSize
 local Face
 local SkipTeam
 local Particles, Boxes = {}, {}
-local targets = {}
-local distances = {}
-
-local function getEntities()
-	local localTeam = lplr.Team
-	local teamFiltering = (SkipTeam.Enabled or localTeam == teams.Criminals) and (
-		localTeam == teams.Guards
-		or localTeam == teams.Inmates
-		or localTeam == teams.Criminals
-	)
-
-	if not teamFiltering then
-		return entitylib.AllPosition({
-			Range = AttackRange.Value,
-			Wallcheck = Targets.Walls.Enabled or nil,
-			Part = 'RootPart',
-			Players = Targets.Players.Enabled,
-			NPCs = Targets.NPCs.Enabled,
-			Limit = Max.Value,
-			AttackCheck = true
-		})
-	end
-
-	local localPosition = entitylib.character.RootPart.Position
-	local range = AttackRange.Value
-	local players = Targets.Players.Enabled
-	local npcs = Targets.NPCs.Enabled
-	local wallcheck = Targets.Walls.Enabled or nil
-	local maxTargets = Max.Value
-
-	table.clear(targets)
-	for _, entity in entitylib.List do
-		if not players and entity.Player then continue end
-		if not npcs and entity.NPC then continue end
-		if entity.Player then
-			if isFriend(entity.Player) or not select(2, whitelist:get(entity.Player)) then continue end
-
-			local targetTeam = entity.Player.Team
-			if localTeam == teams.Guards then
-				if targetTeam ~= teams.Inmates and targetTeam ~= teams.Criminals then continue end
-			elseif targetTeam ~= teams.Guards and targetTeam ~= teams.Inmates and targetTeam ~= teams.Criminals then
-				continue
-			end
-		elseif not entity.Targetable then
-			continue
-		end
-
-		local distance = (entity.RootPart.Position - localPosition).Magnitude
-		if distance > range or not entitylib.isVulnerable(entity, true, SkipTeam.Enabled) then continue end
-
-		distances[entity] = entity.Target and -1 or distance
-		table.insert(targets, entity)
-	end
-
-	table.sort(targets, function(a, b)
-		return distances[a] < distances[b]
-	end)
-
-	local targetCount = 0
-	for _, entity in targets do
-		if wallcheck and entitylib.Wallcheck(localPosition, entity.RootPart.Position, wallcheck) then
-			continue
-		end
-		targetCount += 1
-		targets[targetCount] = entity
-		if targetCount >= maxTargets then break end
-	end
-
-	for index = #targets, targetCount + 1, -1 do
-		targets[index] = nil
-	end
-	table.clear(distances)
-
-	return targets
-end
 
 Killaura = vape.Categories.Blatant:CreateModule({
 	Name = 'Killaura',
@@ -99,7 +24,16 @@ Killaura = vape.Categories.Blatant:CreateModule({
 				table.clear(attacked)
 
 				if not Mouse.Enabled or inputService:IsMouseButtonPressed(0) then
-					local entities = getEntities()
+					local entities = entitylib.AllPosition({
+						Range = AttackRange.Value,
+						Wallcheck = Targets.Walls.Enabled or nil,
+						Part = 'RootPart',
+						Players = Targets.Players.Enabled,
+						NPCs = Targets.NPCs.Enabled,
+						Limit = Max.Value,
+						AttackCheck = true,
+						SkipTeam = SkipTeam.Enabled or lplr.Team ~= teams.Guards
+					})
 
 					if entities[1] then
 						local root = entitylib.character.RootPart
