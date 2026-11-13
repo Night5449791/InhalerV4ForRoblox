@@ -5,14 +5,9 @@ local sharedConnections = {}
 
 local viewPlayer
 local followModule, followOldMove, followPlayer, followConnection
-local danceTrack
 
 local flatMask = Vector3.new(1, 0, 1)
 local tpOffset = Vector3.new(0, 2, 0)
-local danceIds = {
-	R6 = {'27789359', '30196114', '248263260', '45834924', '33796059', '28488254', '52155728'},
-	R15 = {'3333432454', '4555808220', '4049037604', '4555782893', '10214311282', '10714010337', '10713981723', '10714372526', '10714076981', '10714392151', '11444443576'}
-}
 
 local function argument(text)
 	text = text and text:match('^%s*(.-)%s*$') or nil
@@ -21,8 +16,7 @@ end
 
 local function getLocalHumanoid()
 	local character = lplr.Character
-	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
-	return humanoid or (entitylib.character and entitylib.character.Humanoid)
+	return character and character:FindFirstChildOfClass('Humanoid')
 end
 
 local function setListValue(list, value, enabled)
@@ -32,8 +26,6 @@ local function setListValue(list, value, enabled)
 end
 
 local function clearListValues(list)
-	if not list or not list.List then return 0 end
-
 	local count = #list.List + #list.ListEnabled
 	if count == 0 then return 0 end
 
@@ -44,7 +36,12 @@ local function clearListValues(list)
 end
 
 local function search(list, lowered, filter)
-	local partial
+	local partial, wildcardMatch
+	local pattern
+
+	if lowered:find('*', 1, true) then
+		pattern = '^'..lowered:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
+	end
 
 	for _, entry in list do
 		if filter and not filter(entry) then continue end
@@ -55,12 +52,16 @@ local function search(list, lowered, filter)
 			return entry
 		end
 
+		if pattern and not wildcardMatch and (name:match(pattern) or display:match(pattern)) then
+			wildcardMatch = entry
+		end
+
 		if not partial and (name:sub(1, #lowered) == lowered or display:sub(1, #lowered) == lowered) then
 			partial = entry
 		end
 	end
 
-	return partial
+	return wildcardMatch or partial
 end
 
 local function findEntity(prefix, includeDead)
@@ -110,10 +111,9 @@ end
 local function startFollow(player)
 	stopFollow()
 
-	local module
-	if not pcall(function()
-		module = require(lplr.PlayerScripts.PlayerModule).controls
-	end) or not module or not module.moveFunction then
+	local success, controls = pcall(require, lplr.PlayerScripts.PlayerModule)
+	local module = success and controls and controls.controls
+	if not (module and module.moveFunction) then
 		notif('ChatCommand', 'Follow is not supported in this game.', 5, 'warning')
 		return
 	end
@@ -156,14 +156,6 @@ local function startFollow(player)
 			stopFollow()
 		end
 	end)
-end
-
-local function stopDance()
-	if danceTrack then
-		danceTrack:Stop()
-		danceTrack:Destroy()
-		danceTrack = nil
-	end
 end
 
 local function enableModule(name)
@@ -235,6 +227,41 @@ local function changeWhitelist(args, remove)
 	notif('Whitelist', player.DisplayName..' has been '..(remove and 'unwhitelisted.' or 'whitelisted.'), 5)
 end
 
+local function bulkWhitelistAdd(args)
+	if not options.Whitelist.Enabled then return end
+
+	local text = argument(args)
+	if not text then
+		notif('Whitelist', 'No display name given.', 5, 'warning')
+		return
+	end
+
+	text = text:lower()
+
+	if text:sub(-1) ~= '*' then
+		text = text..'*'
+	end
+
+	local pattern = '^'..text:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
+
+	local list = vape.Categories.Friends
+	local count = 0
+	for _, plr in playersService:GetPlayers() do
+		local name, display = plr.Name:lower(), plr.DisplayName:lower()
+		if name:match(pattern) or display:match(pattern) then
+			setListValue(list, plr.Name, true)
+			count = count + 1
+		end
+	end
+
+	if count == 0 then
+		notif('Whitelist', 'No player matches '..argument(args)..'.', 5, 'warning')
+		return
+	end
+
+	notif('Whitelist', count..' player'..(count == 1 and '' or 's')..' whitelisted.', 5)
+end
+
 local function whitelistAdd(args)
 	return changeWhitelist(args, false)
 end
@@ -300,25 +327,6 @@ local function reloadVape()
 	end
 end
 
-local function startDance()
-	if not options.Dance.Enabled then return end
-
-	local humanoid = getLocalHumanoid()
-	if not humanoid then
-		notif('ChatCommand', 'You have no character.', 5, 'warning')
-		return
-	end
-
-	stopDance()
-
-	local dances = humanoid.RigType == Enum.HumanoidRigType.R15 and danceIds.R15 or danceIds.R6
-	local animation = Instance.new('Animation')
-	animation.AnimationId = 'rbxassetid://'..dances[math.random(1, #dances)]
-	danceTrack = humanoid:LoadAnimation(animation)
-	danceTrack.Looped = true
-	danceTrack:Play()
-end
-
 local commands = {
 	tp = handleTP,
 	follow = handleFollow,
@@ -330,6 +338,8 @@ local commands = {
 	whitelist = whitelistAdd,
 	unwl = whitelistRemove,
 	unwhitelist = whitelistRemove,
+	bulkwl = bulkWhitelistAdd,
+	bulkwhitelist = bulkWhitelistAdd,
 
 	target = targetAdd,
 	blacklist = targetAdd,
@@ -341,9 +351,7 @@ local commands = {
 	rj = rejoinServer,
 	rejoin = rejoinServer,
 
-	reload = reloadVape,
-	dance = startDance,
-	undance = stopDance
+	reload = reloadVape
 }
 
 local toggles = {
@@ -358,9 +366,8 @@ local toggles = {
 	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
-	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>'},
-	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Dance', Tooltip = '.dance\n.dundance'}
+	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>\n.bulkwl/.bulkwhitelist <name> whitelists everyone matching the name, name* matches any prefix'},
+	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'}
 }
 
 local function canShare(plr)
@@ -415,8 +422,6 @@ ChatCommand = vape.Categories.Utility:CreateModule({
 
 		ChatCommand:Clean(restoreCamera)
 		ChatCommand:Clean(stopFollow)
-		ChatCommand:Clean(stopDance)
-		ChatCommand:Clean(lplr.CharacterAdded:Connect(stopDance))
 		ChatCommand:Clean(playersService.PlayerRemoving:Connect(function(plr)
 			untrackPlayer(plr)
 

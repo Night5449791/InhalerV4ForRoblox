@@ -16,7 +16,7 @@ local function renderStepForLoop(startVal, endVal, increment, callback)
 			return
 		end
 
-		startVal += increment * runService.RenderStepped:Wait() * 60
+		startVal = startVal + increment * runService.RenderStepped:Wait() * 60
 	end
 end
 

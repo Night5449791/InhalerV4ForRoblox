@@ -1044,4 +1044,4 @@ run(function()
 end)
 entitylib.start()
 
-notif("Inhaler", "Welcome to Inhaler V4, the better exploiting solution.", 5)
+notif('Inhaler', 'Welcome to Inhaler V4, the better exploiting solution.', 5)

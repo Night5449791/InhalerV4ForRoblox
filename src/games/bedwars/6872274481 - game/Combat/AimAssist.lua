@@ -12,8 +12,8 @@ local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 
 local function wrapAngle(num)
 	num = num % math.pi
-	num -= num >= (math.pi / 2) and math.pi or 0
-	num += num < -(math.pi / 2) and math.pi or 0
+	num = num - (num >= (math.pi / 2) and math.pi or 0)
+	num = num + (num < -(math.pi / 2) and math.pi or 0)
 	return num
 end
 
@@ -74,7 +74,7 @@ AimAssist = vape.Categories.Combat:CreateModule({
 				local diffPitch = math.asin(facing.Y) - math.asin(target.Y)
 				local move = Vector2.new(diffYaw, diffPitch) // mouseScale
 
-				move *= alpha
+				move = move * alpha
 
 				if typeof(mousemoverel) == 'function' then
 					mousemoverel(move.X, move.Y)

@@ -101,9 +101,9 @@ Viewmodel = vape.Legit:CreateModule({
 
 				if Sway.Enabled then
 					if target.Magnitude > 0.1 then
-						target += (camCF * CFrame.new(math.sin(clock * 10) * 0.06, 0, 0)).Position - camCF.Position
+						target = target + ((camCF * CFrame.new(math.sin(clock * 10) * 0.06, 0, 0)).Position - camCF.Position)
 					else
-						target += (camCF * CFrame.new(0, math.sin(clock) * 0.04, 0)).Position - camCF.Position
+						target = target + ((camCF * CFrame.new(0, math.sin(clock) * 0.04, 0)).Position - camCF.Position)
 					end
 				end
 

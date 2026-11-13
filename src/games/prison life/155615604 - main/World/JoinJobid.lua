@@ -28,7 +28,7 @@ JoinJobid = vape.Categories.World:CreateModule({
 			end
 
 			teleportService:TeleportToPlaceInstance(placeId, id)
-			JobId:SetValue('') -- spent, don't leave it saved to be rejoined by accident
+			JobId:SetValue('')
 		end
 	end,
 	Tooltip = 'Teleports into a specific server using its job id\nReinjects after the teleport just like ServerHop does.'

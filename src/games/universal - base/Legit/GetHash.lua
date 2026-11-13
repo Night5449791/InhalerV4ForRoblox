@@ -31,5 +31,5 @@ GetHash = vape.Legit:CreateModule({
 GetHashUsername = GetHash:CreateTextBox({
 	Name = 'Username',
 	Placeholder = 'roblox username',
-	Tooltip = 'leave it blank to copy self hash',
+	Tooltip = 'leave it blank to copy self hash'
 })

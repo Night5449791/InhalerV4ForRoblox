@@ -92,7 +92,7 @@ AimAssist = vape.Categories.Combat:CreateModule({
 				local diffPitch = math.asin(facing.Y) - math.asin(target.Y)
 				local angle = Vector2.new(diffYaw, diffPitch) // mouseScale
 
-				angle *= alpha
+				angle = angle * alpha
 
 				if typeof(mousemoverel) == 'function' then
 					mousemoverel(angle.X, angle.Y)

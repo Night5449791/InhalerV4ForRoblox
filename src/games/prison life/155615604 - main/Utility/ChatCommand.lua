@@ -19,8 +19,7 @@ end
 
 local function getLocalHumanoid()
 	local character = lplr.Character
-	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
-	return humanoid or (entitylib.character and entitylib.character.Humanoid)
+	return character and character:FindFirstChildOfClass('Humanoid')
 end
 
 local function setListValue(list, value, enabled)
@@ -30,8 +29,6 @@ local function setListValue(list, value, enabled)
 end
 
 local function clearListValues(list)
-	if not list or not list.List then return 0 end
-
 	local count = #list.List + #list.ListEnabled
 	if count == 0 then return 0 end
 
@@ -117,10 +114,9 @@ end
 local function startFollow(player)
 	stopFollow()
 
-	local module
-	if not pcall(function()
-		module = require(lplr.PlayerScripts.PlayerModule).controls
-	end) or not module or not module.moveFunction then
+	local success, controls = pcall(require, lplr.PlayerScripts.PlayerModule)
+	local module = success and controls and controls.controls
+	if not (module and module.moveFunction) then
 		notif('ChatCommand', 'Follow is not supported in this game.', 5, 'warning')
 		return
 	end
@@ -245,29 +241,36 @@ end
 local function bulkWhitelistAdd(args)
 	if not options.Whitelist.Enabled then return end
 
-	local display = argument(args)
-	if not display then
+	local text = argument(args)
+	if not text then
 		notif('Whitelist', 'No display name given.', 5, 'warning')
 		return
 	end
 
-	display = display:lower()
+	text = text:lower()
+
+	if text:sub(-1) ~= '*' then
+		text = text..'*'
+	end
+
+	local pattern = '^'..text:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
 
 	local list = vape.Categories.Friends
 	local count = 0
 	for _, plr in playersService:GetPlayers() do
-		if plr.DisplayName:lower() == display then
+		local name, display = plr.Name:lower(), plr.DisplayName:lower()
+		if name:match(pattern) or display:match(pattern) then
 			setListValue(list, plr.Name, true)
 			count = count + 1
 		end
 	end
 
 	if count == 0 then
-		notif('Whitelist', 'No player with that display name.', 5, 'warning')
+		notif('Whitelist', 'No player matches '..argument(args)..'.', 5, 'warning')
 		return
 	end
 
-	notif('Whitelist', count..' player'..(count == 1 and '' or 's')..' with that display name whitelisted.', 5)
+	notif('Whitelist', count..' player'..(count == 1 and '' or 's')..' whitelisted.', 5)
 end
 
 local function changeTargets(args, remove)
@@ -289,10 +292,9 @@ local function changeTargets(args, remove)
 		return
 	end
 
-	local name = player.Name
-	setListValue(list, name, not remove)
-	whitelist.customtags[name] = not remove and {{text = 'Exploiter', color = targetColor}} or nil
-	tempTargets[name] = not remove or nil
+	setListValue(list, player.Name, not remove)
+	whitelist.customtags[player.Name] = not remove and {{text = 'Exploiter', color = targetColor}} or nil
+	tempTargets[player.Name] = not remove and true or nil
 	notif('Blacklist', player.DisplayName..' has been '..(remove and 'unblacklisted.' or 'blacklisted.'), 5)
 end
 
@@ -368,13 +370,11 @@ local function startFling(args)
 		targetMode:SetValue(mode)
 	end
 
-	if player then
-		if #list.List ~= 1 or list.List[1] ~= player.Name or #list.ListEnabled ~= 1 or list.ListEnabled[1] ~= player.Name then
-			table.clear(list.List)
-			table.clear(list.ListEnabled)
-			list:ChangeValue(player.Name)
-			changed = true
-		end
+	if player and (#list.List ~= 1 or list.List[1] ~= player.Name or #list.ListEnabled ~= 1 or list.ListEnabled[1] ~= player.Name) then
+		table.clear(list.List)
+		table.clear(list.ListEnabled)
+		list:ChangeValue(player.Name)
+		changed = true
 	end
 
 	if not module.Enabled then
@@ -385,10 +385,6 @@ local function startFling(args)
 	end
 
 	notif('ChatCommand', 'Flinging '..(player and player.DisplayName or 'everyone')..'.', 5)
-end
-
-local function kickTarget(args)
-	return startFling(args)
 end
 
 local function reloadVape()
@@ -410,7 +406,7 @@ local function reloadVape()
 end
 
 local function openDiscordInvite(code)
-	if typeof(request) ~= 'function' then return false end
+	if typeof(request) ~= 'function' then return end
 
 	local body = httpService:JSONEncode({
 		nonce = httpService:GenerateGUID(false),
@@ -432,8 +428,6 @@ local function openDiscordInvite(code)
 			Body = body
 		})
 	end
-
-	return true
 end
 
 local function handleCopyServer()
@@ -476,8 +470,8 @@ local commands = {
 	rj = rejoinServer,
 	rejoin = rejoinServer,
 
-	kick = kickTarget,
-	bang = kickTarget,
+	kick = startFling,
+	bang = startFling,
 
 	reload = reloadVape,
 	copyserver = handleCopyServer
@@ -496,7 +490,7 @@ local toggles = {
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
 	{Name = 'Fling', Tooltip = '.kick / ;bang <plr/all> flings the target with a vehicle seat'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
-	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>\n.bulkwl/.bulkwhitelist <display name> whitelists every player with that display name'},
+	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>\n.bulkwl/.bulkwhitelist <name> whitelists everyone matching the name, name* matches any prefix'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
 	{Name = 'CopyServer', Tooltip = '.copyserver\nCopies the discord invite and opens discord over rpc'}

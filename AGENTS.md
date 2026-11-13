@@ -206,6 +206,12 @@ Measured against upstream `7GrandDadPGN/VapeV4ForRoblox` (402 of 410 Lua files u
 25. New modules go in `src/games/<game>/<PlaceId> - <desc>/<Category>/<Name>.lua` with no `require` and the base's locals; top-level names only have to be unique against `base.lua` and the other unwrapped files, since a wrapped file keeps its own scope (§9).
 26. When asked to optimize, touch only code the assistant wrote in that file; upstream and maintainer code stays unless explicitly requested.
 
+**Cross-product parity**
+
+27. `src/games/universal - base/Utility/ChatCommand.lua` and `src/games/prison life/155615604 - main/Utility/ChatCommand.lua` are two copies of the same command set. Every command that exists in both must be **byte-identical Lua** — same helper (`argument`, `search`, `findPlayer`, `setListValue`, `clearListValues`, `changeWhitelist`, `changeTargets`, `bulkWhitelistAdd`, `canShare`, `trackPlayer`, `untrackPlayer`, `onChatted`), same notification text, same matching rules. Fixing a command in one copy means applying the same edit to the other in the same change.
+28. The only allowed difference is a command that needs a game-specific mechanism the other product does not have — a module option, a base local, an executor API, a remote — e.g. prison life's `.target` also writes `whitelist.customtags`/`tempTargets` because that product owns `CheaterDetector`, and its `.kick`/`.bang`/`.addskid`/`.copyserver` exist only there. Everything shared around that command stays identical; only the extra lines differ, never the shared helpers or the copy-pasted logic.
+29. Adding a command to one product is not a licence to leave the other behind: either add the same command there too, or state explicitly that it is product-specific and why.
+
 **Change boundary**
 
 - Restyle only code Inhaler added or rewrote. Lines identical to upstream stay byte-for-byte, never reformatted.

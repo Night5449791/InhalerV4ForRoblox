@@ -1,6 +1,5 @@
 local CheaterDetector
 local webhookUrl
-local whitelist = vape.Libraries.whitelist
 local jsonEncode, jsonDecode = httpService.JSONEncode, httpService.JSONDecode
 local osDate, osTime = os.date, os.time
 local dbVersion = 3
@@ -16,8 +15,8 @@ local webhookName = 'Inhaler CheaterDetector'
 
 local function countCheaters(names, users)
 	local count = 0
-	for _ in names do count += 1 end
-	for _ in users do count += 1 end
+	for _ in names do count = count + 1 end
+	for _ in users do count = count + 1 end
 	return count
 end
 
@@ -30,9 +29,7 @@ local function isWhitelisted(plr)
 end
 
 local function notify(text, duration, type)
-	if vape.Notifications then
-		notif('CheaterDetector', text, duration, type)
-	end
+	notif('CheaterDetector', text, duration, type)
 end
 
 local function saveCheaters()
@@ -107,9 +104,9 @@ local function loadCheaters()
 		saveCheaters()
 		notify('Upgraded cheater database to v'..dbVersion..'.', 10)
 	elseif restored then
-		saveCheaters() -- write the recovered data back over the broken file
+		saveCheaters()
 	elseif content and not isfile(backupPath) then
-		pcall(writefile, backupPath, content) -- seed the backup on first run
+		pcall(writefile, backupPath, content)
 	end
 end
 
@@ -165,12 +162,11 @@ local function splitCheaterText(text)
 			return hit, table.concat(words, ' ', i + 1), name
 		end
 
-		local wildcard = lowered:find('*', 1, true)
-			and '^'..lowered:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
+		local wildcard = lowered:find('*', 1, true) ~= nil
 		local partial, wildcardMatches
 
 		for _, entry in entries do
-			if wildcard and (entry[2]:match(wildcard) or entry[3]:match(wildcard)) then
+			if wildcard and (matchesNamePattern(entry[2], lowered) or matchesNamePattern(entry[3], lowered)) then
 				wildcardMatches = wildcardMatches or {}
 				wildcardMatches[#wildcardMatches + 1] = entry[1]
 			end
@@ -225,9 +221,10 @@ local function sendWebhookLog(plr, name, reason, removed, previous)
 
 	task.spawn(function()
 		local sent, err = webhook.sendEmbed(url, {
-			title = removed and '✅ Cheater Removed / Unflagged' or '🚨 Detected Cheater',
+			title = removed and '✅ Cheater Removed / Unflagged' or '🚨 Detected Skid Target',
 			description = 'User: '..label..' (@'..handle..')\nID: '..id,
 			color = removed and embedGreen or embedRed,
+			footer = {text = 'Webhook via Inhaler V4'},
 			fields = fields
 		}, webhookName)
 
@@ -258,7 +255,7 @@ local function editCheater(text, reason, remove)
 				for _, matched in wildcardMatches do
 					if getCheaterReason(matched) ~= nil then
 						editCheater(matched.Name, nil, true)
-						removed += 1
+						removed = removed + 1
 					end
 				end
 
@@ -420,8 +417,7 @@ CheaterDetector = vape.Categories.Utility:CreateModule({
 			CheaterDetector:Clean(playersService.PlayerRemoving:Connect(playerRemoving))
 			CheaterDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(autoAddCheater))
 
-			cheaterOptions.Teleports.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
-			cheaterOptions.Speed.Object.Visible = cheaterOptions.AutomaticAdd.Enabled
+			setMovementOptionsVisible(cheaterOptions.AutomaticAdd.Enabled)
 
 			for _, v in playersService:GetPlayers() do
 				playerAdded(v)
@@ -449,8 +445,7 @@ cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
 	Name = 'Automatic Add',
 	Default = false,
 	Function = function(enabled)
-		cheaterOptions.Teleports.Object.Visible = enabled
-		cheaterOptions.Speed.Object.Visible = enabled
+		setMovementOptionsVisible(enabled)
 	end,
 	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation; the two options below add the movement flags as well.\nThe reason is logged as exploits/<flag>.'
 })
@@ -477,6 +472,11 @@ cheaterOptions.Speed = CheaterDetector:CreateToggle({
 	Tooltip = 'Also add players flagged for speeding'
 })
 
+local function setMovementOptionsVisible(visible)
+	cheaterOptions.Teleports.Object.Visible = visible
+	cheaterOptions.Speed.Object.Visible = visible
+end
+
 cheaterOptions.Webhook = CheaterDetector:CreateToggle({
 	Name = 'Webhook',
 	Default = false,
@@ -489,7 +489,7 @@ cheaterOptions.Webhook = CheaterDetector:CreateToggle({
 })
 
 webhookUrl = CheaterDetector:CreateTextBox({
-	Name = 'Webhook URL', -- for anyone reading this, we WONT LOG ur discord webhook and never will. dashboard is used to manage inhaler users
+	Name = 'Webhook URL',
 	Placeholder = 'https://discord.com/api/webhooks/...',
 	Visible = false,
 	Darker = true,

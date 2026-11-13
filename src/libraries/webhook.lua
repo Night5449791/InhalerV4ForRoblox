@@ -85,6 +85,10 @@ function webhook.sendEmbed(url, embed, username)
 
 	if fields[1] then built.fields = fields end
 
+	if type(embed.footer) == 'table' and embed.footer.text then
+		built.footer = {text = clamp(embed.footer.text, 2048)}
+	end
+
 	return webhook.send(url, {username = username, embeds = {built}})
 end
 
