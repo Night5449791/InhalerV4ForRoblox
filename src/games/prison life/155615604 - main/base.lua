@@ -247,6 +247,15 @@ run(function()
 			return
 		end
 
+		if select(1, whitelist:get(plr)) ~= 0 or table.find(vape.Categories.Friends.ListEnabled, plr.Name) ~= nil then
+			return
+		end
+
+		local cheaterDetector = vape.Modules and vape.Modules.CheaterDetector
+		if cheaterDetector and cheaterDetector.IsExcluded and cheaterDetector:IsExcluded(plr) then
+			return
+		end
+
 		if not self.Flags[plr.UserId] then
 			self.Flags[plr.UserId] = {}
 		end

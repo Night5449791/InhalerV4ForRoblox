@@ -330,6 +330,18 @@ local function skidRemove(args)
 	return changeCheater(args, true)
 end
 
+local function skidExclude(args)
+	if not options.Cheater.Enabled then return end
+
+	local module = vape.Modules and vape.Modules.CheaterDetector
+	if not (module and module.ExcludeCheater) then
+		notif('ChatCommand', 'CheaterDetector is not available in this game.', 5, 'warning')
+		return
+	end
+
+	module:ExcludeCheater(args)
+end
+
 local function hopServer()
 	enableModule('ServerHop')
 end
@@ -464,6 +476,8 @@ local commands = {
 
 	addskid = skidAdd,
 	delskid = skidRemove,
+	excludeskid = skidExclude,
+	antiskid = skidExclude,
 
 	hop = hopServer,
 	serverhop = hopServer,
@@ -492,7 +506,7 @@ local toggles = {
 	{Name = 'ReloadVape', Tooltip = '.reload'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>\n.bulkwl/.bulkwhitelist <name> whitelists everyone matching the name, name* matches any prefix'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
-	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>'},
+	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>\n.excludeskid/.antiskid <plr>'},
 	{Name = 'CopyServer', Tooltip = '.copyserver\nCopies the discord invite and opens discord over rpc'}
 }
 

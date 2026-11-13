@@ -17,6 +17,17 @@ local pingItem = stats.Network.ServerStatsItem['Data Ping']
 
 local function isWhitelisted(plr)
 	return select(1, whitelist:get(plr)) ~= 0
+		or table.find(vape.Categories.Friends.ListEnabled, plr.Name) ~= nil
+end
+
+local function isExcluded(plr)
+	local module = vape.Modules and vape.Modules.CheaterDetector
+	if not (module and module.IsExcluded) then return false end
+	return module:IsExcluded(plr)
+end
+
+local function isIgnored(plr)
+	return isWhitelisted(plr) or isExcluded(plr)
 end
 
 local pingValue, pingTime = 0, 0
@@ -51,7 +62,7 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 	Function = function(callback)
 		if callback then
 			CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagType)
-				if isWhitelisted(plr) then return end
+				if isIgnored(plr) then return end
 
 				notif('CheatDetector', 'This player may be cheating! ('..flagType..'): '..plr.Name, 15, 'warning')
 				if AddTarget.Enabled then
@@ -76,7 +87,7 @@ CheatDetector = vape.Categories.Utility:CreateModule({
 				local movement = getPing() <= PingLimit.Value
 
 				for _, entity in entitylib.List do
-					if entity.Health > 0 and entity.Player and not isWhitelisted(entity.Player) and not Cheats.Flagged[entity.Player.UserId] then
+					if entity.Health > 0 and entity.Player and not isIgnored(entity.Player) and not Cheats.Flagged[entity.Player.UserId] then
 						local root = entity.RootPart
 						local humanoid = entity.Humanoid
 						local playerPos = root.Position
