@@ -2,6 +2,7 @@ local SilentAim
 local Targets
 local Mode
 local HitChance
+local HeadshotMode
 local HeadshotChance
 local Range
 local ShowTarget
@@ -22,10 +23,53 @@ run(function()
 	local entityMouse = entitylib.EntityMouse
 	local entityPosition = entitylib.EntityPosition
 
+	local dynamicCap = 75
+	local jumpCap = 65
+	local movingCap = 50
+	local stillCap = 35
+
+	-- dynamic mode rides the local player's own movement: standing still keeps headshots
+	-- rare, running lifts them, and being airborne caps it, so the rate never reads as a
+	-- constant and never climbs past the static ceiling. this game drives the character with
+	-- an AnimationController, so there is no Humanoid:GetState - the vertical velocity is the
+	-- only signal for "in the air"
+	local function dynamicHeadshotChance()
+		local entity = entitylib.character
+		local humanoid = entity and entity.Humanoid
+		local root = entity and entity.RootPart
+		if not humanoid or not root then return stillCap end
+
+		local velocity = root.AssemblyLinearVelocity
+		local moving = humanoid.MoveDirection.Magnitude > 0.1
+		local horizontal = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+		local airborne = math.abs(velocity.Y) > 4
+
+		local ceiling = stillCap
+		if airborne then
+			ceiling = jumpCap
+		elseif moving or horizontal > 8 then
+			ceiling = movingCap
+		end
+
+		if ceiling > dynamicCap then
+			ceiling = dynamicCap
+		end
+
+		return rand:NextNumber(0, ceiling)
+	end
+
+	local function headshotChance()
+		if HeadshotMode.Value == 'Dynamic' then
+			return dynamicHeadshotChance()
+		end
+
+		return HeadshotChance.Value
+	end
+
 	local function getTarget(origin)
 		if rand:NextNumber(0, 100) > HitChance.Value then return end
 
-		local targetPart = rand:NextNumber(0, 100) < HeadshotChance.Value and 'Head' or 'RootPart'
+		local targetPart = rand:NextNumber(0, 100) < headshotChance() and 'Head' or 'RootPart'
 		local fromMouse = Mode.Value == 'Mouse'
 		local entity = (fromMouse and entityMouse or entityPosition)({
 			Part = targetPart,
@@ -41,13 +85,15 @@ run(function()
 
 	local ignore = {}
 
-	local weapon, hookBullet
+	local weapon, hookBullet, installHook
 
 	local function findWeapon()
 		if typeof(getgc) ~= 'function' then return end
 
+		-- a destroyed weapon keeps its IsEquipped flag until the game recycles it, so skip
+		-- those or the loop fires at a dead table and every shot silently fails
 		for _, v in getgc(true) do
-			if type(v) == 'table' and rawget(v, 'IsEquipped') == true and type(rawget(v, 'Identifier')) == 'string' then
+			if type(v) == 'table' and rawget(v, 'IsEquipped') == true and rawget(v, 'IsDestroyed') ~= true and type(rawget(v, 'Identifier')) == 'string' then
 				return v
 			end
 		end
@@ -59,8 +105,14 @@ run(function()
 			return active
 		end
 
-		weapon = findWeapon()
-		return weapon
+		-- keep the cache when a scan misses, otherwise one unlucky getgc pass drops the
+		-- weapon and every later frame has to rescan
+		local found = findWeapon()
+		if found then
+			weapon = found
+		end
+
+		return found
 	end
 
 	local gateIgnore = {}
@@ -73,10 +125,14 @@ run(function()
 		if not root then return false end
 
 		local origin = root.Position
-		local entity = entityPosition({
+		local fromMouse = Mode.Value == 'Mouse'
+		-- mirror getTarget: Mouse mode measures pixels from the crosshair, Position mode
+		-- measures studs from the character, so the gate must use the same selector
+		local entity = (fromMouse and entityMouse or entityPosition)({
 			Part = 'RootPart',
 			Range = Range.Value,
-			Origin = origin,
+			MouseOrigin = fromMouse and gameCamera.ViewportSize / 2 or nil,
+			Origin = fromMouse and nil or origin,
 			Players = Targets.Players.Enabled,
 			NPCs = Targets.NPCs.Enabled
 		})
@@ -97,7 +153,13 @@ run(function()
 		repeat
 			task.wait()
 
-			if AutoFire.Enabled and SilentAim.Enabled and Bullet.create == hookBullet then
+			if AutoFire.Enabled and SilentAim.Enabled then
+				-- the game can swap the Bullet module out from under us, which leaves the hook
+				-- detached and stops the loop for good, so reinstall it instead of bailing
+				if Bullet.create ~= hookBullet then
+					installHook()
+				end
+
 				local now = os.clock()
 				if now >= gateUntil then
 					gateOk = reachable()
@@ -105,7 +167,7 @@ run(function()
 				end
 
 				local active = gateOk and currentWeapon()
-				if active then
+				if active and (rawget(active, 'NextShotDue') or 0) <= now then
 					pcall(active.shoot, active)
 				end
 			end
@@ -113,7 +175,10 @@ run(function()
 	end
 
 	hookBullet = function(self, aimingOptions, isAiming)
-		weapon = rawget(self, 'Weapon') or weapon
+		local selfWeapon = rawget(self, 'Weapon')
+		if type(selfWeapon) == 'table' and rawget(selfWeapon, 'IsDestroyed') ~= true then
+			weapon = selfWeapon
+		end
 
 		local bullet = OriginalCreate(self, aimingOptions, isAiming)
 		if not SilentAim.Enabled or type(bullet) ~= 'table' then return bullet end
@@ -139,11 +204,13 @@ run(function()
 		return bullet
 	end
 
-	local function installHook()
+	installHook = function()
 		if Bullet.create == hookBullet then return end
 
+		-- reuse the original only when it came from this same module; a swapped module has
+		-- its own create and capturing the stale one would call a dead function
 		local previous = shared.__bloxstrikeBullet
-		if previous and Bullet.create == previous.Hook then
+		if previous and previous.Module == Bullet then
 			OriginalCreate = previous.Original
 		else
 			OriginalCreate = Bullet.create
@@ -152,7 +219,8 @@ run(function()
 		Bullet.create = hookBullet
 		shared.__bloxstrikeBullet = {
 			Hook = hookBullet,
-			Original = OriginalCreate
+			Original = OriginalCreate,
+			Module = Bullet
 		}
 	end
 
@@ -197,6 +265,14 @@ run(function()
 		Suffix = '%',
 		Tooltip = 'Chance that the shot is redirected onto the target'
 	})
+	HeadshotMode = SilentAim:CreateDropdown({
+		Name = 'Headshot Chance',
+		List = {'Static', 'Dynamic'},
+		Function = function(val)
+			HeadshotChance.Object.Visible = val == 'Static'
+		end,
+		Tooltip = 'Static - uses the headshot slider\nDynamic - randomizes it from your movement and jumps, capped at 75%'
+	})
 	HeadshotChance = SilentAim:CreateSlider({
 		Name = 'Headshot Chance',
 		Min = 0,
@@ -205,6 +281,7 @@ run(function()
 		Suffix = '%',
 		Tooltip = 'Chance that the shot is aimed at the head instead of the body'
 	})
+	HeadshotChance.Object.Visible = HeadshotMode.Value == 'Static'
 	Range = SilentAim:CreateSlider({
 		Name = 'Range',
 		Min = 1,
