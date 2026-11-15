@@ -30,6 +30,8 @@ local function parseVector3(text)
 	return Vector3.new(x, y, z)
 end
 
+local getTargetPlayer
+
 local function getTargetPosition()
 	if Target.Value == 'LocalPlayer' then
 		local player = getTargetPlayer()
@@ -47,7 +49,7 @@ local function getTargetPosition()
 	return parseVector3(Position.Value)
 end
 
-local function getTargetPlayer()
+getTargetPlayer = function()
 	local name = TargetName.Value:gsub('^%s+', ''):gsub('%s+$', ''):lower()
 
 	if name == '' then
@@ -94,7 +96,15 @@ local function setMaxSimRadius()
 end
 
 local function getParts()
-	return workspace:QueryDescendants('BasePart[Anchored = false]')
+	local parts = {}
+
+	for _, v in workspace:GetDescendants() do
+		if v:IsA('BasePart') then
+			table.insert(parts, v)
+		end
+	end
+
+	return parts
 end
 
 local function pushTowards(part, position, speed)
@@ -231,7 +241,7 @@ LoopDelay = NetworkOwnershipDebugger:CreateSlider({
 })
 OnlyOwned = NetworkOwnershipDebugger:CreateToggle({
 	Name = 'Only network owned',
-	Default = true,
+	Default = false,
 	Tooltip = 'Skip parts your client does not simulate, they ignore the velocity change anyway'
 })
 NetworkOwnershipDebugger:CreateButton({
