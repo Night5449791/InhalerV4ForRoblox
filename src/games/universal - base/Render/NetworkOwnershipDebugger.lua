@@ -1,7 +1,7 @@
 local NetworkOwnershipDebugger
 local ControlMode
 local Target
-local Vector3
+local Position
 local Speed
 local TargetName
 
@@ -26,7 +26,7 @@ local function getTargetPosition()
 		return entitylib.isAlive and (entitylib.character.RootPart.Position + Vector3.new(0, entitylib.character.HipHeight, 0)) or nil
 	end
 
-	return parseVector3(Vector3.Value)
+	return parseVector3(Position.Value)
 end
 
 local function getTargetPlayer()
@@ -115,14 +115,14 @@ Target = NetworkOwnershipDebugger:CreateDropdown({
 	Name = 'Target',
 	List = {'LocalPlayer', 'Vector3'},
 	Function = function(val)
-		Vector3.Object.Visible = val == 'Vector3'
+		Position.Object.Visible = val == 'Vector3'
 		TargetName.Object.Visible = val == 'LocalPlayer'
 	end
 })
-Vector3 = NetworkOwnershipDebugger:CreateTextBox({
+Position = NetworkOwnershipDebugger:CreateTextBox({
 	Name = 'Position',
 	Function = function()
-		if parseVector3(Vector3.Value) == nil then
+		if parseVector3(Position.Value) == nil then
 			notif('NetworkOwnershipDebugger', 'Invalid Vector3, use x, y, z', 5, 'warning')
 		end
 	end,
