@@ -399,6 +399,71 @@ local function startFling(args)
 	notif('ChatCommand', 'Flinging '..(player and player.DisplayName or 'everyone')..'.', 5)
 end
 
+local teamAliases = {
+	c = 'Criminals',
+	criminals = 'Criminals',
+	i = 'Inmates',
+	inmates = 'Inmates',
+	g = 'Guards',
+	guards = 'Guards'
+}
+
+local function startFlingTeam(args)
+	if not options.Fling.Enabled then return end
+
+	local module = vape.Modules and vape.Modules.FlingExploit
+	local targetMode = module and module.Options.Mode
+	local list = module and module.Options.Targets
+	if not (targetMode and list) then
+		notif('ChatCommand', 'FlingExploit is not available in this game.', 5, 'warning')
+		return
+	end
+
+	local text = argument(args)
+	if not text then
+		notif('ChatCommand', 'Usage: .flingteam <c/i/g>', 5, 'warning')
+		return
+	end
+
+	local teamName = teamAliases[text:lower()]
+	if not teamName then
+		notif('ChatCommand', 'Unknown team '..text..', use c, i or g.', 5, 'warning')
+		return
+	end
+
+	local names = {}
+	for _, plr in playersService:GetPlayers() do
+		if plr ~= lplr and plr.Team and plr.Team.Name == teamName then
+			table.insert(names, plr.Name)
+		end
+	end
+
+	if #names == 0 then
+		notif('ChatCommand', 'No '..teamName..' in this server.', 5, 'warning')
+		return
+	end
+
+	table.clear(list.List)
+	table.clear(list.ListEnabled)
+
+	for _, name in names do
+		list:ChangeValue(name)
+	end
+
+	if targetMode.Value ~= 'Individual' then
+		targetMode:SetValue('Individual')
+	end
+
+	if module.Enabled then
+		module:Toggle()
+		module:Toggle()
+	else
+		module:Toggle()
+	end
+
+	notif('ChatCommand', 'Flinging '..#names..' '..teamName..'.', 5)
+end
+
 local function profileExists(name)
 	local success, data = pcall(readfile, 'newvape/profiles/'..name..vape.Place..'.txt')
 	return success and data ~= nil and data ~= ''
@@ -547,6 +612,7 @@ local commands = {
 
 	kick = startFling,
 	bang = startFling,
+	flingteam = startFlingTeam,
 
 	lp = loadProfile,
 	loadprofile = loadProfile,
@@ -566,7 +632,7 @@ local toggles = {
 	end},
 	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
-	{Name = 'Fling', Tooltip = '.kick / ;bang <plr/all> flings the target with a vehicle seat'},
+	{Name = 'Fling', Tooltip = '.kick / ;bang <plr/all> flings the target with a vehicle seat\n.flingteam <c/i/g> flings every criminal, inmate or guard'},
 	{Name = 'LoadProfile', Tooltip = '.lp/.loadprofile <name>\n.lp lists every profile'},
 	{Name = 'ReloadVape', Tooltip = '.reload'},
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>\n.bulkwl/.bulkwhitelist <name> whitelists everyone matching the name, name* matches any prefix'},
