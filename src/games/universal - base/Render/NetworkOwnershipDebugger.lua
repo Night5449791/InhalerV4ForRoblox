@@ -33,7 +33,7 @@ end
 local getTargetPlayer
 
 local function getTargetPosition()
-	if Target.Value == 'LocalPlayer' then
+	if Target.Value == 'Player' then
 		local player = getTargetPlayer()
 		local character = player and player.Character
 
@@ -54,6 +54,12 @@ getTargetPlayer = function()
 
 	if name == '' then
 		return lplr
+	end
+
+	for _, plr in playersService:GetPlayers() do
+		if plr.Name:lower() == name then
+			return plr
+		end
 	end
 
 	for _, plr in playersService:GetPlayers() do
@@ -141,8 +147,8 @@ local function runControl()
 	end
 
 	if ControlMode.Value == 'CFrame' then
-		local part = getTargetPlayer()
-		local character = part and part.Character
+		local player = getTargetPlayer()
+		local character = player and player.Character
 		local root = character and character:FindFirstChild('HumanoidRootPart')
 
 		if not root then
@@ -155,9 +161,10 @@ local function runControl()
 
 	local speed = Speed.Value
 	local onlyOwned = OnlyOwned.Enabled
+	local parts = getParts()
 	local pushedCount = 0
 
-	for _, part in getParts() do
+	for _, part in parts do
 		if onlyOwned and not isNetworkOwned(part) then
 			continue
 		end
@@ -167,8 +174,7 @@ local function runControl()
 		pushedCount = pushedCount + 1
 	end
 
-	if pushedCount == 0 and onlyOwned then
-		notif('NetworkOwnershipDebugger', 'No network owned part found.', 5, 'warning')
+	if pushedCount == 0 then
 		return false
 	end
 
@@ -196,10 +202,10 @@ ControlMode = NetworkOwnershipDebugger:CreateDropdown({
 })
 Target = NetworkOwnershipDebugger:CreateDropdown({
 	Name = 'Target',
-	List = {'LocalPlayer', 'Vector3'},
+	List = {'Player', 'Vector3'},
 	Function = function(val)
 		Position.Object.Visible = val == 'Vector3'
-		TargetName.Object.Visible = val == 'LocalPlayer'
+		TargetName.Object.Visible = val == 'Player'
 	end
 })
 Position = NetworkOwnershipDebugger:CreateTextBox({
@@ -216,13 +222,15 @@ Position = NetworkOwnershipDebugger:CreateTextBox({
 TargetName = NetworkOwnershipDebugger:CreateTextBox({
 	Name = 'Player',
 	Function = function()
-		if Target.Value == 'LocalPlayer' and TargetName.Value ~= '' and not getTargetPlayer() then
-			notif('NetworkOwnershipDebugger', 'No player named '..TargetName.Value, 5, 'warning')
+		local name = TargetName.Value:gsub('^%s+', ''):gsub('%s+$', '')
+
+		if name ~= '' and not getTargetPlayer() then
+			notif('NetworkOwnershipDebugger', 'No player named '..name, 5, 'warning')
 		end
 	end,
 	Default = '',
 	Placeholder = 'Empty for yourself',
-	Tooltip = 'Name of the player whose character is used as the target'
+	Tooltip = 'Name or display name of the player whose character is used as the target'
 })
 Speed = NetworkOwnershipDebugger:CreateSlider({
 	Name = 'Speed',
