@@ -8,8 +8,16 @@ local delfile = delfile or function(file)
 	writefile(file, '')
 end
 
+local function correct(path)
+	return isfile(path) and select(1, readfile(path):find('--This watermark is used to delete the file if its cached, remove it to make the file persist after inhaler updates.', 1, true)) == 1
+end
+
 local function downloadFile(path, func)
-	if not isfile(path) then
+	if not correct(path) then
+		if isfile(path) then
+			delfile(path)
+		end
+
 		local suc, res = pcall(function()
 			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
@@ -17,7 +25,7 @@ local function downloadFile(path, func)
 			error(res)
 		end
 		if path:find('.lua') then
-			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
+			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after inhaler updates.\n'..res
 		end
 		writefile(path, res)
 	end
@@ -28,7 +36,7 @@ local function wipeFolder(path)
 	if not isfolder(path) then return end
 	for _, file in listfiles(path) do
 		if file:find('loader') then continue end
-		if isfile(file) and select(1, readfile(file):find('--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.')) == 1 then
+		if not correct(file) then
 			delfile(file)
 		end
 	end
