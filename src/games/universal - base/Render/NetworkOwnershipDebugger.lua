@@ -5,7 +5,14 @@ local Position
 local Speed
 local TargetName
 local LoopDelay
+local OnlyOwned
 local looping = false
+local pushed = {}
+
+local function executorShim(name)
+	local env = getgenv and getgenv()
+	return (env and env[name]) or _G[name]
+end
 
 local function parseVector3(text)
 	local split = text:split(',')
@@ -25,7 +32,16 @@ end
 
 local function getTargetPosition()
 	if Target.Value == 'LocalPlayer' then
-		return entitylib.isAlive and (entitylib.character.RootPart.Position + Vector3.new(0, entitylib.character.HipHeight, 0)) or nil
+		local player = getTargetPlayer()
+		local character = player and player.Character
+
+		if not character then
+			return
+		end
+
+		local root = character:FindFirstChild('HumanoidRootPart')
+
+		return root and root.Position
 	end
 
 	return parseVector3(Position.Value)
@@ -45,16 +61,66 @@ local function getTargetPlayer()
 	end
 end
 
-local function getParts()
-	local parts = {}
+local function isNetworkOwned(part)
+	local isnetowner = executorShim('isnetworkowner')
 
-	for _, v in workspace:GetDescendants() do
-		if v:IsA('BasePart') and not v.Anchored then
-			table.insert(parts, v)
+	if typeof(isnetowner) ~= 'function' then
+		return true
+	end
+
+	local success, owned = pcall(isnetowner, part)
+	return success and owned
+end
+
+local function setMaxSimRadius()
+	local sethidden = executorShim('sethiddenproperty')
+	local setsim = executorShim('setsimulationradius')
+	local setflag = executorShim('setfflag')
+
+	if typeof(sethidden) == 'function' then
+		pcall(sethidden, lplr, 'SimulationRadius', 1e9)
+		pcall(sethidden, lplr, 'MaximumSimulationRadius', 1e9)
+	end
+
+	if typeof(setsim) == 'function' then
+		pcall(setsim, 1e9)
+	end
+
+	if typeof(setflag) == 'function' then
+		pcall(setflag, 'MinClientSimulationRadius', '1e9')
+		pcall(setflag, 'MaxClientSimulationRadius', '1e9')
+		pcall(setflag, 'MinimalSimRadiusBuffer', '1e9')
+	end
+end
+
+local function getParts()
+	return workspace:QueryDescendants('BasePart[Anchored = false]')
+end
+
+local function pushTowards(part, position, speed)
+	local offset = position - part.Position
+
+	if offset.Magnitude < 1e-3 then
+		offset = Vector3.new(0, 1, 0)
+	end
+
+	part.AssemblyLinearVelocity = offset.Unit * speed
+end
+
+local function saveVelocity(part)
+	if pushed[part] == nil then
+		pushed[part] = part.AssemblyLinearVelocity
+	end
+end
+
+local function restoreVelocities()
+	for part, velocity in pushed do
+		if part.Parent then
+			part.AssemblyLinearVelocity = velocity
 		end
 	end
 
-	return parts
+	table.clear(pushed)
 end
 
 local function runControl()
@@ -64,37 +130,36 @@ local function runControl()
 		return false
 	end
 
-	if ControlMode.Value == 'Velocity' then
-		for _, part in getParts() do
-			part.AssemblyLinearVelocity = (position - part.Position).Unit * Speed.Value
+	if ControlMode.Value == 'CFrame' then
+		local part = getTargetPlayer()
+		local character = part and part.Character
+		local root = character and character:FindFirstChild('HumanoidRootPart')
+
+		if not root then
+			return false
 		end
 
+		root.CFrame = CFrame.lookAt(position, position - root.CFrame.LookVector)
 		return true
 	end
 
-	local player = getTargetPlayer()
-	local character = player and player.Character
-
-	if character then
-		local root = character:FindFirstChild('HumanoidRootPart')
-
-		if root then
-			root.CFrame = CFrame.lookAt(position, position - root.CFrame.LookVector)
-			return true
-		end
-	end
-
-	local first = true
+	local speed = Speed.Value
+	local onlyOwned = OnlyOwned.Enabled
+	local pushedCount = 0
 
 	for _, part in getParts() do
-		if player then
-			part.CFrame = CFrame.lookAt(position, position - part.CFrame.LookVector)
-		elseif first then
-			first = false
-			part.CFrame = CFrame.lookAt(position + part.CFrame.LookVector * 4, position)
-		else
-			part.CFrame = CFrame.lookAt(position + (part.Position - position).Unit * 4, position)
+		if onlyOwned and not isNetworkOwned(part) then
+			continue
 		end
+
+		saveVelocity(part)
+		pushTowards(part, position, speed)
+		pushedCount = pushedCount + 1
+	end
+
+	if pushedCount == 0 and onlyOwned then
+		notif('NetworkOwnershipDebugger', 'No network owned part found.', 5, 'warning')
+		return false
 	end
 
 	return true
@@ -106,13 +171,18 @@ NetworkOwnershipDebugger = vape.Categories.Render:CreateModule({
 		local physicsSettings = settings():GetService('PhysicsSettings')
 
 		physicsSettings.AreOwnersShown = callback and true or false
+
+		if not callback then
+			looping = false
+			restoreVelocities()
+		end
 	end,
 	Tooltip = 'Shows the network owner of every part in the world.'
 })
 ControlMode = NetworkOwnershipDebugger:CreateDropdown({
 	Name = 'Control mode',
 	List = {'Velocity', 'CFrame'},
-	Tooltip = 'Velocity - throws unanchored parts at the target\nCFrame - moves the character or the parts onto the target'
+	Tooltip = 'Velocity - throws every unanchored part at the target\nCFrame - moves your character onto the target'
 })
 Target = NetworkOwnershipDebugger:CreateDropdown({
 	Name = 'Target',
@@ -136,13 +206,13 @@ Position = NetworkOwnershipDebugger:CreateTextBox({
 TargetName = NetworkOwnershipDebugger:CreateTextBox({
 	Name = 'Player',
 	Function = function()
-		if NetworkOwnershipDebugger.Enabled and Target.Value == 'LocalPlayer' and TargetName.Value ~= '' and not getTargetPlayer() then
+		if Target.Value == 'LocalPlayer' and TargetName.Value ~= '' and not getTargetPlayer() then
 			notif('NetworkOwnershipDebugger', 'No player named '..TargetName.Value, 5, 'warning')
 		end
 	end,
 	Default = '',
 	Placeholder = 'Empty for yourself',
-	Tooltip = 'Name of the player whose character is moved when using CFrame'
+	Tooltip = 'Name of the player whose character is used as the target'
 })
 Speed = NetworkOwnershipDebugger:CreateSlider({
 	Name = 'Speed',
@@ -159,11 +229,17 @@ LoopDelay = NetworkOwnershipDebugger:CreateSlider({
 	Decimal = 100,
 	Tooltip = 'Seconds between each control pass'
 })
+OnlyOwned = NetworkOwnershipDebugger:CreateToggle({
+	Name = 'Only network owned',
+	Default = true,
+	Tooltip = 'Skip parts your client does not simulate, they ignore the velocity change anyway'
+})
 NetworkOwnershipDebugger:CreateButton({
 	Name = 'Control Parts',
 	Function = function()
 		if looping then
 			looping = false
+			restoreVelocities()
 			notif('NetworkOwnershipDebugger', 'Stopped controlling parts', 5)
 			return
 		end
@@ -173,9 +249,12 @@ NetworkOwnershipDebugger:CreateButton({
 
 		task.spawn(function()
 			while looping do
+				setMaxSimRadius()
+
 				if not runControl() then
 					looping = false
-					notif('NetworkOwnershipDebugger', 'No target position found.', 5, 'warning')
+					restoreVelocities()
+					notif('NetworkOwnershipDebugger', 'Control stopped.', 5, 'warning')
 					break
 				end
 
@@ -183,5 +262,5 @@ NetworkOwnershipDebugger:CreateButton({
 			end
 		end)
 	end,
-	Tooltip = 'Velocity throws every unanchored part at the target, CFrame teleports the character or the parts to it'
+	Tooltip = 'Velocity throws every unanchored part at the target, CFrame teleports your character to it'
 })
