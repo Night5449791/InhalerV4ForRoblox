@@ -19,13 +19,20 @@ end
 local function modifyPart(part)
 	if modified[part] then return end
 
-	local current = part.LocalTransparencyModifier
-	if current ~= 0 then
-		originals[part] = current
-	end
-
+	originals[part] = part.LocalTransparencyModifier
 	modified[part] = true
 	part.LocalTransparencyModifier = 0.5
+end
+
+local function restoreParts()
+	for part, value in originals do
+		if part.Parent then
+			part.LocalTransparencyModifier = value
+		end
+	end
+
+	table.clear(modified)
+	table.clear(originals)
 end
 
 local function startScan()
@@ -63,13 +70,7 @@ Xray = vape.Categories.World:CreateModule({
 			startScan()
 		else
 			scanToken = scanToken + 1
-
-			for part in modified do
-				part.LocalTransparencyModifier = originals[part] or 0
-			end
-
-			table.clear(modified)
-			table.clear(originals)
+			restoreParts()
 		end
 	end,
 	Tooltip = 'Renders whitelisted parts through walls.'

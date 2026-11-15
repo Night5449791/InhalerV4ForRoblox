@@ -4,6 +4,8 @@ local Target
 local Position
 local Speed
 local TargetName
+local LoopDelay
+local looping = false
 
 local function parseVector3(text)
 	local split = text:split(',')
@@ -59,8 +61,7 @@ local function runControl()
 	local position = getTargetPosition()
 
 	if not position then
-		notif('NetworkOwnershipDebugger', 'No target position found.', 5, 'warning')
-		return
+		return false
 	end
 
 	if ControlMode.Value == 'Velocity' then
@@ -68,7 +69,7 @@ local function runControl()
 			part.AssemblyLinearVelocity = (position - part.Position).Unit * Speed.Value
 		end
 
-		return
+		return true
 	end
 
 	local player = getTargetPlayer()
@@ -79,7 +80,7 @@ local function runControl()
 
 		if root then
 			root.CFrame = CFrame.lookAt(position, position - root.CFrame.LookVector)
-			return
+			return true
 		end
 	end
 
@@ -95,6 +96,8 @@ local function runControl()
 			part.CFrame = CFrame.lookAt(position + (part.Position - position).Unit * 4, position)
 		end
 	end
+
+	return true
 end
 
 NetworkOwnershipDebugger = vape.Categories.Render:CreateModule({
@@ -148,10 +151,37 @@ Speed = NetworkOwnershipDebugger:CreateSlider({
 	Default = 100,
 	Decimal = 1
 })
+LoopDelay = NetworkOwnershipDebugger:CreateSlider({
+	Name = 'Loop delay',
+	Min = 0,
+	Max = 1,
+	Default = 0,
+	Decimal = 100,
+	Tooltip = 'Seconds between each control pass'
+})
 NetworkOwnershipDebugger:CreateButton({
 	Name = 'Control Parts',
 	Function = function()
-		runControl()
+		if looping then
+			looping = false
+			notif('NetworkOwnershipDebugger', 'Stopped controlling parts', 5)
+			return
+		end
+
+		looping = true
+		notif('NetworkOwnershipDebugger', 'Controlling parts, press again to stop', 5)
+
+		task.spawn(function()
+			while looping do
+				if not runControl() then
+					looping = false
+					notif('NetworkOwnershipDebugger', 'No target position found.', 5, 'warning')
+					break
+				end
+
+				task.wait(LoopDelay.Value)
+			end
+		end)
 	end,
 	Tooltip = 'Velocity throws every unanchored part at the target, CFrame teleports the character or the parts to it'
 })
