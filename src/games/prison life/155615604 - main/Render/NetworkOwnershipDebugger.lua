@@ -7,10 +7,15 @@ local TargetName
 local LoopDelay
 local OnlyOwned
 local SpawnCars
+local NoCollide
 local looping = false
 local pushed = {}
+local pushedCollide = {}
 local spawners = {}
 local didClick = {}
+local partCache
+local partMembers
+local partCacheAt = 0
 local dir = 0
 local CYAN = BrickColor.new('Cyan')
 local driveVelocity = Vector3.new(24, 0, 0)
@@ -174,16 +179,46 @@ local function setMaxSimRadius()
 	end
 end
 
-local function getParts()
-	local parts = {}
+local function isPlayerPart(part)
+	for _, player in playersService:GetPlayers() do
+		local character = player.Character
 
-	for _, v in workspace:GetDescendants() do
-		if v:IsA('BasePart') then
-			table.insert(parts, v)
+		if character and part:IsDescendantOf(character) then
+			return true
 		end
 	end
 
-	return parts
+	return false
+end
+
+local function getParts()
+	if partCache and (os.clock() - partCacheAt) < 1 then
+		return partCache, partMembers
+	end
+
+	local parts, seen, members = {}, {}, {}
+
+	for _, v in workspace:GetDescendants() do
+		if v:IsA('BasePart') and not v.Anchored and not isPlayerPart(v) then
+			local root = v.AssemblyRootPart
+
+			if root then
+				if not seen[root] then
+					seen[root] = true
+					members[root] = {}
+					table.insert(parts, root)
+				end
+
+				table.insert(members[root], v)
+			end
+		end
+	end
+
+	partCache = parts
+	partMembers = members
+	partCacheAt = os.clock()
+
+	return parts, members
 end
 
 local function pushTowards(part, position, speed)
@@ -202,6 +237,16 @@ local function saveVelocity(part)
 	end
 end
 
+local function setCollision(members)
+	for _, member in members do
+		if pushedCollide[member] == nil then
+			pushedCollide[member] = member.CanCollide
+		end
+
+		member.CanCollide = false
+	end
+end
+
 local function restoreVelocities()
 	for part, velocity in pushed do
 		if part.Parent then
@@ -209,8 +254,17 @@ local function restoreVelocities()
 		end
 	end
 
+	for part, collide in pushedCollide do
+		if part.Parent then
+			part.CanCollide = collide
+		end
+	end
+
 	table.clear(pushed)
+	table.clear(pushedCollide)
 	table.clear(didClick)
+	partCache = nil
+	partMembers = nil
 end
 
 local function runControl()
@@ -235,7 +289,8 @@ local function runControl()
 
 	local speed = Speed.Value
 	local onlyOwned = OnlyOwned.Enabled
-	local parts = getParts()
+	local noCollide = NoCollide.Enabled
+	local parts, members = getParts()
 	local pushedCount = 0
 
 	for _, part in parts do
@@ -245,6 +300,11 @@ local function runControl()
 
 		saveVelocity(part)
 		pushTowards(part, position, speed)
+
+		if noCollide then
+			setCollision(members[part])
+		end
+
 		pushedCount = pushedCount + 1
 	end
 
@@ -330,6 +390,11 @@ SpawnCars = NetworkOwnershipDebugger:CreateToggle({
 	Name = 'Spawn cars',
 	Default = true,
 	Tooltip = 'Fires every car spawner while controlling parts'
+})
+NoCollide = NetworkOwnershipDebugger:CreateToggle({
+	Name = 'No collision',
+	Default = true,
+	Tooltip = 'Turns off collision on every thrown part, restores it when stopped'
 })
 NetworkOwnershipDebugger:CreateButton({
 	Name = 'Control Parts',
