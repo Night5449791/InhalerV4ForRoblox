@@ -279,6 +279,21 @@ Position = NetworkOwnershipDebugger:CreateTextBox({
 	Placeholder = 'x, y, z',
 	Visible = false
 })
+NetworkOwnershipDebugger:CreateButton({
+	Name = 'Use my position',
+	Function = function()
+		local root = entitylib.isAlive and entitylib.character.RootPart
+
+		if not root then
+			notif('NetworkOwnershipDebugger', 'Character missing.', 5, 'warning')
+			return
+		end
+
+		local position = root.Position
+		Position:SetValue(math.round(position.X)..', '..math.round(position.Y)..', '..math.round(position.Z))
+	end,
+	Tooltip = 'Fills the Position field with your character position'
+})
 TargetName = NetworkOwnershipDebugger:CreateTextBox({
 	Name = 'Player',
 	Function = function()
@@ -333,14 +348,7 @@ NetworkOwnershipDebugger:CreateButton({
 		task.spawn(function()
 			while looping do
 				setMaxSimRadius()
-
-				if not runControl() then
-					looping = false
-					restoreVelocities()
-					notif('NetworkOwnershipDebugger', 'Control stopped.', 5, 'warning')
-					break
-				end
-
+				pcall(runControl)
 				task.wait(LoopDelay.Value)
 			end
 		end)

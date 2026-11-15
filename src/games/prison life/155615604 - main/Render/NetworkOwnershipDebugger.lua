@@ -16,9 +16,6 @@ local didClick = {}
 local partCache
 local partMembers
 local partCacheAt = 0
-local dir = 0
-local CYAN = BrickColor.new('Cyan')
-local driveVelocity = Vector3.new(24, 0, 0)
 
 local function interact(spawner)
 	replicatedStorage.Remotes.InteractWithItem:InvokeServer(spawner)
@@ -113,38 +110,15 @@ local function getSpawners()
 	return spawners
 end
 
-local function fireSpawners(dt)
-	local root = entitylib.isAlive and entitylib.character.RootPart
-
-	if not root then
-		return
-	end
-
+local function fireSpawners()
 	local now = os.clock()
-	local rootPos = root.Position
-	local didMove
 
 	for _, spawner in getSpawners() do
-		local offset = spawner.Position - rootPos
-		local mag = offset.Magnitude
-
-		if mag < 15 and (didClick[spawner] or 0) < now then
+		if (didClick[spawner] or 0) < now then
 			didClick[spawner] = now + 0.2
 			task.spawn(interact, spawner)
 		end
-
-		if mag < 50 and spawner.BrickColor == CYAN and not didMove then
-			dir = math.clamp(dir + (math.clamp(offset.X, -1, 1) * dt * 24), -12, 14)
-			didMove = true
-		end
 	end
-
-	if not didMove then
-		dir = math.clamp(dir + (math.clamp(-dir, -1, 1) * dt * 24), -12, 14)
-	end
-
-	root.CFrame = CFrame.new(610 + dir, 98, 2494)
-	root.AssemblyLinearVelocity = driveVelocity
 end
 
 local function isNetworkOwned(part)
@@ -353,6 +327,21 @@ Position = NetworkOwnershipDebugger:CreateTextBox({
 	Placeholder = 'x, y, z',
 	Visible = false
 })
+NetworkOwnershipDebugger:CreateButton({
+	Name = 'Use my position',
+	Function = function()
+		local root = entitylib.isAlive and entitylib.character.RootPart
+
+		if not root then
+			notif('NetworkOwnershipDebugger', 'Character missing.', 5, 'warning')
+			return
+		end
+
+		local position = root.Position
+		Position:SetValue(math.round(position.X)..', '..math.round(position.Y)..', '..math.round(position.Z))
+	end,
+	Tooltip = 'Fills the Position field with your character position'
+})
 TargetName = NetworkOwnershipDebugger:CreateTextBox({
 	Name = 'Player',
 	Function = function()
@@ -401,7 +390,6 @@ NetworkOwnershipDebugger:CreateButton({
 	Function = function()
 		if looping then
 			looping = false
-			dir = 0
 			restoreVelocities()
 			notif('NetworkOwnershipDebugger', 'Stopped controlling parts', 5)
 			return
@@ -411,25 +399,14 @@ NetworkOwnershipDebugger:CreateButton({
 		notif('NetworkOwnershipDebugger', 'Controlling parts, press again to stop', 5)
 
 		task.spawn(function()
-			local lastClock = os.clock()
-
 			while looping do
-				local now = os.clock()
-				local dt = now - lastClock
-				lastClock = now
-
 				setMaxSimRadius()
 
 				if SpawnCars.Enabled then
-					fireSpawners(dt)
+					pcall(fireSpawners)
 				end
 
-				if not runControl() then
-					looping = false
-					restoreVelocities()
-					notif('NetworkOwnershipDebugger', 'Control stopped.', 5, 'warning')
-					break
-				end
+				pcall(runControl)
 
 				task.wait(LoopDelay.Value)
 			end
