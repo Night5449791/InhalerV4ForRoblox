@@ -4,9 +4,7 @@ local Target
 local Position
 local Speed
 local TargetName
-local LoopDelay
-local OnlyOwned
-local SpawnCars
+local Movement
 local NoCollide
 local looping = false
 local pushed = {}
@@ -16,6 +14,9 @@ local didClick = {}
 local partCache
 local partMembers
 local partCacheAt = 0
+local dir = 0
+local CYAN = BrickColor.new('Cyan')
+local driveVelocity = Vector3.new(24, 0, 0)
 
 local function interact(spawner)
 	replicatedStorage.Remotes.InteractWithItem:InvokeServer(spawner)
@@ -119,6 +120,44 @@ local function fireSpawners()
 			task.spawn(interact, spawner)
 		end
 	end
+end
+
+local function driveCar(dt)
+	if not Movement.Enabled or not entitylib.isAlive then
+		return
+	end
+
+	local root = entitylib.character.RootPart
+
+	if not root then
+		return
+	end
+
+	local now = os.clock()
+	local rootPos = root.Position
+	local didMove
+
+	for _, spawner in getSpawners() do
+		local offset = spawner.Position - rootPos
+		local mag = offset.Magnitude
+
+		if mag < 15 and (didClick[spawner] or 0) < now then
+			didClick[spawner] = now + 0.2
+			task.spawn(interact, spawner)
+		end
+
+		if mag < 50 and spawner.BrickColor == CYAN and not didMove then
+			dir = math.clamp(dir + (math.clamp(offset.X, -1, 1) * dt * 24), -12, 14)
+			didMove = true
+		end
+	end
+
+	if not didMove then
+		dir = math.clamp(dir + (math.clamp(-dir, -1, 1) * dt * 24), -12, 14)
+	end
+
+	root.CFrame = CFrame.new(610 + dir, 98, 2494)
+	root.AssemblyLinearVelocity = driveVelocity
 end
 
 local function isNetworkOwned(part)
@@ -262,13 +301,12 @@ local function runControl()
 	end
 
 	local speed = Speed.Value
-	local onlyOwned = OnlyOwned.Enabled
 	local noCollide = NoCollide.Enabled
 	local parts, members = getParts()
 	local pushedCount = 0
 
 	for _, part in parts do
-		if onlyOwned and not isNetworkOwned(part) then
+		if not isNetworkOwned(part) then
 			continue
 		end
 
@@ -362,23 +400,10 @@ Speed = NetworkOwnershipDebugger:CreateSlider({
 	Default = 100,
 	Decimal = 1
 })
-LoopDelay = NetworkOwnershipDebugger:CreateSlider({
-	Name = 'Loop delay',
-	Min = 0,
-	Max = 1,
-	Default = 0,
-	Decimal = 100,
-	Tooltip = 'Seconds between each control pass'
-})
-OnlyOwned = NetworkOwnershipDebugger:CreateToggle({
-	Name = 'Only network owned',
-	Default = false,
-	Tooltip = 'Skip parts your client does not simulate, they ignore the velocity change anyway'
-})
-SpawnCars = NetworkOwnershipDebugger:CreateToggle({
-	Name = 'Spawn cars',
+Movement = NetworkOwnershipDebugger:CreateToggle({
+	Name = 'Movement',
 	Default = true,
-	Tooltip = 'Fires every car spawner while controlling parts'
+	Tooltip = 'Drives a car around the prison while flinging'
 })
 NoCollide = NetworkOwnershipDebugger:CreateToggle({
 	Name = 'No collision',
@@ -390,6 +415,7 @@ NetworkOwnershipDebugger:CreateButton({
 	Function = function()
 		if looping then
 			looping = false
+			dir = 0
 			restoreVelocities()
 			notif('NetworkOwnershipDebugger', 'Stopped controlling parts', 5)
 			return
@@ -399,16 +425,18 @@ NetworkOwnershipDebugger:CreateButton({
 		notif('NetworkOwnershipDebugger', 'Controlling parts, press again to stop', 5)
 
 		task.spawn(function()
+			local lastClock = os.clock()
+
 			while looping do
+				local now = os.clock()
+				local dt = now - lastClock
+				lastClock = now
+
 				setMaxSimRadius()
-
-				if SpawnCars.Enabled then
-					pcall(fireSpawners)
-				end
-
+				pcall(fireSpawners)
+				pcall(driveCar, dt)
 				pcall(runControl)
-
-				task.wait(LoopDelay.Value)
+				task.wait()
 			end
 		end)
 	end,
