@@ -153,6 +153,7 @@ Prison Life's `Utility/ChatCommand.lua` keeps a shared path next to the local `l
 
 ## 9. Known pitfalls
 
+- `NewMainScript.lua` at the repo root is a hand-kept copy of `src/loader.lua` and is what every injection actually executes; edits to `src/loader.lua` alone do nothing for players. Copy the file over in the same change.
 - `base.lua:560` — `vape:Load` ends with `return toggleData`, but `toggleData` is undefined.
 - `base.lua:524` — `Save` inside `Load` early-returns (`not self.Loaded`); the first real write comes from the 10-second loop.
 - Module objects have no `Type` field, so `Remove`'s `isModule` check never re-sorts categories.
