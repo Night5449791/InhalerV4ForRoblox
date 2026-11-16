@@ -33,16 +33,16 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/InhalerV
 3. If it still loads original vape v4 try this loadstring instead.
 ```luau
 pcall(function()
-    delfile("newvape/main.lua")
+    delfile("InhalerV4/main.lua")
 end)
 pcall(function()
-    delfolder("newvape/libraries")
+    delfolder("InhalerV4/libraries")
 end)
 pcall(function()
-    delfolder("newvape/games")
+    delfolder("InhalerV4/games")
 end)
 pcall(function()
-    delfolder("newvape/guis")
+    delfolder("InhalerV4/guis")
 end)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Night5449791/InhalerV4ForRoblox/main/NewMainScript.lua", true))()
 ```
