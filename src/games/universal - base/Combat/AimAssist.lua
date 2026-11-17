@@ -16,7 +16,7 @@ local ShowTarget
 local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 
 local function wrapAngle(num)
-	return (num + math.pi % math.tau) - math.pi
+	return ((num + math.pi) % math.tau) - math.pi
 end
 
 AimAssist = vape.Categories.Combat:CreateModule({
@@ -88,7 +88,7 @@ AimAssist = vape.Categories.Combat:CreateModule({
 				gameCamera.CFrame = CFrame.lookAt(origin, origin + blended / magnitude)
 			else
 				local facing = camCF.LookVector
-				local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - math.atan2(target.X, target.Z))
+				local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - wrapAngle(math.atan2(target.X, target.Z)))
 				local diffPitch = math.asin(facing.Y) - math.asin(target.Y)
 				local angle = Vector2.new(diffYaw, diffPitch) // mouseScale
 

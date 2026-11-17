@@ -553,9 +553,15 @@ run(function()
 	getGunController()
 	if not (pl.Bullet and pl.SwitchTable) then
 		repeat
-			getShootFunction()
-			getGunController()
-			task.wait()
+			if not (pl.Bullet and pl.Shoot and pl.Reload and pl.PlaySound) then
+				getShootFunction()
+			end
+
+			if not (pl.ShootParams and pl.Equip and pl.SwitchTable and pl.SwitchUpdate) then
+				getGunController()
+			end
+
+			task.wait(0.5)
 		until pl.Bullet and pl.SwitchTable or vape.Loaded == nil
 
 		if vape.Loaded == nil then
@@ -852,6 +858,7 @@ task.spawn(function()
 	if not whitelist.loaded then return end
 
 	for _, plr in playersService:GetPlayers() do
+		task.wait(2.5)
 		announceMember(plr)
 	end
 end)

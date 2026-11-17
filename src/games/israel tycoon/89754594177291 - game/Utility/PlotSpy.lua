@@ -5,9 +5,12 @@ local HideMine
 local holder
 local label
 
+local cashUnits = {{1e12, 'T'}, {1e9, 'B'}, {1e6, 'M'}, {1e3, 'K'}}
+
 local function formatCash(value)
 	local suffix = ''
-	for _, unit in {{1e12, 'T'}, {1e9, 'B'}, {1e6, 'M'}, {1e3, 'K'}} do
+
+	for _, unit in cashUnits do
 		if value >= unit[1] then
 			suffix = unit[2]
 			value = value / unit[1]
@@ -18,8 +21,6 @@ local function formatCash(value)
 	return string.format(value >= 100 and '%.0f' or '%.1f', value)..suffix
 end
 
--- PendingCash is the income sitting uncollected on a plot, which is the only public number
--- that hints at how rich its owner is
 local function buildLines()
 	local folder = israel.tycoonsFolder()
 	if not folder then return {} end

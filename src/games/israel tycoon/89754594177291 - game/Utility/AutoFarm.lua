@@ -3,18 +3,19 @@ local Collect
 local Buy
 local BuyDelay
 
+local fireTouchInterest = (getgenv and getgenv().firetouchinterest) or _G.firetouchinterest
+local itemMap
+local itemMapConfig
+
 local function touch(part)
 	local hrp = lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart')
 	if not hrp then return end
+	if typeof(fireTouchInterest) ~= 'function' then return end
 
-	local fire = getgenv().firetouchinterest
-	if typeof(fire) ~= 'function' then return end
-
-	pcall(fire, hrp, part, 0)
-	pcall(fire, hrp, part, 1)
+	pcall(fireTouchInterest, hrp, part, 0)
+	pcall(fireTouchInterest, hrp, part, 1)
 end
 
--- the cash pad pays out on touch, and PendingCash tells us whether there is anything to take
 local function collectPad(plot)
 	if (plot:GetAttribute('PendingCash') or 0) <= 0 then return end
 
@@ -25,26 +26,30 @@ local function collectPad(plot)
 	end
 end
 
--- buttons are Button_<ItemId> pads and Config holds the price, so only offer what we can
--- afford and take the cheapest first
 local function cheapestAffordable(plot)
 	local config = israel.Config
 	local buttons = plot:FindFirstChild('Buttons')
 	if not config or not buttons then return end
 
-	local byId = {}
-	for _, item in config.Items do
-		if item.Id then
-			byId[item.Id] = item
+	if itemMapConfig ~= config then
+		itemMapConfig = config
+		itemMap = {}
+
+		for _, item in config.Items do
+			if item.Id and itemMap[item.Id] == nil then
+				itemMap[item.Id] = item
+			end
 		end
 	end
 
 	local cash = israel.cash()
 	local best, bestPrice
+
 	for _, button in buttons:GetChildren() do
 		local id = button.Name:match('^Button_(.+)$')
-		local item = id and byId[id]
+		local item = id and itemMap[id]
 		local price = item and (item.Price or 0)
+
 		if price and price <= cash and (not bestPrice or price < bestPrice) then
 			local pad = button:FindFirstChild('Pad')
 			if pad then

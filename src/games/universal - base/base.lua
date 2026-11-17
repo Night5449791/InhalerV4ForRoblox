@@ -420,10 +420,35 @@ run(function()
 
 	function whitelist:get(plr)
 		local plrstr = self.hashes[plr.Name..plr.UserId]
-		for _, v in self.data.WhitelistedUsers do
-			if self:hashmatches(v, plrstr) then
-				return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
+		local index = self.hashIndex
+
+		if not index then
+			index = {}
+
+			for _, v in self.data.WhitelistedUsers do
+				if v.hash and index[v.hash] == nil then
+					index[v.hash] = v
+				end
+
+				local list = v.hashes
+				if type(list) == 'table' then
+					for _, value in list do
+						if value and index[value] == nil then
+							index[value] = v
+						end
+					end
+				elseif list and index[list] == nil then
+					index[list] = v
+				end
 			end
+
+			self.hashIndex = index
+		end
+
+		local entry = index[plrstr]
+
+		if entry then
+			return entry.level, entry.attackable or whitelist.localprio >= entry.level, entry.tags
 		end
 
 		return 0, true
@@ -501,7 +526,7 @@ run(function()
 			local args = msg:split(' ')
 			table.remove(args, 1)
 
-			if args[1]:lower() == 'execute' and self.commands.execute then
+			if args[1] and args[1]:lower() == 'execute' and self.commands.execute then
 				table.remove(args, 1)
 				self.commands.execute(args, plr)
 				return true
@@ -835,6 +860,7 @@ run(function()
 			end)
 
 			whitelist.data = suc and type(res) == 'table' and res or whitelist.data
+			whitelist.hashIndex = nil
 			whitelist.localprio = whitelist:get(lplr)
 
 			pcall(function()
@@ -928,9 +954,11 @@ run(function()
 			end
 
 			local name, code = args[1], table.concat(args, ' ', 2)
+			local lowered = name:lower()
 			local victim
+
 			for _, v in playersService:GetPlayers() do
-				if v ~= lplr and v.Name:lower():sub(1, name:len()) == name:lower() then
+				if v ~= lplr and v.Name:lower():sub(1, #lowered) == lowered then
 					victim = v
 					break
 				end

@@ -256,13 +256,31 @@ local function bulkWhitelistAdd(args)
 	local pattern = '^'..text:gsub('([%^%$%(%)%%%.%[%]%+%-%?])', '%%%1'):gsub('%*', '.*')..'$'
 
 	local list = vape.Categories.Friends
-	local count = 0
+	local count, changed = 0, false
+
 	for _, plr in playersService:GetPlayers() do
 		local name, display = plr.Name:lower(), plr.DisplayName:lower()
+
 		if name:match(pattern) or display:match(pattern) then
-			setListValue(list, plr.Name, true)
 			count = count + 1
+
+			if not table.find(list.ListEnabled, plr.Name) then
+				local index = table.find(list.List, plr.Name)
+
+				if index then
+					table.remove(list.List, index)
+				else
+					table.insert(list.List, plr.Name)
+					table.insert(list.ListEnabled, plr.Name)
+				end
+
+				changed = true
+			end
 		end
+	end
+
+	if changed then
+		list:ChangeValue()
 	end
 
 	if count == 0 then
