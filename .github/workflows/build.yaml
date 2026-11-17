@@ -51,5 +51,9 @@ jobs:
       run: |-
         cd ./InhalerCompiled
         git add .
+        if git diff --staged --quiet; then
+          echo "::error::Bundler produced no changes in InhalerCompiled. Nothing to publish."
+          exit 1
+        fi
         git commit -m "Updated Inhaler to Prod"
         git push origin

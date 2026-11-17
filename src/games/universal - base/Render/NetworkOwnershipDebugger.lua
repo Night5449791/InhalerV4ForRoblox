@@ -10,13 +10,33 @@ local pushedCollide = {}
 local partCache
 local partMembers
 local partCacheAt = 0
+local lastPositionText
+local lastPositionValue
+local isNetworkOwner
+local sethiddenProperty
+local setSimulationRadius
+local setFflag
 
 local function executorShim(name)
-	local env = getgenv and getgenv()
-	return (env and env[name]) or _G[name]
+	local env = (getgenv and getgenv()) or _G
+	local func = env[name] or _G[name]
+
+	return typeof(func) == 'function' and func or nil
 end
 
+isNetworkOwner = executorShim('isnetworkowner')
+sethiddenProperty = executorShim('sethiddenproperty')
+setSimulationRadius = executorShim('setsimulationradius')
+setFflag = executorShim('setfflag')
+
 local function parseVector3(text)
+	if text == lastPositionText then
+		return lastPositionValue
+	end
+
+	lastPositionText = text
+	lastPositionValue = nil
+
 	local split = text:split(',')
 
 	if #split ~= 3 then
@@ -29,7 +49,9 @@ local function parseVector3(text)
 		return
 	end
 
-	return Vector3.new(x, y, z)
+	lastPositionValue = Vector3.new(x, y, z)
+
+	return lastPositionValue
 end
 
 local getTargetPlayer
@@ -58,61 +80,65 @@ getTargetPlayer = function()
 		return lplr
 	end
 
+	local prefixMatch
+
 	for _, plr in playersService:GetPlayers() do
-		if plr.Name:lower() == name then
+		local playerName = plr.Name:lower()
+
+		if playerName == name then
 			return plr
+		end
+
+		if not prefixMatch and playerName:sub(1, #name) == name then
+			prefixMatch = plr
 		end
 	end
 
-	for _, plr in playersService:GetPlayers() do
-		if plr.Name:lower():sub(1, #name) == name then
-			return plr
-		end
-	end
+	return prefixMatch
 end
 
 local function isNetworkOwned(part)
-	local isnetowner = executorShim('isnetworkowner')
-
-	if typeof(isnetowner) ~= 'function' then
+	if not isNetworkOwner then
 		return true
 	end
 
-	local success, owned = pcall(isnetowner, part)
+	local success, owned = pcall(isNetworkOwner, part)
 	return success and owned
 end
 
 local function setMaxSimRadius()
-	local sethidden = executorShim('sethiddenproperty')
-	local setsim = executorShim('setsimulationradius')
-	local setflag = executorShim('setfflag')
-
-	if typeof(sethidden) == 'function' then
-		pcall(sethidden, lplr, 'SimulationRadius', 1e9)
-		pcall(sethidden, lplr, 'MaximumSimulationRadius', 1e9)
+	if sethiddenProperty then
+		pcall(sethiddenProperty, lplr, 'SimulationRadius', 1e9)
+		pcall(sethiddenProperty, lplr, 'MaximumSimulationRadius', 1e9)
 	end
 
-	if typeof(setsim) == 'function' then
-		pcall(setsim, 1e9)
+	if setSimulationRadius then
+		pcall(setSimulationRadius, 1e9)
 	end
 
-	if typeof(setflag) == 'function' then
-		pcall(setflag, 'MinClientSimulationRadius', '1e9')
-		pcall(setflag, 'MaxClientSimulationRadius', '1e9')
-		pcall(setflag, 'MinimalSimRadiusBuffer', '1e9')
+	if setFflag then
+		pcall(setFflag, 'MinClientSimulationRadius', '1e9')
+		pcall(setFflag, 'MaxClientSimulationRadius', '1e9')
+		pcall(setFflag, 'MinimalSimRadiusBuffer', '1e9')
 	end
 end
 
-local function isPlayerPart(part)
+local function collectPlayerParts()
+	local playerParts = {}
+
 	for _, player in playersService:GetPlayers() do
 		local character = player.Character
 
-		if character and part:IsDescendantOf(character) then
-			return true
+		if character then
+			for _, descendant in character:GetDescendants() do
+				if descendant:IsA('BasePart') then
+					playerParts[descendant] = true
+				end
+			end
 		end
 	end
 
-	return false
+	return playerParts
 end
 
 local function getParts()
@@ -120,10 +146,11 @@ local function getParts()
 		return partCache, partMembers
 	end
 
+	local playerParts = collectPlayerParts()
 	local parts, seen, members = {}, {}, {}
 
 	for _, v in workspace:GetDescendants() do
-		if v:IsA('BasePart') and not v.Anchored and not isPlayerPart(v) then
+		if v:IsA('BasePart') and not v.Anchored and not playerParts[v] then
 			local root = v.AssemblyRootPart
 
 			if root then

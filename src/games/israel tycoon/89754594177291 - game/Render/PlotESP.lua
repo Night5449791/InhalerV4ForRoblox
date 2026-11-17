@@ -10,13 +10,40 @@ local referenced = {}
 local nextRefresh = 0
 local getfontbounds = vape.Libraries.getfontbounds
 local uipallet = vape.Libraries.uipallet
+local ownColorCache = {}
+local shieldColorCache = {}
+local baseColorCache = {}
+local lastTextScale
+local lastTextSize
 local Folder = Instance.new('Folder')
 Folder.Name = 'PlotESP'
 Folder.Parent = vape.holder
 
-local function plotLabel(plot)
-	local owner = israel.plotOwner(plot)
+local function cachedColor(option, cache)
+	if cache.hue ~= option.Hue or cache.sat ~= option.Sat or cache.value ~= option.Value then
+		cache.hue = option.Hue
+		cache.sat = option.Sat
+		cache.value = option.Value
+		cache.color = Color3.fromHSV(option.Hue, option.Sat, option.Value)
+	end
+
+	return cache.color
+end
+
+local function getTextSize()
+	local scale = Scale.Value
+
+	if lastTextScale ~= scale then
+		lastTextScale = scale
+		lastTextSize = getfontbounds('Empty (shield)', 14 * scale, uipallet.Font, Vector2.new(100000, 100000))
+	end
+
+	return lastTextSize
+end
+
+local function plotLabel(plot, owner)
 	local name = owner and owner.DisplayName or 'Empty'
+
 	if plot:GetAttribute('NewbieShield') == true then
 		name = name..' (shield)'
 	end
@@ -24,27 +51,38 @@ local function plotLabel(plot)
 	return name
 end
 
-local function plotColor(plot)
-	if israel.plotOwner(plot) == lplr then
-		return Color3.fromHSV(OwnColor.Hue, OwnColor.Sat, OwnColor.Value)
+local function plotColor(plot, owner)
+	if owner == lplr then
+		return cachedColor(OwnColor, ownColorCache)
 	end
 
 	if plot:GetAttribute('NewbieShield') == true then
-		return Color3.fromHSV(ShieldColor.Hue, ShieldColor.Sat, ShieldColor.Value)
+		return cachedColor(ShieldColor, shieldColorCache)
 	end
 
-	return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+	return cachedColor(Color, baseColorCache)
+end
+
+local function refreshPlot(plot)
+	local data = referenced[plot]
+	if not data then return end
+
+	local owner = israel.plotOwner(plot)
+	local color = plotColor(plot, owner)
+
+	if data.text then
+		data.text.Text = plotLabel(plot, owner)
+		data.text.TextColor3 = color
+	end
+
+	if data.highlight then
+		data.highlight.OutlineColor = color
+	end
 end
 
 local function refreshText()
-	for plot, data in referenced do
-		if data.text then
-			data.text.Text = plotLabel(plot)
-			data.text.TextColor3 = plotColor(plot)
-		end
-		if data.highlight then
-			data.highlight.OutlineColor = plotColor(plot)
-		end
+	for plot in referenced do
+		refreshPlot(plot)
 	end
 end
 
@@ -73,11 +111,13 @@ local function Added(plot)
 	local target = plot.PrimaryPart or plot:FindFirstChild('Base')
 	if not target then return end
 
+	local owner = israel.plotOwner(plot)
+	local color = plotColor(plot, owner)
 	local highlight = Instance.new('Highlight')
 	highlight.Adornee = target
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillColor = plotColor(plot)
-	highlight.OutlineColor = plotColor(plot)
+	highlight.FillColor = color
+	highlight.OutlineColor = color
 	highlight.FillTransparency = FillTransparency.Value
 	highlight.OutlineTransparency = OutlineTransparency.Value
 	highlight.Parent = Folder
@@ -85,7 +125,7 @@ local function Added(plot)
 	local billboard
 	local text
 	if ShowText.Enabled then
-		local size = getfontbounds('Empty (shield)', 14 * Scale.Value, uipallet.Font, Vector2.new(100000, 100000))
+		local size = getTextSize()
 		billboard = Instance.new('BillboardGui')
 		billboard.AlwaysOnTop = true
 		billboard.Size = UDim2.fromOffset(size.X + 8, size.Y + 7)
@@ -98,8 +138,8 @@ local function Added(plot)
 		text.FontFace = uipallet.Font
 		text.RichText = true
 		text.Size = billboard.Size
-		text.Text = plotLabel(plot)
-		text.TextColor3 = plotColor(plot)
+		text.Text = plotLabel(plot, owner)
+		text.TextColor3 = color
 		text.TextSize = 14 * Scale.Value
 		text.TextStrokeTransparency = 1
 		text.TextStrokeColor3 = Color3.new()
@@ -110,8 +150,12 @@ local function Added(plot)
 		highlight = highlight,
 		billboard = billboard,
 		text = text,
-		titleConnection = plot:GetAttributeChangedSignal('OwnerUserId'):Connect(refreshText),
-		shieldConnection = plot:GetAttributeChangedSignal('NewbieShield'):Connect(refreshText),
+		titleConnection = plot:GetAttributeChangedSignal('OwnerUserId'):Connect(function()
+			refreshPlot(plot)
+		end),
+		shieldConnection = plot:GetAttributeChangedSignal('NewbieShield'):Connect(function()
+			refreshPlot(plot)
+		end),
 		connection = plot.Destroying:Connect(function()
 			Removed(plot)
 		end)

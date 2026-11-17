@@ -8,18 +8,40 @@ local referenced = {}
 local nextRefresh = 0
 local getfontbounds = vape.Libraries.getfontbounds
 local uipallet = vape.Libraries.uipallet
+local colorCache = {}
+local heldColorCache = {}
+local zoneTextSize
 local Folder = Instance.new('Folder')
 Folder.Name = 'ZoneESP'
 Folder.Parent = vape.holder
 
-local function zoneColor(zone)
-	-- HolderUserId is the only stable signal: State is a display word (Neutral/Held/...)
-	local holderId = zone:GetAttribute('HolderUserId')
-	if typeof(holderId) == 'number' and holderId ~= 0 then
-		return Color3.fromHSV(HeldColor.Hue, HeldColor.Sat, HeldColor.Value)
+local function cachedColor(option, cache)
+	if cache.hue ~= option.Hue or cache.sat ~= option.Sat or cache.value ~= option.Value then
+		cache.hue = option.Hue
+		cache.sat = option.Sat
+		cache.value = option.Value
+		cache.color = Color3.fromHSV(option.Hue, option.Sat, option.Value)
 	end
 
-	return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+	return cache.color
+end
+
+local function getZoneTextSize()
+	if not zoneTextSize then
+		zoneTextSize = getfontbounds('Neutral 100%', 14, uipallet.Font, Vector2.new(100000, 100000))
+	end
+
+	return zoneTextSize
+end
+
+local function zoneColor(zone)
+	local holderId = zone:GetAttribute('HolderUserId')
+
+	if typeof(holderId) == 'number' and holderId ~= 0 then
+		return cachedColor(HeldColor, heldColorCache)
+	end
+
+	return cachedColor(Color, colorCache)
 end
 
 local function zoneLabel(zone)
@@ -39,16 +61,25 @@ local function zoneLabel(zone)
 	return state
 end
 
-local function refreshText()
-	for zone, data in referenced do
-		if data.text then
-			data.text.Text = zoneLabel(zone)
-			data.text.TextColor3 = zoneColor(zone)
-		end
+local function refreshZone(zone)
+	local data = referenced[zone]
+	if not data then return end
 
-		if data.highlight then
-			data.highlight.OutlineColor = zoneColor(zone)
-		end
+	local color = zoneColor(zone)
+
+	if data.text then
+		data.text.Text = zoneLabel(zone)
+		data.text.TextColor3 = color
+	end
+
+	if data.highlight then
+		data.highlight.OutlineColor = color
+	end
+end
+
+local function refreshText()
+	for zone in referenced do
+		refreshZone(zone)
 	end
 end
 
@@ -83,11 +114,12 @@ local function Added(zone)
 	local target = zone.PrimaryPart or zone:FindFirstChildWhichIsA('BasePart', true)
 	if not target then return end
 
+	local color = zoneColor(zone)
 	local highlight = Instance.new('Highlight')
 	highlight.Adornee = target
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillColor = zoneColor(zone)
-	highlight.OutlineColor = zoneColor(zone)
+	highlight.FillColor = color
+	highlight.OutlineColor = color
 	highlight.FillTransparency = FillTransparency.Value
 	highlight.OutlineTransparency = OutlineTransparency.Value
 	highlight.Parent = Folder
@@ -95,7 +127,7 @@ local function Added(zone)
 	local billboard
 	local text
 	if ShowText.Enabled then
-		local size = getfontbounds('Neutral 100%', 14, uipallet.Font, Vector2.new(100000, 100000))
+		local size = getZoneTextSize()
 		billboard = Instance.new('BillboardGui')
 		billboard.AlwaysOnTop = true
 		billboard.Size = UDim2.fromOffset(size.X + 8, size.Y + 7)
@@ -108,7 +140,7 @@ local function Added(zone)
 		text.FontFace = uipallet.Font
 		text.Size = billboard.Size
 		text.Text = zoneLabel(zone)
-		text.TextColor3 = zoneColor(zone)
+		text.TextColor3 = color
 		text.TextSize = 14
 		text.TextStrokeTransparency = 1
 		text.TextStrokeColor3 = Color3.new()
@@ -117,7 +149,9 @@ local function Added(zone)
 
 	local connections = {}
 	for _, attribute in {'State', 'Progress', 'HolderName', 'HolderUserId', 'CapturerName'} do
-		table.insert(connections, zone:GetAttributeChangedSignal(attribute):Connect(refreshText))
+		table.insert(connections, zone:GetAttributeChangedSignal(attribute):Connect(function()
+			refreshZone(zone)
+		end))
 	end
 
 	referenced[zone] = {

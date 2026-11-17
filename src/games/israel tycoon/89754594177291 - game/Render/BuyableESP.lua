@@ -8,23 +8,43 @@ local getfontbounds = vape.Libraries.getfontbounds
 local uipallet = vape.Libraries.uipallet
 local parented = {}
 local nextRefresh = 0
+local itemMap
+local itemMapConfig
+local colorCache = {}
+local affordableCache = {}
 local Folder = Instance.new('Folder')
 Folder.Name = 'BuyableESP'
 Folder.Parent = vape.holder
 
--- Button_<Id> is the only link back to Config, which is where the price and label live
+local function cachedColor(option, cache)
+	if cache.hue ~= option.Hue or cache.sat ~= option.Sat or cache.value ~= option.Value then
+		cache.hue = option.Hue
+		cache.sat = option.Sat
+		cache.value = option.Value
+		cache.color = Color3.fromHSV(option.Hue, option.Sat, option.Value)
+	end
+
+	return cache.color
+end
+
 local function itemFor(button)
 	local config = israel.Config
 	if not config or not config.Items then return end
 
-	local id = button.Name:match('^Button_(.+)$')
-	if not id then return end
+	if itemMapConfig ~= config then
+		itemMapConfig = config
+		itemMap = {}
 
-	for _, item in config.Items do
-		if item.Id == id then
-			return item
+		for _, item in config.Items do
+			if not itemMap[item.Id] then
+				itemMap[item.Id] = item
+			end
 		end
 	end
+
+	local id = button.Name:match('^Button_(.+)$')
+
+	return id and itemMap[id]
 end
 
 local function affordable(item)
@@ -33,10 +53,10 @@ end
 
 local function colorFor(item)
 	if affordable(item) then
-		return Color3.fromHSV(AffordableColor.Hue, AffordableColor.Sat, AffordableColor.Value)
+		return cachedColor(AffordableColor, affordableCache)
 	end
 
-	return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+	return cachedColor(Color, colorCache)
 end
 
 local function Removed(button)
@@ -118,8 +138,12 @@ BuyableESP = vape.Categories.Render:CreateModule({
 				if now < nextRefresh then return end
 
 				nextRefresh = now + 0.5
+				local cash = israel.cash()
+				local affordableColor = cachedColor(AffordableColor, affordableCache)
+				local expensiveColor = cachedColor(Color, colorCache)
+
 				for button, data in parented do
-					data.text.TextColor3 = colorFor(data.item)
+					data.text.TextColor3 = cash >= (data.item.Price or 0) and affordableColor or expensiveColor
 				end
 			end))
 
