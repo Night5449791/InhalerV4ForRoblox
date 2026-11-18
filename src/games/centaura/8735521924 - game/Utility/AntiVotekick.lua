@@ -18,13 +18,13 @@ local function serverhop()
 		lplr:Kick()
 	end)
 	local success, data = pcall(function()
-		local response = game:HttpGet('https://games.roblox.com/v1/games/'..game.PlaceId..'/servers/Public?sortOrder=2&excludeFullGames=true&limit=100')
+		local response = game:HttpGet('https://games.roblox.com/v1/games/'..game.PlaceId..'/servers/Public?sortOrder=1&excludeFullGames=true&limit=100')
 		return httpService:JSONDecode(response)
 	end)
 	if not success or type(data) ~= 'table' or type(data.data) ~= 'table' then return end
 
 	for _, server in data.data do
-		if server.id ~= game.JobId and tonumber(server.playing) < tonumber(server.maxPlayers) then
+		if server.id ~= game.JobId and tonumber(server.playing) < playersService.MaxPlayers then
 			pcall(function()
 				teleportService:TeleportToPlaceInstance(game.PlaceId, server.id, lplr)
 			end)
