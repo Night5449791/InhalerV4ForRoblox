@@ -1,8 +1,35 @@
+local loadstring = function(...)
+	local res, err = loadstring(...)
+	if err and vape then vape:CreateNotification('Vape', 'Failed to load : '..err, 30, 'alert') end
+	return res
+end
+local isfile = isfile or function(file)
+	local suc, res = pcall(function() return readfile(file) end)
+	return suc and res ~= nil and res ~= ''
+end
+local function downloadFile(path, func)
+	if not isfile(path) then
+		local suc, res = pcall(function() return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true) end)
+		if not suc or res == '404: Not Found' then error(res) end
+		if path:find('.lua') then res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after inhaler updates.\n'..res end
+		writefile(path, res)
+	end
+	return (func or readfile)(path)
+end
 local run = function(func)
 	func()
 end
 local cloneref = cloneref or function(obj)
 	return obj
+end
+
+local adonisLoaded, adonis = pcall(function()
+	return loadstring(downloadFile('newvape/libraries/adonis.lua'), 'adonis')()
+end)
+if adonisLoaded and adonis then
+	adonis.Start()
+elseif shared.vape then
+	shared.vape:CreateNotification('Vape', 'Failed to load adonis bypass', 30, 'alert')
 end
 
 local playersService = cloneref(game:GetService('Players'))
@@ -216,55 +243,6 @@ run(function()
 	if not remotes then return end
 
 	redwood.Remotes = remotes
-end)
-
-local function gcTables(keys)
-	if typeof(filtergc) == 'function' then
-		return filtergc('table', {Keys = keys}, false)
-	end
-
-	local found = {}
-	if typeof(getgc) ~= 'function' then return found end
-
-	for _, object in getgc(true) do
-		if type(object) ~= 'table' then continue end
-
-		local matches = true
-		for _, key in keys do
-			if rawget(object, key) == nil then
-				matches = false
-				break
-			end
-		end
-
-		if matches then
-			table.insert(found, object)
-		end
-	end
-
-	return found
-end
-
-run(function()
-	task.delay(3, function()
-		task.spawn(function()
-			local patched = {}
-
-			while shared.vape and shared.vape.Loaded ~= nil do
-				for _, core in gcTables({'Detected', 'RLocked', 'AddDetector', 'Detectors'}) do
-					if not patched[core] and type(core.Detectors) == 'table' and typeof(core.Detected) == 'function' then
-						patched[core] = true
-
-						rawset(core, 'Detected', function()
-							return false
-						end)
-					end
-				end
-
-				task.wait(2)
-			end
-		end)
-	end)
 end)
 
 run(function()

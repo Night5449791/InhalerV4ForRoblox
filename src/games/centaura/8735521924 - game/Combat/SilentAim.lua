@@ -87,7 +87,8 @@ SilentAim = vape.Categories.Combat:CreateModule({
 			if isreadonly(mt) then
 				setreadonly(mt, false)
 			end
-			oldnamecall = hookmetamethod(game, '__namecall', namecallHook)
+			local hook = newcclosure and newcclosure(namecallHook) or namecallHook
+			oldnamecall = hookmetamethod(game, '__namecall', hook)
 		else
 			if oldnamecall then
 				local mt = getrawmetatable(game)
