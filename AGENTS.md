@@ -231,4 +231,9 @@ Measured against upstream `7GrandDadPGN/VapeV4ForRoblox` (402 of 410 Lua files u
 ```
 ````
 
-One line per changed file, `+` added / `-` removed / `~` changed; no mechanics, no multiple lines per file. Universal changes use `[Universal]`; rerunning replaces the earlier message. The script (`./inhaler_send_update.py <WebhookURL>`, or `WEBHOOK_URL`/`UPDATES_FILE`/`PROXY`, proxy default `127.0.0.1:7890`, `off` disables) posts the file, splits entries past Discord's 1024-character field limit into `Name (2)`, keeps the file when sending fails and deletes it on success. Don't run it or post the webhook unless asked.
+One line per changed file, no mechanics, no multiple lines per file. Pick the marker by what the diff actually does — do not default everything to `~`:
+- `+` added — a new file, or a new module/option/feature added to an existing file. Describe what was added (e.g. `+ [SilentAim.lua] added autofire`).
+- `-` removed — a deleted file, or a removed module/option/feature. Describe what was removed (e.g. `- [base.lua] removed the old anti-cheat integration`).
+- `~` changed — a modification that neither adds nor removes a distinct thing (bug fix, behaviour tweak, refactor, rename, path migration).
+
+Judge per file from the net change: if a file is newly created use `+`, if deleted use `-`, otherwise pick `+`/`-` when the dominant change is adding/removing a feature and `~` for pure edits. Universal changes use `[Universal]`; rerunning replaces the earlier message. The script (`./inhaler_send_update.py <WebhookURL>`, or `WEBHOOK_URL`/`UPDATES_FILE`/`PROXY`, proxy default `127.0.0.1:7890`, `off` disables) posts the file, splits entries past Discord's 1024-character field limit into `Name (2)`, keeps the file when sending fails and deletes it on success. Don't run it or post the webhook unless asked.
