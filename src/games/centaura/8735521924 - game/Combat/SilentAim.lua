@@ -12,8 +12,6 @@ local rand = Random.new()
 local clickDelay = os.clock()
 local mouseClicked
 local oldnamecall
-local othOriginal
-local useOth
 
 local function getTarget(origin, ignoreList)
 	if rand:NextNumber(0, 100) > HitChance.Value then return end
@@ -56,18 +54,11 @@ local function isGunRay(ignoreList)
 end
 
 local function restoreNamecall()
-	local mt = getrawmetatable(game)
-	if isreadonly(mt) then
-		setreadonly(mt, false)
-	end
-	if useOth then
-		if othOriginal then
-			pcall(function() oth.unhook(othOriginal) end)
-			othOriginal = nil
+	if oldnamecall then
+		local mt = getrawmetatable(game)
+		if isreadonly(mt) then
+			setreadonly(mt, false)
 		end
-		oldnamecall = nil
-		useOth = nil
-	elseif oldnamecall then
 		pcall(restorefunction, rawget(mt, '__namecall'))
 		oldnamecall = nil
 	end
@@ -108,16 +99,8 @@ SilentAim = vape.Categories.Combat:CreateModule({
 			if isreadonly(mt) then
 				setreadonly(mt, false)
 			end
-			local original = rawget(mt, '__namecall')
-			useOth = typeof(oth) == 'table' and typeof(oth.hook) == 'function' and typeof(oth.unhook) == 'function'
-			if useOth then
-				othOriginal = original
-				oldnamecall = original
-				oth.hook(original, namecallHook)
-			else
-				local hook = typeof(newcclosure) == 'function' and newcclosure(namecallHook) or namecallHook
-				oldnamecall = hookmetamethod(game, '__namecall', hook)
-			end
+			local hook = typeof(newcclosure) == 'function' and newcclosure(namecallHook) or namecallHook
+			oldnamecall = hookmetamethod(game, '__namecall', hook)
 		else
 			if mouse1click and (isrbxactive or iswindowactive)() then
 				if mouseClicked then
