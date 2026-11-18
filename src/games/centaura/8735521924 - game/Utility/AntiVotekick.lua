@@ -147,6 +147,8 @@ trigger = function()
 	rejoining = true
 
 	task.spawn(function()
+		task.wait(1)
+
 		recordKick()
 
 		if Mode.Value == 'ServerHop' then
