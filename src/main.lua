@@ -29,7 +29,8 @@ local playersService = cloneref(game:GetService('Players'))
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/'..select(1, path:gsub('InhalerV4/', '')), true)
+			local commit = isfile('InhalerV4/profiles/commit.txt') and readfile('InhalerV4/profiles/commit.txt') or 'main'
+			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..commit..'/'..select(1, path:gsub('InhalerV4/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)

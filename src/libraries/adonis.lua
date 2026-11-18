@@ -72,21 +72,13 @@ function adonis.Detect()
 	return adonis.Detected
 end
 
-local function hangDetection()
-	coroutine.yield()
-	return task.wait(9e9)
+local function suppressDetection()
+	return false
 end
 
 function adonis.Bypass()
 	if adonis.Active then return true end
 	if not adonis.Detect() then return false end
-
-	local close = typeof(coroutine) == 'table' and typeof(coroutine.close) == 'function' and coroutine.close or nil
-	if close then
-		for _, thread in antiThreads do
-			pcall(close, thread)
-		end
-	end
 
 	local hookfunction = executorFunc('hookfunction')
 	if not hookfunction then
@@ -95,23 +87,22 @@ function adonis.Bypass()
 	end
 
 	local newcclosure = executorFunc('newcclosure')
-	local hook = newcclosure and newcclosure(hangDetection) or hangDetection
+	local hook = newcclosure and newcclosure(suppressDetection) or suppressDetection
 	local isfunctionhooked = executorFunc('isfunctionhooked')
 
 	for _, detectionTable in findDetectionTables() do
-		for _, fn in detectionTable do
-			if typeof(fn) == 'function' and not originals[fn] then
-				local alreadyHooked = false
-				if isfunctionhooked then
-					local ok, res = pcall(isfunctionhooked, fn)
-					alreadyHooked = ok and res == true
-				end
+		local detected = rawget(detectionTable, 'Detected')
+		if typeof(detected) == 'function' and not originals[detected] then
+			local alreadyHooked = false
+			if isfunctionhooked then
+				local ok, res = pcall(isfunctionhooked, detected)
+				alreadyHooked = ok and res == true
+			end
 
-				if not alreadyHooked then
-					local ok, original = pcall(hookfunction, fn, hook)
-					if ok and original then
-						originals[fn] = original
-					end
+			if not alreadyHooked then
+				local ok, original = pcall(hookfunction, detected, hook)
+				if ok and original then
+					originals[detected] = original
 				end
 			end
 		end

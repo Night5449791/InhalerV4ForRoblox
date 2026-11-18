@@ -9,7 +9,7 @@ local isfile = isfile or function(file)
 end
 local function downloadFile(path, func)
 	if not isfile(path) then
-		local suc, res = pcall(function() return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/'..select(1, path:gsub('InhalerV4/', '')), true) end)
+		local suc, res = pcall(function() return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..(isfile('InhalerV4/profiles/commit.txt') and readfile('InhalerV4/profiles/commit.txt') or 'main')..'/'..select(1, path:gsub('InhalerV4/', '')), true) end)
 		if not suc or res == '404: Not Found' then error(res) end
 		if path:find('.lua') then res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after inhaler updates.\n'..res end
 		writefile(path, res)
@@ -27,7 +27,7 @@ local adonisLoaded, adonis = pcall(function()
 	return loadstring(downloadFile('InhalerV4/libraries/adonis.lua'), 'adonis')()
 end)
 if adonisLoaded and adonis then
-	adonis.Start()
+	pcall(adonis.Start)
 elseif shared.vape then
 	shared.vape:CreateNotification('Vape', 'Failed to load adonis bypass', 30, 'alert')
 end
