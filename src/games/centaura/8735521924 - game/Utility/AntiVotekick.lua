@@ -7,14 +7,18 @@ local function trigger()
 	if rejoining then return end
 	rejoining = true
 
-	pcall(function()
-		lplr:Kick('Inhaler: Anti Votekick is working')
-	end)
+	task.spawn(function()
+		task.wait(2.5)
 
-	local target = vape.Modules and vape.Modules[Mode.Value]
-	if target and not target.Enabled then
-		target:Toggle()
-	end
+		pcall(function()
+			lplr:Kick('Inhaler: Anti Votekick is working')
+		end)
+
+		local target = vape.Modules and vape.Modules[Mode.Value]
+		if target and not target.Enabled then
+			target:Toggle()
+		end
+	end)
 end
 
 AntiVotekick = vape.Categories.Utility:CreateModule({
