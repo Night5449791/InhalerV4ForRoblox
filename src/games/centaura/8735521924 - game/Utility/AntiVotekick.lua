@@ -41,13 +41,17 @@ trigger = function()
 	task.spawn(function()
 		task.wait(1)
 
+		local target = vape.Modules and vape.Modules[Mode.Value]
+		if not target then return end
+
 		pcall(function()
 			lplr:Kick('Inhaler: Anti Votekick is working')
 		end)
 
-		local target = vape.Modules and vape.Modules[Mode.Value]
-		if target and not target.Enabled then
-			target:Toggle()
+		if not target.Enabled then
+			pcall(function()
+				target:Toggle()
+			end)
 		end
 	end)
 end
