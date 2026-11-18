@@ -69,6 +69,40 @@ end
 
 local GunSettings
 
+local fireSignal = (getgenv and getgenv().firesignal) or _G.firesignal
+
+run(function()
+	if typeof(fireSignal) ~= 'function' then return end
+	task.spawn(function()
+		local fired = false
+		repeat
+			for _, obj in lplr.PlayerGui:GetDescendants() do
+				if obj:IsA('GuiButton') and obj.Visible then
+					local matched = false
+					if obj:IsA('TextButton') and obj.Text:upper():find('PRESS TO PLAY', 1, true) then
+						matched = true
+					else
+						for _, child in obj:GetDescendants() do
+							if child:IsA('TextLabel') and child.Text:upper():find('PRESS TO PLAY', 1, true) then
+								matched = true
+								break
+							end
+						end
+					end
+
+					if matched then
+						pcall(fireSignal, obj.MouseButton1Click)
+						pcall(fireSignal, obj.Activated)
+						fired = true
+						break
+					end
+				end
+			end
+			task.wait(0.5)
+		until fired or vape.Loaded == nil
+	end)
+end)
+
 run(function()
 	local trekModules = replicatedStorage:WaitForChild('TREKModules', 30)
 	if not trekModules then return end
