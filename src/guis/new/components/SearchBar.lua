@@ -25,14 +25,14 @@ addBlur(search)
 addCorner(search)
 local icon = Instance.new('ImageLabel')
 icon.BackgroundTransparency = 1
-icon.Image = getvapeasset('newvape/assets/new/search.png')
+icon.Image = getvapeasset('InhalerV4/assets/new/search.png')
 icon.ImageColor3 = color.Light(uipallet.Main, 0.37)
 icon.Position = UDim2.new(1, -25, 0, 11)
 icon.Size = UDim2.fromOffset(14, 14)
 icon.Parent = search
 local legiticon = Instance.new('ImageButton')
 legiticon.BackgroundTransparency = 1
-legiticon.Image = getvapeasset('newvape/assets/new/legit_switch.png')
+legiticon.Image = getvapeasset('InhalerV4/assets/new/legit_switch.png')
 legiticon.Name = 'Legit'
 legiticon.Position = UDim2.fromOffset(8, 11)
 legiticon.Size = UDim2.fromOffset(29, 16)

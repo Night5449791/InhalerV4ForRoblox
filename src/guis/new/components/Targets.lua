@@ -72,7 +72,7 @@ addBlur(targetswindow)
 addCorner(targetswindow)
 local icon = Instance.new('ImageLabel')
 icon.BackgroundTransparency = 1
-icon.Image = getvapeasset('newvape/assets/new/aim.png')
+icon.Image = getvapeasset('InhalerV4/assets/new/aim.png')
 icon.Position = UDim2.fromOffset(10, 15)
 icon.Size = UDim2.fromOffset(18, 12)
 icon.Parent = targetswindow
@@ -159,7 +159,7 @@ end
 
 component.Players = components.TargetsButton({
 	Position = UDim2.fromOffset(11, 45),
-	Icon = getvapeasset('newvape/assets/new/players.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/players.png'),
 	IconSize = UDim2.fromOffset(16, 16),
 	IconParent = iconholder,
 	Targets = component,
@@ -169,7 +169,7 @@ component.Players = components.TargetsButton({
 
 component.NPCs = components.TargetsButton({
 	Position = UDim2.fromOffset(112, 45),
-	Icon = getvapeasset('newvape/assets/new/npcs.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/npcs.png'),
 	IconSize = UDim2.fromOffset(12, 16),
 	IconParent = iconholder,
 	Targets = component,

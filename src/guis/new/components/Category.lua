@@ -43,7 +43,7 @@ pencilbutton.Parent = window
 addTooltip(pencilbutton, 'Edit hidden modules')
 local pencil = Instance.new('ImageLabel')
 pencil.BackgroundTransparency = 1
-pencil.Image = getvapeasset('newvape/assets/new/editlarge.png')
+pencil.Image = getvapeasset('InhalerV4/assets/new/editlarge.png')
 pencil.ImageColor3 = Color3.fromRGB(140, 140, 140)
 pencil.Size = UDim2.fromOffset(12, 12)
 pencil.Position = UDim2.fromOffset(4, 14)
@@ -56,7 +56,7 @@ arrowbutton.Text = ''
 arrowbutton.Parent = window
 local arrow = Instance.new('ImageLabel')
 arrow.BackgroundTransparency = 1
-arrow.Image = getvapeasset('newvape/assets/new/downexpand.png')
+arrow.Image = getvapeasset('InhalerV4/assets/new/downexpand.png')
 arrow.ImageColor3 = Color3.fromRGB(140, 140, 140)
 arrow.Size = UDim2.fromOffset(9, 4)
 arrow.Position = UDim2.fromOffset(9, 18)

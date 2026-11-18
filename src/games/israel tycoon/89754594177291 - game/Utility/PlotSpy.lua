@@ -74,7 +74,7 @@ end
 
 PlotSpy = vape:CreateOverlay({
 	Name = 'Plot Spy',
-	Icon = getvapeasset('newvape/assets/new/textgui.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/textgui.png'),
 	Size = UDim2.fromOffset(16, 12),
 	Position = UDim2.fromOffset(12, 14),
 	Function = function(callback)

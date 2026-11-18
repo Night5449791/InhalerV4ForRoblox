@@ -49,7 +49,7 @@ dotsbutton.Text = ''
 dotsbutton.Parent = button
 local dots = Instance.new('ImageLabel')
 dots.BackgroundTransparency = 1
-dots.Image = getvapeasset('newvape/assets/new/overlaydots.png')
+dots.Image = getvapeasset('InhalerV4/assets/new/overlaydots.png')
 dots.ImageColor3 = color.Light(uipallet.Main, 0.37)
 dots.Name = 'Dots'
 dots.Position = UDim2.fromOffset(6, 6)
@@ -89,7 +89,7 @@ back.Name = 'Back'
 back.Size = UDim2.fromOffset(16, 16)
 back.Position = UDim2.fromOffset(11, 13)
 back.BackgroundTransparency = 1
-back.Image = getvapeasset('newvape/assets/new/back.png')
+back.Image = getvapeasset('InhalerV4/assets/new/back.png')
 back.ImageColor3 = color.Light(uipallet.Main, 0.37)
 back.Parent = settingspane
 addCorner(settingspane)

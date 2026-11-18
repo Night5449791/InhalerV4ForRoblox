@@ -40,7 +40,7 @@ title.Parent = button
 addCorner(button, UDim.new(0, 6))
 local arrow = Instance.new('ImageLabel')
 arrow.BackgroundTransparency = 1
-arrow.Image = getvapeasset('newvape/assets/new/expandarrow.png')
+arrow.Image = getvapeasset('InhalerV4/assets/new/expandarrow.png')
 arrow.ImageColor3 = Color3.fromRGB(140, 140, 140)
 arrow.Position = UDim2.new(1, -17, 0, 11)
 arrow.Rotation = 90

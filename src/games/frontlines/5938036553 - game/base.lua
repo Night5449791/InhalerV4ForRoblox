@@ -14,7 +14,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/'..select(1, path:gsub('InhalerV4/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -49,7 +49,7 @@ local prediction = vape.Libraries.prediction
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
 local getvapeasset = vape.Libraries.getvapeasset
-local drawingactor = loadstring(downloadFile('newvape/libraries/drawing.lua'), 'drawing')(...)
+local drawingactor = loadstring(downloadFile('InhalerV4/libraries/drawing.lua'), 'drawing')(...)
 local function notif(...)
 	return vape:CreateNotification(...)
 end
@@ -65,7 +65,7 @@ if not select(1, ...) and game.PlaceId == 5938036553 then
 
 		task.spawn(function()
 			repeat task.wait() until not shared.vape
-			local executionString = "loadfile('newvape/main.lua')("..drawingactor..")"
+			local executionString = "loadfile('InhalerV4/main.lua')("..drawingactor..")"
 			for i, v in shared do
 				if type(v) == 'string' then
 					executionString = string.format("shared.%s = '%s'", i, v)..'\n'..executionString
@@ -102,7 +102,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 89, 1, 52)
 	blur.Position = UDim2.fromOffset(-48, -31)
 	blur.BackgroundTransparency = 1
-	blur.Image = getvapeasset('newvape/assets/new/blur.png')
+	blur.Image = getvapeasset('InhalerV4/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(52, 31, 261, 502)
 	blur.Parent = parent

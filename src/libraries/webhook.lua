@@ -3,7 +3,21 @@ local cloneref = cloneref or function(obj)
 end
 local httpService = cloneref(game:GetService('HttpService'))
 
-local webhook = {}
+local webhook = {
+	defaultName = 'InhalerV4',
+	colors = {
+		red = 15548997,
+		green = 5763911,
+		blue = 3447003,
+		yellow = 16776960,
+		orange = 15105570,
+		purple = 10181046,
+		pink = 15277667,
+		white = 16777215,
+		black = 2303786,
+		grey = 9807270
+	}
+}
 
 function webhook.validate(url)
 	local host = type(url) == 'string' and url:match('^https://([%w%.%-]+)/api/webhooks/%d+/%S+$')
@@ -37,6 +51,10 @@ function webhook.send(url, payload)
 	local post = getRequestFunction()
 	if not post then return false, 'No http request function available' end
 
+	if payload.username == nil then
+		payload.username = webhook.defaultName
+	end
+
 	local encoded, body = pcall(httpService.JSONEncode, httpService, payload)
 	if not encoded then return false, 'Failed to encode: '..tostring(body) end
 
@@ -64,6 +82,10 @@ local function clamp(text, limit)
 end
 
 function webhook.sendEmbed(url, embed, username)
+	if username == nil then
+		username = webhook.defaultName
+	end
+
 	local fields = {}
 	local source = type(embed.fields) == 'table' and embed.fields or {}
 

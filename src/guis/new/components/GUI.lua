@@ -16,7 +16,7 @@ addCorner(window)
 addDragHandler(window)
 local logo = Instance.new('ImageLabel')
 logo.BackgroundTransparency = 1
-logo.Image = getvapeasset('newvape/assets/new/vapelogomini.png')
+logo.Image = getvapeasset('InhalerV4/assets/new/vapelogomini.png')
 logo.ImageColor3 = select(3, uipallet.Main:ToHSV()) > 0.5 and uipallet.Text or Color3.new(1, 1, 1)
 logo.Name = 'VapeLogo'
 logo.Position = UDim2.fromOffset(12, 11)
@@ -24,7 +24,7 @@ logo.Size = UDim2.fromOffset(55, 16)
 logo.Parent = window
 local v4logo = Instance.new('ImageLabel')
 v4logo.BackgroundTransparency = 1
-v4logo.Image = getvapeasset('newvape/assets/new/v4mini.png')
+v4logo.Image = getvapeasset('InhalerV4/assets/new/v4mini.png')
 v4logo.Name = 'V4Logo'
 v4logo.Position = UDim2.new(1, -1, 0, 0)
 v4logo.Size = UDim2.fromOffset(23, 16)
@@ -47,14 +47,14 @@ settingsbutton.Parent = window
 addTooltip(settingsbutton, 'Open settings')
 local settingsicon = Instance.new('ImageLabel')
 settingsicon.BackgroundTransparency = 1
-settingsicon.Image = getvapeasset('newvape/assets/new/settings.png')
+settingsicon.Image = getvapeasset('InhalerV4/assets/new/settings.png')
 settingsicon.ImageColor3 = color.Light(uipallet.Main, 0.37)
 settingsicon.Position = UDim2.fromOffset(15, 12)
 settingsicon.Size = UDim2.fromOffset(14, 14)
 settingsicon.Parent = settingsbutton
 local discord = Instance.new('ImageButton')
 discord.BackgroundTransparency = 1
-discord.Image = getvapeasset('newvape/assets/new/discord.png')
+discord.Image = getvapeasset('InhalerV4/assets/new/discord.png')
 discord.Position = UDim2.new(1, -56, 0, 11)
 discord.Size = UDim2.fromOffset(16, 16)
 discord.Parent = window

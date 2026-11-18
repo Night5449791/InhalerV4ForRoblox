@@ -47,7 +47,7 @@ end
 
 local arrow = Instance.new('ImageLabel')
 arrow.BackgroundTransparency = 1
-arrow.Image = getvapeasset('newvape/assets/new/expandarrow.png')
+arrow.Image = getvapeasset('InhalerV4/assets/new/expandarrow.png')
 arrow.ImageColor3 = color.Light(uipallet.Main, 0.37)
 arrow.Name = 'Arrow'
 arrow.Position = UDim2.new(1, -20, 0, 16)

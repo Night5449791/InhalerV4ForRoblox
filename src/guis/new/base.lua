@@ -74,7 +74,7 @@ local function addBlur(parent, notif, old)
 		blur.Size = UDim2.new(1, 89, 1, 52)
 		blur.Position = UDim2.fromOffset(-48, -31)
 		blur.BackgroundTransparency = 1
-		blur.Image = getvapeasset('newvape/assets/new/'..(notif and 'blurnoti' or 'blur')..'.png')
+		blur.Image = getvapeasset('InhalerV4/assets/new/'..(notif and 'blurnoti' or 'blur')..'.png')
 		blur.ScaleType = Enum.ScaleType.Slice
 		blur.SliceCenter = Rect.new(52, 31, 261, 502)
 		blur.Parent = parent
@@ -101,7 +101,7 @@ local function addCloseButton(parent, mini, offset)
 	close.AutoButtonColor = false
 	close.BackgroundColor3 = Color3.new(1, 1, 1)
 	close.BackgroundTransparency = 1
-	close.Image = getvapeasset('newvape/assets/new/'..(mini and 'closemini' or 'close')..'.png')
+	close.Image = getvapeasset('InhalerV4/assets/new/'..(mini and 'closemini' or 'close')..'.png')
 	close.ImageColor3 = color.Light(uipallet.Text, 0.2)
 	close.ImageTransparency = 0.5
 	close.Name = 'Close'
@@ -357,7 +357,7 @@ function vape:CreateNotification(title, text, duration, type)
 		local notification = Instance.new('ImageLabel')
 		notification.BackgroundTransparency = 1
 		notification.Position = UDim2.new(1, 0, 1, -(29 + (78 * index)))
-		notification.Image = getvapeasset('newvape/assets/new/notification.png')
+		notification.Image = getvapeasset('InhalerV4/assets/new/notification.png')
 		notification.ScaleType = Enum.ScaleType.Slice
 		notification.SliceCenter = Rect.new(7, 7, 9, 9)
 		notification.ZIndex = 5
@@ -365,7 +365,7 @@ function vape:CreateNotification(title, text, duration, type)
 		addBlur(notification, true, true)
 		local iconshadow = Instance.new('ImageLabel')
 		iconshadow.BackgroundTransparency = 1
-		iconshadow.Image = getvapeasset('newvape/assets/new/noti_'..(type or 'info')..'.png')
+		iconshadow.Image = getvapeasset('InhalerV4/assets/new/noti_'..(type or 'info')..'.png')
 		iconshadow.ImageColor3 = Color3.new()
 		iconshadow.ImageTransparency = 0.5
 		iconshadow.Position = UDim2.fromOffset(-5, -8)
@@ -451,8 +451,8 @@ function vape:Load(skipgui, profile)
 	local canSave = true
 	local toggleCount = 0
 
-	if isfile('newvape/profiles/'..game.GameId..'.gui.txt') then
-		guiData = loadJson('newvape/profiles/'..game.GameId..'.gui.txt')
+	if isfile('InhalerV4/profiles/'..game.GameId..'.gui.txt') then
+		guiData = loadJson('InhalerV4/profiles/'..game.GameId..'.gui.txt')
 		if not guiData then
 			guiData = {Categories = {}}
 			self:CreateNotification('Vape', 'Failed to load GUI settings.', 10, 'alert')
@@ -483,8 +483,8 @@ function vape:Load(skipgui, profile)
 		self.Categories.Profiles:ChangeValue('default', true)
 	end
 
-	if isfile('newvape/profiles/'..self.Profile..self.Place..'.txt') then
-		local mainData = loadJson('newvape/profiles/'..self.Profile..self.Place..'.txt')
+	if isfile('InhalerV4/profiles/'..self.Profile..self.Place..'.txt') then
+		local mainData = loadJson('InhalerV4/profiles/'..self.Profile..self.Place..'.txt')
 		if not mainData then
 			mainData = {Categories = {}, Modules = {}, Legit = {}}
 			self:CreateNotification('Vape', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
@@ -546,7 +546,7 @@ function vape:Load(skipgui, profile)
 		button.Parent = gui
 		local image = Instance.new('ImageLabel')
 		image.BackgroundTransparency = 1
-		image.Image = getvapeasset('newvape/assets/new/vape.png')
+		image.Image = getvapeasset('InhalerV4/assets/new/vape.png')
 		image.Position = UDim2.fromOffset(6, 6)
 		image.Size = UDim2.fromOffset(20, 20)
 		image.Parent = button
@@ -635,8 +635,8 @@ function vape:Save(newProfile)
 		module:Save(mainData.Legit)
 	end
 
-	writefile('newvape/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guiData))
-	writefile('newvape/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(mainData))
+	writefile('InhalerV4/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guiData))
+	writefile('InhalerV4/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(mainData))
 end
 
 function vape:SaveOptions(obj)

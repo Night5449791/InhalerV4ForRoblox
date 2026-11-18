@@ -51,7 +51,7 @@ arrow.Name = 'Arrow'
 arrow.Size = UDim2.fromOffset(9, 4)
 arrow.Position = UDim2.fromOffset(15, 20)
 arrow.BackgroundTransparency = 1
-arrow.Image = getvapeasset('newvape/assets/new/downexpand.png')
+arrow.Image = getvapeasset('InhalerV4/assets/new/downexpand.png')
 arrow.ImageColor3 = Color3.fromRGB(140, 140, 140)
 arrow.Rotation = 180
 arrow.Parent = arrowbutton
@@ -74,7 +74,7 @@ childrentwo.Parent = children
 local settings = Instance.new('ImageButton')
 settings.AutoButtonColor = false
 settings.BackgroundTransparency = 1
-settings.Image = getvapeasset('newvape/assets/new/settings.png')
+settings.Image = getvapeasset('InhalerV4/assets/new/settings.png')
 settings.ImageColor3 = color.Dark(uipallet.Text, 0.43)
 settings.Name = 'Settings'
 settings.Position = UDim2.new(1, -56, 0, 15)
@@ -143,7 +143,7 @@ if props.Player then
 end
 local addbutton = Instance.new('ImageButton')
 addbutton.BackgroundTransparency = 1
-addbutton.Image = getvapeasset('newvape/assets/new/add.png')
+addbutton.Image = getvapeasset('InhalerV4/assets/new/add.png')
 addbutton.ImageColor3 = props.Color
 addbutton.ImageTransparency = 0.3
 addbutton.Position = UDim2.new(1, -26, 0, 8)
@@ -189,8 +189,8 @@ function component:ChangeValue(value, skipGUI)
 					profile.Bind:Destroy()
 					table.remove(self.List, index)
 
-					if isfile('newvape/profiles/'..value..vape.Place..'.txt') and delfile then
-						delfile('newvape/profiles/'..value..vape.Place..'.txt')
+					if isfile('InhalerV4/profiles/'..value..vape.Place..'.txt') and delfile then
+						delfile('InhalerV4/profiles/'..value..vape.Place..'.txt')
 					end
 				end
 			else
@@ -258,7 +258,7 @@ function component:ChangeValue(value, skipGUI)
 			dotsbutton.Parent = obj
 			local dots = Instance.new('ImageLabel')
 			dots.BackgroundTransparency = 1
-			dots.Image = getvapeasset('newvape/assets/new/settingdots.png')
+			dots.Image = getvapeasset('InhalerV4/assets/new/settingdots.png')
 			dots.ImageColor3 = color.Light(uipallet.Main, 0.37)
 			dots.Name = 'Dots'
 			dots.Position = UDim2.fromOffset(11, 9)
@@ -354,7 +354,7 @@ function component:ChangeValue(value, skipGUI)
 			close.AutoButtonColor = false
 			close.BackgroundColor3 = Color3.new(1, 1, 1)
 			close.BackgroundTransparency = 1
-			close.Image = getvapeasset('newvape/assets/new/closetiny.png')
+			close.Image = getvapeasset('InhalerV4/assets/new/closetiny.png')
 			close.ImageColor3 = color.Light(uipallet.Text, 0.2)
 			close.ImageTransparency = 0.5
 			close.Position = UDim2.new(1, -27, 0, 8)

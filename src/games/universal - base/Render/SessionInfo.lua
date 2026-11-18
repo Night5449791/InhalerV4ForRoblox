@@ -13,7 +13,7 @@ local infostroke
 
 SessionInfo = vape:CreateOverlay({
 	Name = 'Session Info',
-	Icon = getvapeasset('newvape/assets/new/textgui.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/textgui.png'),
 	Size = UDim2.fromOffset(16, 12),
 	Position = UDim2.fromOffset(12, 14),
 	Function = function(callback)

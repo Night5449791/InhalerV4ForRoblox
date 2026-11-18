@@ -328,7 +328,7 @@ local function rejoinServer()
 end
 
 local function profileExists(name)
-	local success, data = pcall(readfile, 'newvape/profiles/'..name..vape.Place..'.txt')
+	local success, data = pcall(readfile, 'InhalerV4/profiles/'..name..vape.Place..'.txt')
 	return success and data ~= nil and data ~= ''
 end
 
@@ -395,9 +395,9 @@ local function reloadVape()
 		vape:Save()
 		shared.vapereload = true
 		if shared.VapeDeveloper then
-			loadstring(readfile('newvape/loader.lua'), 'loader')()
+			loadstring(readfile('InhalerV4/loader.lua'), 'loader')()
 		else
-			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/loader.lua', true))()
 		end
 	end)
 

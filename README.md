@@ -54,7 +54,7 @@ Half of the time its usually the scripting utility at fault, please make sure th
 3. Maintaining the same behavior across all usages of said functions.
 ### User Issues
 If its not the supposed utility at fault, please try some troubleshooting steps.
-1. Deleting the newvape folder (WITH THE GAME CLOSED).
+1. Deleting the InhalerV4 folder (WITH THE GAME CLOSED).
 2. Making sure you have connection to [the main loadstring.](https://raw.githubusercontent.com/Night5449791/InhalerV4ForRoblox/refs/heads/main/loadstring)
 3. Ensuring no external script is conflicting with vape.
 4. Report the issue by [Issues](https://github.com/Night5449791/InhalerV4ForRoblox/issues) or [Discord](https://discord.gg/YSzD7f9neR) with a detailed description of the issue and the steps to reproduce it.

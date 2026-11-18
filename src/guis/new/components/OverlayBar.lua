@@ -13,7 +13,7 @@ components.Divider(nil, bar)
 local button = Instance.new('ImageButton')
 button.AutoButtonColor = false
 button.BackgroundTransparency = 1
-button.Image = getvapeasset('newvape/assets/new/overlays.png')
+button.Image = getvapeasset('InhalerV4/assets/new/overlays.png')
 button.ImageColor3 = color.Light(uipallet.Main, 0.37)
 button.Position = UDim2.new(1, -34, 0, 7)
 button.Size = UDim2.fromOffset(24, 24)
@@ -39,7 +39,7 @@ window.Parent = shadow
 addCorner(window)
 local icon = Instance.new('ImageLabel')
 icon.BackgroundTransparency = 1
-icon.Image = getvapeasset('newvape/assets/new/overlayslarge.png')
+icon.Image = getvapeasset('InhalerV4/assets/new/overlayslarge.png')
 icon.ImageColor3 = uipallet.Text
 icon.Position = UDim2.fromOffset(10, 13)
 icon.Size = UDim2.fromOffset(14, 12)

@@ -35,7 +35,7 @@ end
 
 TextGUI = vape:CreateOverlay({
 	Name = 'Text GUI',
-	Icon = getvapeasset('newvape/assets/new/textgui.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/textgui.png'),
 	Size = UDim2.fromOffset(16, 12),
 	Position = UDim2.fromOffset(12, 14),
 	Function = function()
@@ -228,7 +228,7 @@ local Logo = Instance.new('ImageLabel')
 Logo.BackgroundColor3 = Color3.new()
 Logo.BackgroundTransparency = 1
 Logo.BorderSizePixel = 0
-Logo.Image = getvapeasset('newvape/assets/new/vapelogo.png')
+Logo.Image = getvapeasset('InhalerV4/assets/new/vapelogo.png')
 Logo.Name = 'Logo'
 Logo.Position = UDim2.new(1, -142, 0, 3)
 Logo.Size = UDim2.fromOffset(81, 24)
@@ -238,7 +238,7 @@ local LogoV4 = Instance.new('ImageLabel')
 LogoV4.BackgroundColor3 = Color3.new()
 LogoV4.BackgroundTransparency = 1
 LogoV4.BorderSizePixel = 0
-LogoV4.Image = getvapeasset('newvape/assets/new/v4.png')
+LogoV4.Image = getvapeasset('InhalerV4/assets/new/v4.png')
 LogoV4.Name = 'Logo2'
 LogoV4.Position = UDim2.new(1, -1, 0, 0)
 LogoV4.Size = UDim2.fromOffset(35, 24)

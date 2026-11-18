@@ -74,32 +74,32 @@ components.GUI({})
 
 vape:CreateCategory({
 	Name = 'Combat',
-	Icon = getvapeasset('newvape/assets/new/combat.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/combat.png'),
 	Size = UDim2.fromOffset(13, 14)
 })
 vape:CreateCategory({
 	Name = 'Blatant',
-	Icon = getvapeasset('newvape/assets/new/blatant.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/blatant.png'),
 	Size = UDim2.fromOffset(14, 14)
 })
 vape:CreateCategory({
 	Name = 'Render',
-	Icon = getvapeasset('newvape/assets/new/render.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/render.png'),
 	Size = UDim2.fromOffset(15, 14)
 })
 vape:CreateCategory({
 	Name = 'Utility',
-	Icon = getvapeasset('newvape/assets/new/utility.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/utility.png'),
 	Size = UDim2.fromOffset(15, 14)
 })
 vape:CreateCategory({
 	Name = 'World',
-	Icon = getvapeasset('newvape/assets/new/world.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/world.png'),
 	Size = UDim2.fromOffset(14, 14)
 })
 vape:CreateCategory({
 	Name = 'Inventory',
-	Icon = getvapeasset('newvape/assets/new/inventory.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/inventory.png'),
 	Size = UDim2.fromOffset(15, 14)
 })
 vape.Categories.Main:CreateDivider({
@@ -119,7 +119,7 @@ do
 
 	friends = vape:CreateCategoryList({
 		Name = 'Friends',
-		Icon = getvapeasset('newvape/assets/new/friends.png'),
+		Icon = getvapeasset('InhalerV4/assets/new/friends.png'),
 		Size = UDim2.fromOffset(17, 16),
 		Placeholder = 'Roblox username',
 		Color = Color3.fromRGB(5, 134, 105),
@@ -173,7 +173,7 @@ end
 ]]
 vape:CreateCategoryList({
 	Name = 'Profiles',
-	Icon = getvapeasset('newvape/assets/new/profiles.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/profiles.png'),
 	Size = UDim2.fromOffset(17, 10),
 	Position = UDim2.fromOffset(12, 16),
 	Placeholder = 'Type name',
@@ -186,7 +186,7 @@ vape:CreateCategoryList({
 local targets
 targets = vape:CreateCategoryList({
 	Name = 'Targets',
-	Icon = getvapeasset('newvape/assets/new/friends.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/friends.png'),
 	Size = UDim2.fromOffset(17, 16),
 	Placeholder = 'Roblox username',
 	Player = true,
@@ -277,15 +277,15 @@ general:CreateButton({
 	Name = 'Reset current profile',
 	Function = function()
 	vape.Save = function() end
-		if isfile('newvape/profiles/'..vape.Profile..vape.Place..'.txt') and delfile then
-			delfile('newvape/profiles/'..vape.Profile..vape.Place..'.txt')
+		if isfile('InhalerV4/profiles/'..vape.Profile..vape.Place..'.txt') and delfile then
+			delfile('InhalerV4/profiles/'..vape.Profile..vape.Place..'.txt')
 		end
 
 		shared.vapereload = true
 		if shared.VapeDeveloper then
-			loadstring(readfile('newvape/loader.lua'), 'loader')()
+			loadstring(readfile('InhalerV4/loader.lua'), 'loader')()
 		else
-			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/loader.lua', true))()
 		end
 	end,
 	Tooltip = 'This will set your profile to the default settings of Vape'
@@ -304,9 +304,9 @@ general:CreateButton({
 	Function = function()
 		shared.vapereload = true
 		if shared.VapeDeveloper then
-			loadstring(readfile('newvape/loader.lua'), 'loader')()
+			loadstring(readfile('InhalerV4/loader.lua'), 'loader')()
 		else
-			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/loader.lua', true))()
 		end
 	end,
 	Tooltip = 'Reloads vape for debugging purposes'
@@ -434,12 +434,12 @@ vape.RainbowUpdateSpeed = guipane:CreateSlider({
 	List = inputService.TouchEnabled and {'new', 'old'} or {'new', 'old', 'rise'},
 	Function = function(val, mouse)
 		if mouse then
-			writefile('newvape/profiles/gui.txt', val)
+			writefile('InhalerV4/profiles/gui.txt', val)
 			shared.vapereload = true
 			if shared.VapeDeveloper then
-				loadstring(readfile('newvape/loader.lua'), 'loader')()
+				loadstring(readfile('InhalerV4/loader.lua'), 'loader')()
 			else
-				loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+				loadstring(game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/loader.lua', true))()
 			end
 		end
 	end,

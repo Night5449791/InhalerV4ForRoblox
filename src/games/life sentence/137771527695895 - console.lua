@@ -15,7 +15,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/Night5449791/InhalerCompiled/'..readfile('InhalerV4/profiles/commit.txt')..'/'..select(1, path:gsub('InhalerV4/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -29,11 +29,11 @@ local function downloadFile(path, func)
 end
 
 vape.Place = 13083893317
-if isfile('newvape/games/'..vape.Place..'.lua') then
-	loadstring(readfile('newvape/games/'..vape.Place..'.lua'), 'life sentence')()
+if isfile('InhalerV4/games/'..vape.Place..'.lua') then
+	loadstring(readfile('InhalerV4/games/'..vape.Place..'.lua'), 'life sentence')()
 else
 	if not shared.VapeDeveloper then
-		local success, result = pcall(downloadFile, 'newvape/games/'..vape.Place..'.lua')
+		local success, result = pcall(downloadFile, 'InhalerV4/games/'..vape.Place..'.lua')
 		if success and result then
 			loadstring(result, 'life sentence')()
 		end

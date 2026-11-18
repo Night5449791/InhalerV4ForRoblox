@@ -26,7 +26,7 @@ title.Parent = pane
 local close = addCloseButton(pane, true)
 local back = Instance.new('ImageButton')
 back.BackgroundTransparency = 1
-back.Image = getvapeasset('newvape/assets/new/backmini.png')
+back.Image = getvapeasset('InhalerV4/assets/new/backmini.png')
 back.ImageColor3 = color.Light(uipallet.Main, 0.37)
 back.Position = UDim2.fromOffset(12, 14)
 back.Size = UDim2.fromOffset(14, 14)
@@ -58,7 +58,7 @@ if props.Main then
 	versionlabel.Position = UDim2.new(0, 0, 1, -16)
 	versionlabel.Size = UDim2.new(1, 0, 0, 16)
 	versionlabel.Text = 'Vape '..vape.Version..' '..(
-		isfile('newvape/profiles/commit.txt') and readfile('newvape/profiles/commit.txt'):sub(1, 6) or ''
+		isfile('InhalerV4/profiles/commit.txt') and readfile('InhalerV4/profiles/commit.txt'):sub(1, 6) or ''
 	)..' '
 	versionlabel.TextColor3 = color.Dark(uipallet.Text, 0.43)
 	versionlabel.TextSize = 10

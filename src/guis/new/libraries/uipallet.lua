@@ -7,7 +7,7 @@ uipallet = {
 }
 
 do
-	local data = isfile('newvape/profiles/color.txt') and loadJson('newvape/profiles/color.txt')
+	local data = isfile('InhalerV4/profiles/color.txt') and loadJson('InhalerV4/profiles/color.txt')
 	if data then
 		uipallet.Main = data.Main and Color3.fromRGB(unpack(data.Main)) or uipallet.Main
 		uipallet.Text = data.Text and Color3.fromRGB(unpack(data.Text)) or uipallet.Text

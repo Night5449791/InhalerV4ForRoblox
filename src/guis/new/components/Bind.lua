@@ -26,7 +26,7 @@ addTooltip(bind, '', function()
 end)
 local icon = Instance.new('ImageLabel')
 icon.BackgroundTransparency = 1
-icon.Image = getvapeasset('newvape/assets/new/bind.png')
+icon.Image = getvapeasset('InhalerV4/assets/new/bind.png')
 icon.ImageColor3 = color.Dark(uipallet.Text, 0.43)
 icon.Name = 'Icon'
 icon.Position = UDim2.new(0.5, -5, 0, 5)
@@ -49,7 +49,7 @@ if props.Module then
 	if props.Cover then
 		cover = Instance.new('ImageLabel')
 		cover.BackgroundTransparency = 1
-		cover.Image = getvapeasset('newvape/assets/new/bindbkg.png')
+		cover.Image = getvapeasset('InhalerV4/assets/new/bindbkg.png')
 		cover.Name = 'Cover'
 		cover.ScaleType = Enum.ScaleType.Slice
 		cover.SliceCenter = Rect.new(0, 0, 141, 40)
@@ -193,7 +193,7 @@ function component:SetBind(keys, mouse)
 	self.Keys = table.clone(keys)
 
 	if mouse then
-		icon.Image = getvapeasset('newvape/assets/new/edit.png')
+		icon.Image = getvapeasset('InhalerV4/assets/new/edit.png')
 
 		if cover then
 			coverlabel.Text = #keys <= 0 and 'BIND REMOVED' or 'BOUND TO'
@@ -247,7 +247,7 @@ end
 bind.MouseEnter:Connect(function()
 	label.Visible = false
 	icon.Visible = not label.Visible
-	icon.Image = getvapeasset(component.Binding and 'newvape/assets/new/close.png' or 'newvape/assets/new/edit.png')
+	icon.Image = getvapeasset(component.Binding and 'InhalerV4/assets/new/close.png' or 'InhalerV4/assets/new/edit.png')
 
 	if not props.Cover or not api.Enabled then
 		icon.ImageColor3 = color.Dark(uipallet.Text, 0.16)
@@ -257,7 +257,7 @@ end)
 bind.MouseLeave:Connect(function()
 	label.Visible = #component.Keys > 0
 	icon.Visible = not label.Visible
-	icon.Image = getvapeasset(component.Binding and 'newvape/assets/new/close.png' or 'newvape/assets/new/bind.png')
+	icon.Image = getvapeasset(component.Binding and 'InhalerV4/assets/new/close.png' or 'InhalerV4/assets/new/bind.png')
 
 	if not props.Cover or not api.Enabled then
 		icon.ImageColor3 = color.Dark(uipallet.Text, 0.43)
@@ -290,7 +290,7 @@ bind.MouseButton1Click:Connect(function()
 	end
 
 	component.Binding = true
-	icon.Image = getvapeasset('newvape/assets/new/close.png')
+	icon.Image = getvapeasset('InhalerV4/assets/new/close.png')
 	vape.Binding = component
 end)
 

@@ -33,7 +33,7 @@ button.Text = ''
 button.Parent = holder
 local icon = Instance.new('ImageLabel')
 icon.BackgroundTransparency = 1
-icon.Image = getvapeasset('newvape/assets/new/allowediconmini.png')
+icon.Image = getvapeasset('InhalerV4/assets/new/allowediconmini.png')
 icon.Position = UDim2.fromOffset(10, 14)
 icon.Size = UDim2.fromOffset(14, 12)
 icon.Parent = button
@@ -75,7 +75,7 @@ addBlur(textlistwindow)
 addCorner(textlistwindow)
 local icon = Instance.new('ImageLabel')
 icon.BackgroundTransparency = 1
-icon.Image = getvapeasset('newvape/assets/new/allowedicon.png')
+icon.Image = getvapeasset('InhalerV4/assets/new/allowedicon.png')
 icon.Position = UDim2.fromOffset(10, 13)
 icon.Size = UDim2.fromOffset(19, 16)
 icon.Parent = textlistwindow
@@ -131,7 +131,7 @@ if props.Player then
 end
 local add = Instance.new('ImageButton')
 add.BackgroundTransparency = 1
-add.Image = getvapeasset('newvape/assets/new/add.png')
+add.Image = getvapeasset('InhalerV4/assets/new/add.png')
 add.ImageColor3 = props.Color
 add.ImageTransparency = 0.3
 add.Position = UDim2.new(1, -26, 0, 8)
@@ -212,7 +212,7 @@ function component:ChangeValue(value)
 		close.AutoButtonColor = false
 		close.BackgroundColor3 = Color3.new(1, 1, 1)
 		close.BackgroundTransparency = 1
-		close.Image = getvapeasset('newvape/assets/new/closetiny.png')
+		close.Image = getvapeasset('InhalerV4/assets/new/closetiny.png')
 		close.ImageColor3 = color.Light(uipallet.Text, 0.2)
 		close.ImageTransparency = 0.5
 		close.Position = UDim2.new(1, -27, 0, 8)

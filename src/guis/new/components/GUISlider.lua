@@ -172,7 +172,7 @@ for index, colorValue in colors do
 end
 local preview = Instance.new('ImageButton')
 preview.BackgroundTransparency = 1
-preview.Image = getvapeasset('newvape/assets/new/colorpreview.png')
+preview.Image = getvapeasset('InhalerV4/assets/new/colorpreview.png')
 preview.ImageColor3 = Color3.fromHSV(component.Hue, component.Sat, component.Value)
 preview.Position = UDim2.new(1, -22, 0, 10)
 preview.Size = UDim2.fromOffset(12, 12)
@@ -196,7 +196,7 @@ expand.Text = ''
 expand.Parent = slider
 local icon = Instance.new('ImageLabel')
 icon.BackgroundTransparency = 1
-icon.Image = getvapeasset('newvape/assets/new/downexpandslider.png')
+icon.Image = getvapeasset('InhalerV4/assets/new/downexpandslider.png')
 icon.ImageColor3 = color.Dark(uipallet.Text, 0.43)
 icon.Position = UDim2.fromOffset(4, 4)
 icon.Size = UDim2.fromOffset(10, 5)
@@ -209,22 +209,22 @@ rainbow.Text = ''
 rainbow.Parent = slider
 local ring1 = Instance.new('ImageLabel')
 ring1.BackgroundTransparency = 1
-ring1.Image = getvapeasset('newvape/assets/new/rainbow_1.png')
+ring1.Image = getvapeasset('InhalerV4/assets/new/rainbow_1.png')
 ring1.ImageColor3 = color.Light(uipallet.Main, 0.37)
 ring1.Size = UDim2.fromOffset(12, 12)
 ring1.Parent = rainbow
 local ring2 = Instance.fromExisting(ring1)
-ring2.Image = getvapeasset('newvape/assets/new/rainbow_2.png')
+ring2.Image = getvapeasset('InhalerV4/assets/new/rainbow_2.png')
 ring2.Parent = rainbow
 local ring3 = Instance.fromExisting(ring1)
-ring3.Image = getvapeasset('newvape/assets/new/rainbow_3.png')
+ring3.Image = getvapeasset('InhalerV4/assets/new/rainbow_3.png')
 ring3.Parent = rainbow
 local ring4 = Instance.fromExisting(ring1)
-ring4.Image = getvapeasset('newvape/assets/new/rainbow_4.png')
+ring4.Image = getvapeasset('InhalerV4/assets/new/rainbow_4.png')
 ring4.Parent = rainbow
 local knob = Instance.new('ImageLabel')
 knob.BackgroundTransparency = 1
-knob.Image = getvapeasset('newvape/assets/new/theme.png')
+knob.Image = getvapeasset('InhalerV4/assets/new/theme.png')
 knob.ImageColor3 = colors[4]
 knob.Name = 'Knob'
 knob.Position = UDim2.fromOffset(colorPositions[4] - 3, -5)
@@ -247,8 +247,8 @@ local vibSlider = createSlider('Vibrance', ColorSequence.new({
 	ColorSequenceKeypoint.new(1, Color3.fromHSV(component.Hue, component.Sat, 1))
 }))
 
-local normalknob = getvapeasset('newvape/assets/new/theme.png')
-local rainbowknob = getvapeasset('newvape/assets/new/customtheme.png')
+local normalknob = getvapeasset('InhalerV4/assets/new/theme.png')
+local rainbowknob = getvapeasset('InhalerV4/assets/new/customtheme.png')
 local rainbowthread
 local currentNotch
 

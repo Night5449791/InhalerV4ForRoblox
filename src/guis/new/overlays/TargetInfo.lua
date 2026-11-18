@@ -20,7 +20,7 @@ local DisplayName
 
 TargetInfoOverlay = vape:CreateOverlay({
 	Name = 'Target Info',
-	Icon = getvapeasset('newvape/assets/new/targetinfo.png'),
+	Icon = getvapeasset('InhalerV4/assets/new/targetinfo.png'),
 	Size = UDim2.fromOffset(14, 14),
 	Position = UDim2.fromOffset(12, 14),
 	CategorySize = 240,
