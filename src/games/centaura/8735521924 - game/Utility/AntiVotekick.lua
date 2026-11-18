@@ -1,9 +1,102 @@
 local AntiVotekick
 local Mode
+local teleportService = cloneref(game:GetService('TeleportService'))
+local kickFile = 'InhalerV4/profiles/CENTAURAkick.json'
 local voteCounter
 local valueConnection
 local rejoining
 local trigger
+
+local function loadKickData()
+	if not isfile(kickFile) then return {} end
+
+	local ok, content = pcall(readfile, kickFile)
+	if not ok or type(content) ~= 'string' then return {} end
+
+	local decoded, data = pcall(httpService.JSONDecode, httpService, content)
+	if not decoded or type(data) ~= 'table' then return {} end
+
+	return data
+end
+
+local function saveKickData(data)
+	local encoded, content = pcall(httpService.JSONEncode, httpService, data)
+	if encoded then
+		pcall(writefile, kickFile, content)
+	end
+end
+
+local function recordKick()
+	local userId = tostring(lplr.UserId)
+	local data = loadKickData()
+	local entry = type(data[userId]) == 'table' and data[userId] or {}
+	entry.jobs = type(entry.jobs) == 'table' and entry.jobs or {}
+
+	for _, job in entry.jobs do
+		if type(job) == 'table' and job.jobid == game.JobId then
+			return
+		end
+	end
+
+	entry.jobs[#entry.jobs + 1] = {
+		jobid = game.JobId,
+		timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ')
+	}
+	data[userId] = entry
+	saveKickData(data)
+end
+
+local function getLoggedJobs()
+	local userId = tostring(lplr.UserId)
+	local data = loadKickData()
+	local entry = data[userId]
+	local jobs = type(entry) == 'table' and type(entry.jobs) == 'table' and entry.jobs or nil
+	local logged = {}
+
+	if jobs then
+		local oldest
+		for _, job in jobs do
+			if type(job) == 'table' and type(job.jobid) == 'string' then
+				logged[job.jobid] = true
+				if type(job.timestamp) == 'string' and (not oldest or job.timestamp < oldest.timestamp) then
+					oldest = job
+				end
+			end
+		end
+		return logged, oldest and oldest.jobid or nil
+	end
+
+	return logged, nil
+end
+
+local function joinServer(jobId)
+	pcall(function()
+		teleportService:TeleportToPlaceInstance(game.PlaceId, jobId, lplr)
+	end)
+end
+
+local function serverhop()
+	local logged, oldest = getLoggedJobs()
+
+	local success, data = pcall(function()
+		local response = game:HttpGet('https://games.roblox.com/v1/games/'..game.PlaceId..'/servers/Public?sortOrder=1&excludeFullGames=true&limit=100')
+		return httpService:JSONDecode(response)
+	end)
+	if not success or type(data) ~= 'table' or type(data.data) ~= 'table' then return end
+
+	local candidates = {}
+	for _, server in data.data do
+		if server.id ~= game.JobId and tonumber(server.playing) < playersService.MaxPlayers and not logged[server.id] then
+			candidates[#candidates + 1] = server.id
+		end
+	end
+
+	if candidates[1] then
+		joinServer(candidates[math.random(1, #candidates)])
+	elseif oldest then
+		joinServer(oldest)
+	end
+end
 
 local function watchCounter(counter)
 	if not counter:IsA('IntValue') then return end
@@ -39,17 +132,24 @@ trigger = function()
 	rejoining = true
 
 	task.spawn(function()
-		local target = vape.Modules and vape.Modules[Mode.Value]
-		if not target then return end
+		recordKick()
 
-		pcall(function()
-			lplr:Kick('Inhaler: Anti Votekick is working')
-		end)
-
-		if not target.Enabled then
+		if Mode.Value == 'ServerHop' then
 			pcall(function()
-				target:Toggle()
+				lplr:Kick('Inhaler: Anti Votekick is working')
 			end)
+			serverhop()
+		else
+			local target = vape.Modules and vape.Modules.Rejoin
+			if not target then return end
+			pcall(function()
+				lplr:Kick('Inhaler: Anti Votekick is working')
+			end)
+			if not target.Enabled then
+				pcall(function()
+					target:Toggle()
+				end)
+			end
 		end
 	end)
 end
