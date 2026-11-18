@@ -14,6 +14,7 @@ local ShellsPerShot
 local Teamkill
 local Weight
 local Suppression
+local InfiniteAmmo
 
 local fields = {'MaxDamage', 'MinDamage', 'AmmoCount', 'HeadshotMultiplier', 'ReloadSpeed', 'firerate', 'spread', 'crouchSpread', 'Recoil', 'Penetration', 'Range', 'ShellsPerShot', 'teamkill', 'Weight', 'Suppression'}
 local originals = {}
@@ -23,9 +24,14 @@ local function modify(settings)
 		originals[settings] = table.clone(settings)
 	end
 
+	local ammo = AmmoCount.Value
+	if InfiniteAmmo.Enabled then
+		ammo = math.huge
+	end
+
 	settings.MaxDamage = MaxDamage.Value
 	settings.MinDamage = MinDamage.Value
-	settings.AmmoCount = AmmoCount.Value
+	settings.AmmoCount = ammo
 	settings.HeadshotMultiplier = HeadshotMultiplier.Value
 	settings.ReloadSpeed = ReloadSpeed.Value
 	settings.firerate = FireRate.Value
@@ -101,6 +107,10 @@ AmmoCount = GunModifications:CreateSlider({
 	Min = 0,
 	Max = 500,
 	Default = 100,
+	Function = apply
+})
+InfiniteAmmo = GunModifications:CreateToggle({
+	Name = 'Infinite Ammo',
 	Function = apply
 })
 HeadshotMultiplier = GunModifications:CreateSlider({
