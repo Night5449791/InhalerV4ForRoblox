@@ -32,12 +32,49 @@ elseif shared.vape then
 	shared.vape:CreateNotification('Vape', 'Failed to load adonis bypass', 30, 'alert')
 end
 
+local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
+local runService = cloneref(game:GetService('RunService'))
+local inputService = cloneref(game:GetService('UserInputService'))
+local httpService = cloneref(game:GetService('HttpService'))
+local guiService = cloneref(game:GetService('GuiService'))
+local coreGui = cloneref(game:GetService('CoreGui'))
 
 local gameCamera = workspace.CurrentCamera
+local lplr = playersService.LocalPlayer
 local vape = shared.vape
 local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
+local prediction = vape.Libraries.prediction
+
+local function canClick()
+	local pos = (inputService:GetMouseLocation() - guiService:GetGuiInset())
+
+	if gethui and gethui():IsA('BasePlayerGui') then
+		for _, obj in gethui():GetGuiObjectsAtPosition(pos.X, pos.Y) do
+			local holder = obj:FindFirstAncestorOfClass('ScreenGui')
+			if obj.Active and obj.Visible and holder and holder.Enabled then
+				return false
+			end
+		end
+	end
+
+	for _, obj in coreGui:GetGuiObjectsAtPosition(pos.X, pos.Y) do
+		local holder = obj:FindFirstAncestorOfClass('ScreenGui')
+		if obj.Active and obj.Visible and holder and holder.Enabled then
+			return false
+		end
+	end
+
+	for _, obj in lplr.PlayerGui:GetGuiObjectsAtPosition(pos.X, pos.Y) do
+		local holder = obj:FindFirstAncestorOfClass('ScreenGui')
+		if obj.Active and obj.Visible and holder and holder.Enabled then
+			return false
+		end
+	end
+
+	return (not vape.gui.ScaledGui.ClickGui.Visible) and (not inputService:GetFocusedTextBox())
+end
 
 local GunSettings
 
