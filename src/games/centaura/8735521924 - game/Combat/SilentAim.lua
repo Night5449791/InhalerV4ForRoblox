@@ -1,6 +1,5 @@
 run(function()
 	local SilentAim
-	local Mode
 	local Range
 	local HitChance
 	local oldnamecall
@@ -9,7 +8,7 @@ run(function()
 	local function getTarget(origin)
 		if rand.NextNumber(rand, 0, 100) > HitChance.Value then return end
 
-		local entity = entitylib['Entity'..Mode.Value]({
+		local entity = entitylib.EntityMouse({
 			Part = 'Head',
 			Range = Range.Value,
 			Origin = origin,
@@ -68,11 +67,6 @@ run(function()
 			oldnamecall = nil
 		end
 	end)
-	Mode = SilentAim:CreateDropdown({
-		Name = 'Mode',
-		List = {'Mouse', 'Position'},
-		Tooltip = 'Mouse - targets near your crosshair\nPosition - targets closest to your gun'
-	})
 	Range = SilentAim:CreateSlider({
 		Name = 'Range',
 		Min = 1,
