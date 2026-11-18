@@ -6,8 +6,12 @@ local HitChance
 local HeadshotChance
 local Wallbang
 local ShowTarget
+local AutoFire
+local ShootDelay
 local oldnamecall
 local rand = Random.new()
+local clickDelay = os.clock()
+local mouseClicked
 
 local function getTarget(origin, ignoreList)
 	if rand:NextNumber(0, 100) > HitChance.Value then return end
@@ -93,7 +97,36 @@ SilentAim = vape.Categories.Combat:CreateModule({
 				pcall(restorefunction, getrawmetatable(game).__namecall)
 				oldnamecall = nil
 			end
+
+			if mouse1click and (isrbxactive or iswindowactive)() then
+				if mouseClicked then
+					mouse1release()
+				end
+			end
+			mouseClicked = false
 		end
+
+		repeat
+			if AutoFire.Enabled and mouse1click and (isrbxactive or iswindowactive)() then
+				local origin = entitylib.isAlive and entitylib.character.RootPart.Position or gameCamera.CFrame.Position
+				local entity = getTarget(origin, nil)
+				if entity and clickDelay < os.clock() then
+					if mouseClicked then
+						mouse1release()
+						clickDelay = os.clock() + ShootDelay.Value
+					else
+						mouse1press()
+					end
+
+					mouseClicked = not mouseClicked
+				elseif not entity and mouseClicked then
+					mouse1release()
+					mouseClicked = false
+				end
+			end
+
+			task.wait()
+		until not SilentAim.Enabled
 	end,
 	Tooltip = 'Redirects your bullets onto the target without moving your camera'
 })
@@ -138,4 +171,22 @@ Wallbang = SilentAim:CreateToggle({
 })
 ShowTarget = SilentAim:CreateToggle({
 	Name = 'Show target info'
+})
+AutoFire = SilentAim:CreateToggle({
+	Name = 'AutoFire',
+	Function = function(callback)
+		ShootDelay.Object.Visible = callback
+	end
+})
+ShootDelay = SilentAim:CreateSlider({
+	Name = 'Next Shot Delay',
+	Min = 0,
+	Max = 1,
+	Decimal = 100,
+	Default = 0.1,
+	Visible = false,
+	Darker = true,
+	Suffix = function(val)
+		return val == 1 and 'second' or 'seconds'
+	end
 })
