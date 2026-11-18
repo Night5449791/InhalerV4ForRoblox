@@ -39,8 +39,6 @@ trigger = function()
 	rejoining = true
 
 	task.spawn(function()
-		task.wait(1)
-
 		local target = vape.Modules and vape.Modules[Mode.Value]
 		if not target then return end
 
