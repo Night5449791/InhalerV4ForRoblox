@@ -11,12 +11,8 @@ local function trigger()
 		lplr:Kick()
 	end)
 
-	local utility = vape.Categories.Utility
-	local target = utility and utility[Mode.Value]
-	if target then
-		if target.Enabled then
-			target:Toggle()
-		end
+	local target = vape.Modules and vape.Modules[Mode.Value]
+	if target and not target.Enabled then
 		target:Toggle()
 	end
 end
