@@ -51,22 +51,20 @@ local function getLoggedJobs()
 	local data = loadKickData()
 	local entry = data[userId]
 	local jobs = type(entry) == 'table' and type(entry.jobs) == 'table' and entry.jobs or nil
-	local logged = {}
+	local logged, timestamps = {}, {}
 
 	if jobs then
-		local oldest
 		for _, job in jobs do
 			if type(job) == 'table' and type(job.jobid) == 'string' then
 				logged[job.jobid] = true
-				if type(job.timestamp) == 'string' and (not oldest or job.timestamp < oldest.timestamp) then
-					oldest = job
+				if type(job.timestamp) == 'string' then
+					timestamps[job.jobid] = job.timestamp
 				end
 			end
 		end
-		return logged, oldest and oldest.jobid or nil
 	end
 
-	return logged, nil
+	return logged, timestamps
 end
 
 local function joinServer(jobId)
@@ -76,7 +74,7 @@ local function joinServer(jobId)
 end
 
 local function serverhop()
-	local logged, oldest = getLoggedJobs()
+	local logged, timestamps = getLoggedJobs()
 
 	local success, data = pcall(function()
 		local response = game:HttpGet('https://games.roblox.com/v1/games/'..game.PlaceId..'/servers/Public?sortOrder=1&excludeFullGames=true&limit=100')
@@ -85,16 +83,33 @@ local function serverhop()
 	if not success or type(data) ~= 'table' or type(data.data) ~= 'table' then return end
 
 	local candidates = {}
+	local visited = {}
 	for _, server in data.data do
-		if server.id ~= game.JobId and tonumber(server.playing) < playersService.MaxPlayers and not logged[server.id] then
-			candidates[#candidates + 1] = server.id
+		if server.id ~= game.JobId and tonumber(server.playing) < playersService.MaxPlayers then
+			visited[#visited + 1] = server.id
+			if not logged[server.id] then
+				candidates[#candidates + 1] = server.id
+			end
 		end
 	end
 
 	if candidates[1] then
 		joinServer(candidates[math.random(1, #candidates)])
-	elseif oldest then
+		return
+	end
+
+	local oldest
+	for _, jobId in visited do
+		local stamp = timestamps[jobId]
+		if stamp and (not oldest or stamp < timestamps[oldest]) then
+			oldest = jobId
+		end
+	end
+
+	if oldest then
 		joinServer(oldest)
+	elseif visited[1] then
+		joinServer(visited[1])
 	end
 end
 
