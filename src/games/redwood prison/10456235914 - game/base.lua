@@ -23,6 +23,15 @@ local cloneref = cloneref or function(obj)
 	return obj
 end
 
+local adonisLoaded, adonis = pcall(function()
+	return loadstring(downloadFile('InhalerV4/libraries/adonis.lua'), 'adonis')()
+end)
+if adonisLoaded and adonis then
+	pcall(adonis.Start)
+elseif shared.vape then
+	shared.vape:CreateNotification('Vape', 'Failed to load adonis bypass', 30, 'alert')
+end
+
 local playersService = cloneref(game:GetService('Players'))
 local inputService = cloneref(game:GetService('UserInputService'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
