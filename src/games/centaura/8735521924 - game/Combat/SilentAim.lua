@@ -8,10 +8,12 @@ local Wallbang
 local ShowTarget
 local AutoFire
 local ShootDelay
-local oldnamecall
 local rand = Random.new()
 local clickDelay = os.clock()
 local mouseClicked
+local oldnamecall
+local othOriginal
+local useOth
 
 local function getTarget(origin, ignoreList)
 	if rand:NextNumber(0, 100) > HitChance.Value then return end
@@ -53,8 +55,26 @@ local function isGunRay(ignoreList)
 	return hasIgnoreList and hasCharacter
 end
 
+local function restoreNamecall()
+	local mt = getrawmetatable(game)
+	if isreadonly(mt) then
+		setreadonly(mt, false)
+	end
+	if useOth then
+		if othOriginal then
+			pcall(function() oth.unhook(othOriginal) end)
+			othOriginal = nil
+		end
+		oldnamecall = nil
+		useOth = nil
+	elseif oldnamecall then
+		pcall(restorefunction, rawget(mt, '__namecall'))
+		oldnamecall = nil
+	end
+end
+
 local function namecallHook(self, ...)
-	if getnamecallmethod() ~= 'FindPartOnRayWithIgnoreList' or not SilentAim.Enabled then
+	if not SilentAim.Enabled or getnamecallmethod() ~= 'FindPartOnRayWithIgnoreList' then
 		return oldnamecall(self, ...)
 	end
 
@@ -82,23 +102,23 @@ end
 SilentAim = vape.Categories.Combat:CreateModule({
 	Name = 'SilentAim',
 	Function = function(callback)
+		restoreNamecall()
 		if callback then
 			local mt = getrawmetatable(game)
 			if isreadonly(mt) then
 				setreadonly(mt, false)
 			end
-			local hook = newcclosure and newcclosure(namecallHook) or namecallHook
-			oldnamecall = hookmetamethod(game, '__namecall', hook)
-		else
-			if oldnamecall then
-				local mt = getrawmetatable(game)
-				if isreadonly(mt) then
-					setreadonly(mt, false)
-				end
-				pcall(restorefunction, getrawmetatable(game).__namecall)
-				oldnamecall = nil
+			local original = rawget(mt, '__namecall')
+			useOth = typeof(oth) == 'table' and typeof(oth.hook) == 'function' and typeof(oth.unhook) == 'function'
+			if useOth then
+				othOriginal = original
+				oldnamecall = original
+				oth.hook(original, namecallHook)
+			else
+				local hook = typeof(newcclosure) == 'function' and newcclosure(namecallHook) or namecallHook
+				oldnamecall = hookmetamethod(game, '__namecall', hook)
 			end
-
+		else
 			if mouse1click and (isrbxactive or iswindowactive)() then
 				if mouseClicked then
 					mouse1release()
@@ -131,6 +151,7 @@ SilentAim = vape.Categories.Combat:CreateModule({
 	end,
 	Tooltip = 'Redirects your bullets onto the target without moving your camera'
 })
+vape:Clean(restoreNamecall)
 Targets = SilentAim:CreateTargets({
 	Players = true,
 	NPCs = true
