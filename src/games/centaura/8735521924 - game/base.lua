@@ -23,6 +23,15 @@ local cloneref = cloneref or function(obj)
 	return obj
 end
 
+local adonisLoaded, adonis = pcall(function()
+	return loadstring(downloadFile('InhalerV4/libraries/adonis.lua'), 'adonis')()
+end)
+if adonisLoaded and adonis then
+	pcall(adonis.Start)
+elseif shared.vape then
+	shared.vape:CreateNotification('Vape', 'Failed to load adonis bypass', 30, 'alert')
+end
+
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 local runService = cloneref(game:GetService('RunService'))
@@ -75,6 +84,6 @@ run(function()
 	GunSettings = trekModules:WaitForChild('GunSettings', 30)
 end)
 
-for _, v in {'SilentAim', 'Reach', 'Killaura', 'HitBoxes', 'AutoClicker', 'TargetStrafe', 'AntiFall', 'HighJump', 'LongJump', 'Invisible', 'Jesus', 'MouseTP', 'Phase', 'Fly', 'Speed', 'SpinBot', 'Spider', 'Swim', 'Timer', 'AntiFeature', 'MurderMystery'} do
+for _, v in {'Reach', 'Killaura', 'HitBoxes', 'AutoClicker', 'TargetStrafe', 'AntiFall', 'HighJump', 'LongJump', 'Invisible', 'Jesus', 'MouseTP', 'SpinBot', 'Spider', 'Swim', 'Timer', 'MurderMystery'} do
 	vape:Remove(v)
 end
