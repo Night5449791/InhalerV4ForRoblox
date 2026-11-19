@@ -102,6 +102,7 @@ local function connectFake()
 
 	FakeKXUser:Clean(events.OnMessageDoneFiltering.OnClientEvent:Connect(function(data)
 		if data and data.Message then
+			task.wait(0.5)
 			fakeKXUser(data.FromSpeaker, data.Message)
 		end
 	end))
