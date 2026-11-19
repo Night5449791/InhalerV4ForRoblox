@@ -561,6 +561,16 @@ local function reloadVape()
 	end
 end
 
+local function loadKX()
+	local success, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Keraunius/213sadd23/refs/heads/main/kxadm.lua"))()
+	end)
+
+	if not success then
+		notif('ChatCommand', 'Failed to load KX : '..tostring(err), 5, 'warning')
+	end
+end
+
 local function openDiscordInvite(code)
 	if typeof(request) ~= 'function' then return end
 
@@ -636,7 +646,10 @@ local commands = {
 	loadprofile = loadProfile,
 
 	reload = reloadVape,
-	copyserver = handleCopyServer
+	copyserver = handleCopyServer,
+
+	loadkx = loadKX,
+	larpinghvh = loadKX
 }
 
 local toggles = {
@@ -656,6 +669,7 @@ local toggles = {
 	{Name = 'Whitelist', Tooltip = '.wl/.whitelist <plr>\n.unwl/.unwhitelist <plr>\n.bulkwl/.bulkwhitelist <name> whitelists everyone matching the name, name* matches any prefix'},
 	{Name = 'Blacklist', Tooltip = '.target/.blacklist <plr>\n.untarget/.unblacklist <plr>\n.untarget all/.target all clears every target'},
 	{Name = 'Cheater', Tooltip = '.addskid <plr> <reason>\n.delskid <plr>\n.excludeskid/.antiskid <plr>'},
+	{Name = 'LoadKX', Tooltip = '.loadkx \n.larpinghvh'}
 	{Name = 'CopyServer', Tooltip = '.copyserver\nCopies the discord invite and opens discord over rpc'}
 }
 
