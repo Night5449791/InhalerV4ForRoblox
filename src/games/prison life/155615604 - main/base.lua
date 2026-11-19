@@ -858,7 +858,7 @@ task.spawn(function()
 	if not whitelist.loaded then return end
 
 	for _, plr in playersService:GetPlayers() do
-		task.wait(2.5)
+		task.wait(5)
 		announceMember(plr)
 	end
 end)
