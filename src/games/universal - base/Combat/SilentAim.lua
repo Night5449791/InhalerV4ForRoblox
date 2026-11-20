@@ -17,6 +17,9 @@ run(function()
 	local Wallbang
 	local FunctionHook
 	local OthHook
+	local CircleMode
+	local CircleFOV
+	local CircleToggle
 	local CircleColor
 	local CircleTransparency
 	local CircleFilled
@@ -42,14 +45,53 @@ run(function()
 		return inputService:GetMouseLocation()
 	end
 
+	local function isGameCameraCircle()
+		return CircleObject ~= nil and CircleMode ~= nil and CircleMode.Value == 'GameCamera'
+	end
+
+	local function getFovPixels()
+		if not CircleFOV then return Range.Value end
+		local viewport = gameCamera.ViewportSize
+		local cameraTan = math.tan(math.rad(gameCamera.FieldOfView) / 2)
+		if viewport.Y <= 0 or cameraTan ~= cameraTan or cameraTan <= 0 then
+			return Range.Value
+		end
+
+		return math.min(viewport.Y / 2 * math.tan(math.rad(CircleFOV.Value) / 2) / cameraTan, viewport.Magnitude)
+	end
+
+	local function updateCircle()
+		if not CircleObject then return end
+
+		if isGameCameraCircle() then
+			CircleObject.Position = gameCamera.ViewportSize / 2
+			CircleObject.Radius = getFovPixels()
+		else
+			CircleObject.Position = getMousePosition()
+			CircleObject.Radius = Range.Value
+		end
+
+		CircleObject.Visible = SilentAim.Enabled
+	end
+
+	local function getSelector(entitysettings)
+		if isGameCameraCircle() then
+			entitysettings.MouseOrigin = gameCamera.ViewportSize / 2
+			entitysettings.Range = getFovPixels()
+			return entitylib.EntityMouse(entitysettings)
+		end
+
+		entitysettings.Range = Range.Value
+		return entitylib['Entity'..Mode.Value](entitysettings)
+	end
+
 	local function getTarget(origin, obj)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then
 			return
 		end
 
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
-		local entity = entitylib['Entity'..Mode.Value]({
-			Range = Range.Value,
+		local entity = getSelector({
 			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
 			Part = targetPart,
 			Origin = origin,
@@ -208,7 +250,7 @@ run(function()
 		Name = 'SilentAim',
 		Function = function(callback)
 			if CircleObject then
-				CircleObject.Visible = callback and Mode.Value == 'Mouse'
+				CircleObject.Visible = callback
 			end
 
 			if callback then
@@ -287,14 +329,11 @@ run(function()
 			end
 
 			repeat
-				if CircleObject then
-					CircleObject.Position = getMousePosition()
-				end
+				updateCircle()
 
 				if AutoFire.Enabled then
 					local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
-					local entity = entitylib['Entity'..Mode.Value]({
-						Range = Range.Value,
+					local entity = getSelector({
 						Wallcheck = Target.Walls.Enabled or nil,
 						Part = 'Head',
 						Origin = (origin * fireOffset).Position,
@@ -338,11 +377,6 @@ run(function()
 	Mode = SilentAim:CreateDropdown({
 		Name = 'Mode',
 		List = {'Mouse', 'Position'},
-		Function = function(val)
-			if CircleObject then
-				CircleObject.Visible = SilentAim.Enabled and val == 'Mouse'
-			end
-		end,
 		Tooltip = 'Mouse - Checks for entities near the mouses position\nPosition - Checks for entities near the local character'
 	})
 	Method = SilentAim:CreateDropdown({
@@ -375,10 +409,8 @@ run(function()
 		Min = 1,
 		Max = 1000,
 		Default = 150,
-		Function = function(val)
-			if CircleObject then
-				CircleObject.Radius = val
-			end
+		Function = function()
+			updateCircle()
 		end,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
@@ -475,28 +507,52 @@ run(function()
 		end,
 		Tooltip = 'Hook the function using a less detected method (useful on some games)'
 	})
-	SilentAim:CreateToggle({
+	CircleToggle = SilentAim:CreateToggle({
 		Name = 'Range Circle',
 		Function = function(callback)
 			if callback then
 				CircleObject = Drawing.new('Circle')
 				CircleObject.Filled = CircleFilled.Enabled
 				CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
-				CircleObject.Position = vape.gui.AbsoluteSize / 2
-				CircleObject.Radius = Range.Value
 				CircleObject.NumSides = 100
 				CircleObject.Transparency = 1 - CircleTransparency.Value
-				CircleObject.Visible = SilentAim.Enabled and Mode.Value == 'Mouse'
+				updateCircle()
 			else
 				pcall(function()
 					CircleObject.Visible = false
 					CircleObject:Remove()
 				end)
+				CircleObject = nil
 			end
+			CircleMode.Object.Visible = callback
+			CircleFOV.Object.Visible = callback and CircleMode.Value == 'GameCamera'
 			CircleColor.Object.Visible = callback
 			CircleTransparency.Object.Visible = callback
 			CircleFilled.Object.Visible = callback
 		end
+	})
+	CircleMode = SilentAim:CreateDropdown({
+		Name = 'Circle Mode',
+		List = {'Mouse', 'GameCamera'},
+		Darker = true,
+		Visible = false,
+		Function = function(val)
+			CircleFOV.Object.Visible = CircleToggle.Enabled and val == 'GameCamera'
+			updateCircle()
+		end,
+		Tooltip = 'Mouse - circle follows the mouse, Range is pixel radius\nGameCamera - circle at screen center, FOV sets the aim cone'
+	})
+	CircleFOV = SilentAim:CreateSlider({
+		Name = 'Circle FOV',
+		Min = 1,
+		Max = 180,
+		Default = 30,
+		Darker = true,
+		Visible = false,
+		Function = function()
+			updateCircle()
+		end,
+		Suffix = '°'
 	})
 	CircleColor = SilentAim:CreateColorSlider({
 		Name = 'Circle Color',
