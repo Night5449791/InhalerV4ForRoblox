@@ -39,6 +39,18 @@ local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
 local whitelist = vape.Libraries.whitelist
 
+local urbanLoaded, urban = pcall(function()
+	return loadstring(downloadFile('InhalerV4/libraries/urbananticheat.lua'), 'urbananticheat')()
+end)
+if urbanLoaded and urban then
+	pcall(urban.Start)
+	vape.Libraries.urbananticheat = urban
+	vape:Clean(function()
+		pcall(urban.Stop)
+		vape.Libraries.urbananticheat = nil
+	end)
+end
+
 local WeaponData
 local Remotes = {}
 
