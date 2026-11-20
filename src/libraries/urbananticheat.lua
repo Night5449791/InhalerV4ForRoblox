@@ -86,6 +86,8 @@ local function restoreBeatWatch()
 	hooked = nil
 end
 
+urban.IsBait = isBait
+
 function urban.Start()
 	if urban.Active then return end
 	urban.Active = true
