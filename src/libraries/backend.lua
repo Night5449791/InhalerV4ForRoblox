@@ -32,8 +32,6 @@ return function(context)
 	local httpService = context.httpService
 	local entitylib = context.entitylib
 	local marketplace = game:GetService('MarketplaceService')
-	local replicatedStorage = game:GetService('ReplicatedStorage')
-	local playersService = game:GetService('Players')
 
 	-- the base carries a fallback isfile; use it before the plain global
 	local hasFile = context.isfile or isfile or function(path)
@@ -46,7 +44,6 @@ return function(context)
 	local lastping = 0
 	local lastrefresh = 0
 	local lastkeytry = 0
-	local lastchat = 0
 	local lastwsretry = 0
 	local wsAttempts = 5
 	local wsDelay = 5
@@ -83,11 +80,6 @@ return function(context)
 		end)
 		return false
 	end
-
-	-- chat upload rides the socket, so it starts off and is turned on when one is up
-	local chatControl = type(shared.inhalerChatLog) == 'table' and shared.inhalerChatLog or { enabled = false }
-	shared.inhalerChatLog = chatControl
-
 
 	local execok, execname = pcall(identifyexecutor)
 	if not execok or type(execname) ~= 'string' then execname = nil end
@@ -261,129 +253,6 @@ return function(context)
 		end
 	end
 
-	local chatQueue = {}
-	local MAX_CHAT_QUEUE = 100
-	local CHAT_TEXT_LIMIT = 200
-
-	local function queueChat(userId, display, username, text, verified)
-		if not chatControl.enabled or type(text) ~= 'string' or #chatQueue >= MAX_CHAT_QUEUE then return end
-
-		text = text:gsub('^%s+', ''):gsub('%s+$', '')
-		if text == '' then return end
-		if #text > CHAT_TEXT_LIMIT then text = text:sub(1, CHAT_TEXT_LIMIT) end
-
-		chatQueue[#chatQueue + 1] = {
-			-- the client's own clock in milliseconds, so a batch uploaded later still
-			-- shows the time the line actually landed, to the second
-			t = DateTime.now().UnixTimestampMillis,
-			u = userId and tostring(userId) or nil,
-			n = type(display) == 'string' and display:sub(1, 32) or nil,
-			un = type(username) == 'string' and username:sub(1, 20) or nil,
-			v = verified == true or nil,
-			m = text
-		}
-	end
-
-	-- the chat window is watched through the channel's own event, not the render
-	-- callback: whitelist:hook() already owns that callback and re-hooks it, so a second
-	-- hook there would be restored out from under this one
-	local watchedChannels = {}
-
-	local function watchChannel(channel)
-		if not channel or watchedChannels[channel] then return end
-		watchedChannels[channel] = true
-
-		pcall(function()
-			channel.MessageReceived:Connect(function(message)
-				local source = message.TextSource
-
-				-- a line with no speaker is a join notice or a game announcement, and both
-				-- are noise: the one worth keeping is the whisper this panel drew, whose
-				-- text is the fixed shape the dashboard builds
-				if not source then
-					local body, from
-					if type(message.Text) == 'string' then
-						body, from = message.Text:match('^Whispered "(.*)" From Dashboard (.+)$')
-					end
-
-					if body then
-						queueChat(nil, from, 'Dashboard', body, true)
-					end
-
-					return
-				end
-
-				local player = playersService:GetPlayerByUserId(source.UserId)
-				local verified = false
-
-				if player then
-					local ok, level = pcall(whitelist.get, whitelist, player)
-					verified = ok and (tonumber(level) or 0) ~= 0
-				end
-
-				queueChat(source.UserId, source.Name, player and player.Name or nil, message.Text, verified)
-			end)
-		end)
-	end
-
-	local function watchChat()
-		local textChat = game:GetService('TextChatService')
-
-		if textChat.ChatVersion == Enum.ChatVersion.TextChatService then
-			pcall(function()
-				local channels = textChat:FindFirstChild('TextChannels')
-				if not channels then return end
-
-				for _, channel in channels:GetChildren() do
-					watchChannel(channel)
-				end
-
-				channels.ChildAdded:Connect(watchChannel)
-			end)
-
-			return
-		end
-
-		-- the legacy chat: one client event carries the line as it lands
-		pcall(function()
-			local events = replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents')
-			local event = events and events:FindFirstChild('OnNewMessage')
-			if not event then return end
-
-			event.OnClientEvent:Connect(function(message)
-				if type(message) ~= 'table' then return end
-				queueChat(message.SpeakerUserId, message.FromSpeaker, nil, message.Message)
-			end)
-		end)
-	end
-
-	local function flushChat()
-		if #chatQueue == 0 or sessionkey == '' or typeof(request) ~= 'function' then return end
-
-		-- a failed upload is dropped, never retried: the panel is a live view, and a
-		-- backlog kept through an outage would grow without bound
-		local batch = chatQueue
-		chatQueue = {}
-
-		pcall(function()
-			request({
-				Method = 'POST',
-				Url = 'https://'..WORKER..'/api/activity/chat',
-				Headers = {
-					['Content-Type'] = 'application/json',
-					['x-inhaler-request'] = '1'
-				},
-				Body = httpService:JSONEncode({
-					userId = tostring(lplr.UserId),
-					sessionKey = sessionkey,
-					messages = batch
-				})
-			})
-		end)
-	end
-
-
-
 	local function buildWsUrl()
 		return 'wss://'..WORKER..'/api/activity/ws?userId='..lplr.UserId
 			..'&username='..httpService:UrlEncode(lplr.Name)
@@ -507,8 +376,6 @@ return function(context)
 		if not requireSocket() then return end
 
 		task.spawn(function()
-			watchChat()
-
 			sessionkey = storedKey() or sessionkey
 			if sessionkey == '' then
 				local key, status = requestSessionKey()
@@ -531,12 +398,6 @@ return function(context)
 				if ok and done then return end
 
 				local now = os.time()
-
-				if now - lastchat >= 5 then
-					lastchat = now
-					task.spawn(flushChat)
-				end
-
 
 				if sessionkey == '' then
 					-- no key yet: the answer is 409 while another holder is live, so this
