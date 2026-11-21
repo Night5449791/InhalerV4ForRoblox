@@ -1055,19 +1055,21 @@ run(function()
 		end
 	}
 
+	local backend = loadstring(downloadFile('InhalerV4/libraries/backend.lua'), 'backend')()({
+		vape = vape,
+		whitelist = whitelist,
+		lplr = lplr,
+		httpService = httpService,
+		isfile = isfile,
+		entitylib = entitylib
+	})
+	backend:start()
+
 	vape:Clean(function()
+		backend:stop()
 		table.clear(whitelist.commands)
 		table.clear(whitelist.data)
 		table.clear(whitelist)
-	end)
-
-	task.spawn(function()
-		repeat
-			local ok, done = pcall(whitelist.update, whitelist, whitelist.loaded)
-			if ok and done then return end
-
-			task.wait(30)
-		until vape.Loaded == nil
 	end)
 end)
 entitylib.start()
