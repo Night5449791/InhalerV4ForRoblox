@@ -17,7 +17,7 @@ VehicleSpeed = vape.Categories.Blatant:CreateModule({
 			if Boat.Enabled then
 				oldboat = hookfunction(jb.Boat.UpdatePhysics, function(...)
 					local self = ...
-					self.SpringAccelp *= math.max(Value.Value / 10, 1)
+					self.SpringAccelp = self.SpringAccelp * math.max(Value.Value / 10, 1)
 					return oldboat(...)
 				end)
 			end

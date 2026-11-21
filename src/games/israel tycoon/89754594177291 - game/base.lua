@@ -48,7 +48,6 @@ function israel.tycoonsFolder()
 	return israel.Tycoons
 end
 
--- the plot a player owns, read off PlotIndex so it survives them respawning
 function israel.plot(plr)
 	plr = plr or lplr
 	if not plr then return end

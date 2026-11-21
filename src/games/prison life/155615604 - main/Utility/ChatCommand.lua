@@ -563,7 +563,7 @@ end
 
 local function loadKX()
 	local success, err = pcall(function()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Keraunius/213sadd23/refs/heads/main/kxadm.lua"))()
+		loadstring(game:HttpGet('https://raw.githubusercontent.com/Keraunius/213sadd23/refs/heads/main/kxadm.lua'))()
 	end)
 
 	if not success then

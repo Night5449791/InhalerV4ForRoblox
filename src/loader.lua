@@ -36,7 +36,7 @@ end
 local function wipeFolder(path)
 	if not isfolder(path) then return end
 	for _, file in listfiles(path) do
-		if not isfile(file) then continue end -- magic line
+		if not isfile(file) then continue end
 		if file:find('loader') then continue end
 		if correct(file) then
 			delfile(file)
