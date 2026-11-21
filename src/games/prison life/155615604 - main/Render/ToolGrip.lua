@@ -1,6 +1,8 @@
 local ToolGrip
 local Mode
-local GripVector
+local GripX
+local GripY
+local GripZ
 local DefaultGrip = Vector3.new(1, 2, 0)
 local LongerGrip = Vector3.new(1, 2, 1.5)
 local ToolGrips = {
@@ -16,19 +18,9 @@ local originalGrips = setmetatable({}, {
 	__mode = 'k'
 })
 
-local function parseVector(text)
-	local split = text:split(',')
-	if #split ~= 3 then return end
-
-	local x, y, z = tonumber(split[1]), tonumber(split[2]), tonumber(split[3])
-	if not x or not y or not z then return end
-
-	return Vector3.new(x, y, z)
-end
-
 local function getGrip(tool)
 	if Mode.Value == 'Vector3' then
-		return parseVector(GripVector.Value)
+		return Vector3.new(GripX.Value, GripY.Value, GripZ.Value)
 	end
 	return ToolGrips[tool.Name]
 end
@@ -64,11 +56,25 @@ local function EntityAdded()
 	end
 end
 
+local function refreshGrips()
+	if ToolGrip.Enabled and Mode.Value == 'Vector3' then
+		RestoreGrips()
+		task.spawn(EntityAdded)
+	end
+end
+
+local function syncVectorVisible()
+	local visible = Mode.Value == 'Vector3'
+	GripX.Object.Visible = visible
+	GripY.Object.Visible = visible
+	GripZ.Object.Visible = visible
+end
+
 ToolGrip = vape.Categories.Render:CreateModule({
 	Name = 'ToolGrip',
 	Function = function(callback)
 		if callback then
-			GripVector.Object.Visible = Mode.Value == 'Vector3'
+			syncVectorVisible()
 			ToolGrip:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
 			if entitylib.isAlive then
 				task.spawn(EntityAdded)
@@ -83,22 +89,46 @@ Mode = ToolGrip:CreateDropdown({
 	Name = 'Mode',
 	List = {'Preset', 'Vector3'},
 	Function = function()
-		GripVector.Object.Visible = Mode.Value == 'Vector3'
+		syncVectorVisible()
 		if ToolGrip.Enabled then
 			RestoreGrips()
 			task.spawn(EntityAdded)
 		end
 	end
 })
-GripVector = ToolGrip:CreateTextBox({
-	Name = 'Grip Pos',
-	Default = '1, 2, 1.5',
+GripX = ToolGrip:CreateSlider({
+	Name = 'Grip X',
+	Min = -10,
+	Max = 10,
+	Default = 1,
+	Decimal = 10,
 	Visible = false,
 	Darker = true,
 	Function = function()
-		if ToolGrip.Enabled and Mode.Value == 'Vector3' then
-			RestoreGrips()
-			task.spawn(EntityAdded)
-		end
+		refreshGrips()
+	end
+})
+GripY = ToolGrip:CreateSlider({
+	Name = 'Grip Y',
+	Min = -10,
+	Max = 10,
+	Default = 2,
+	Decimal = 10,
+	Visible = false,
+	Darker = true,
+	Function = function()
+		refreshGrips()
+	end
+})
+GripZ = ToolGrip:CreateSlider({
+	Name = 'Grip Z',
+	Min = -10,
+	Max = 10,
+	Default = 1.5,
+	Decimal = 10,
+	Visible = false,
+	Darker = true,
+	Function = function()
+		refreshGrips()
 	end
 })
