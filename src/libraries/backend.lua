@@ -73,32 +73,14 @@ return function(context)
 	end)
 	local haswebsockets = wsok and typeof(wsconnect) == 'function'
 
-	-- Prison Life runs no http fallback any more, so an executor without a socket cannot
-	-- use the product at all: it loads, talks to nothing, and its commands never arrive.
-	-- Rather than leave it looking half-working, those clients are told why and dropped.
-	-- The two place ids are the main place and its voice-chat redirect, which loads this
-	-- same chunk under the parent id.
-	local PRISON_LIFE_PLACES = { [155615604] = true, [135564683255158] = true }
-	local NO_SOCKET_KICK = 'Failed to load Inhaler : Executor missing %websocket lib%'
+	local NO_SOCKET_KICK = 'Inhaler: Executor doesn\'t support WebSocket.'
 
-	-- there is no http fallback: a client without a socket cannot talk to the worker at
-	-- all. The beacon existed so an executor without `WebSocket` still worked, but every
-	-- beacon is a request the worker has to answer and a row it may have to write, and
-	-- the socket is the only path that is cheap on both sides. An executor without the
-	-- library is told so once instead of quietly costing the panel its write budget.
 	local function requireSocket()
 		if haswebsockets then return true end
 
-		-- game.PlaceId, not vape.Place: a redirect sets vape.Place to the parent, and both
-		-- halves of prison life have to be caught
-		if PRISON_LIFE_PLACES[game.PlaceId] then
-			pcall(function()
-				lplr:Kick(NO_SOCKET_KICK)
-			end)
-			return false
-		end
-
-		warn('[inhaler] this executor has no WebSocket library, so the backend cannot connect')
+		pcall(function()
+			lplr:Kick(NO_SOCKET_KICK)
+		end)
 		return false
 	end
 
