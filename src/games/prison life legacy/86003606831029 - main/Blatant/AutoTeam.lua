@@ -28,8 +28,7 @@ AutoTeam = vape.Categories.Blatant:CreateModule({
 			local colors = {
 				Guards = 'Bright blue',
 				Inmates = 'Bright orange',
-				Neutral = 'Medium stone grey',
-				Criminals = 'Really red'
+				Neutral = 'Medium stone grey'
 			}
 			local color = colors[Team.Value]
 			local key = jobKey()
@@ -50,5 +49,5 @@ AutoTeam = vape.Categories.Blatant:CreateModule({
 })
 Team = AutoTeam:CreateDropdown({
 	Name = 'Team',
-	List = {'Guards', 'Inmates', 'Neutral', 'Criminals'}
+	List = {'Guards', 'Inmates', 'Neutral'}
 })
