@@ -1,6 +1,6 @@
 local ToySpawner
 
-local TOYS = {
+local toys = {
 	'Campfire',
 	'CreatureBlobman',
 	'CreatureRobot',
@@ -48,7 +48,7 @@ ToySpawner = vape.Categories.Utility:CreateModule({
 })
 ToySpawner:CreateDropdown({
 	Name = 'Toy',
-	List = TOYS,
+	List = toys,
 	Default = 'TractorGreen'
 })
 ToySpawner:CreateSlider({

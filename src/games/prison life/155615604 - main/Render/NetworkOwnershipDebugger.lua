@@ -20,7 +20,7 @@ local sethiddenProperty
 local setSimulationRadius
 local setFflag
 local dir = 0
-local CYAN = BrickColor.new('Cyan')
+local cyan = BrickColor.new('Cyan')
 local driveVelocity = Vector3.new(24, 0, 0)
 
 local function interact(spawner)
@@ -159,7 +159,7 @@ local function driveCar(dt)
 		local offset = spawner.Position - rootPos
 		local mag = offset.Magnitude
 
-		if mag < 50 and spawner.BrickColor == CYAN and not didMove then
+		if mag < 50 and spawner.BrickColor == cyan and not didMove then
 			dir = math.clamp(dir + (math.clamp(offset.X, -1, 1) * dt * 24), -12, 14)
 			didMove = true
 		end

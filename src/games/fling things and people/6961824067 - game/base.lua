@@ -7,7 +7,7 @@ end
 
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
-local collectionService = game:GetService('CollectionService')
+local collectionService = cloneref(game:GetService('CollectionService'))
 
 local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer
