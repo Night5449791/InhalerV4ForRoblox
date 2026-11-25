@@ -5,36 +5,36 @@ local ArrestDelay
 AutoArrest = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoArrest',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			repeat
+				local root = sentence.root(lplr)
 
-		repeat
-			local root = sentence.root(lplr)
+				if root and sentence.isCop(lplr) then
+					local range = ArrestRange.Value
+					local origin = root.Position
 
-			if root and sentence.isCop(lplr) then
-				local range = ArrestRange.Value
-				local origin = root.Position
+					for _, plr in playersService:GetPlayers() do
+						if plr == lplr or not sentence.isDowned(plr) or not sentence.isTarget(plr) then continue end
 
-				for _, plr in playersService:GetPlayers() do
-					if plr == lplr or not sentence.isDowned(plr) or not sentence.isTarget(plr) then continue end
+						local other = sentence.root(plr)
+						if not other or (other.Position - origin).Magnitude > range then continue end
 
-					local other = sentence.root(plr)
-					if not other or (other.Position - origin).Magnitude > range then continue end
+						local prompt = other:FindFirstChild('ArrestPrompt')
+						if not prompt then continue end
 
-					local prompt = other:FindFirstChild('ArrestPrompt')
-					if not prompt then continue end
-
-					prompt.MaxActivationDistance = range
-					prompt.HoldDuration = 0
-					pcall(prompt.InputHoldBegin, prompt)
-					task.wait()
-					pcall(prompt.InputHoldEnd, prompt)
-					task.wait(ArrestDelay.Value)
-					break
+						prompt.MaxActivationDistance = range
+						prompt.HoldDuration = 0
+						pcall(prompt.InputHoldBegin, prompt)
+						task.wait()
+						pcall(prompt.InputHoldEnd, prompt)
+						task.wait(ArrestDelay.Value)
+						break
+					end
 				end
-			end
 
-			task.wait(0.2)
-		until not AutoArrest.Enabled or vape.Loaded == nil
+				task.wait(0.2)
+			until not AutoArrest.Enabled or vape.Loaded == nil
+		end
 	end,
 	Tooltip = 'Arrests downed enemies in range through their own arrest prompt'
 })

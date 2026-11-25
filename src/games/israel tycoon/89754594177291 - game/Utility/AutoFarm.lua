@@ -64,28 +64,28 @@ end
 AutoFarm = vape.Categories.Utility:CreateModule({
 	Name = 'AutoFarm',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			local nextBuy = 0
 
-		local nextBuy = 0
+			repeat
+				local plot = israel.plot(lplr)
+				if plot then
+					if Collect.Enabled then
+						collectPad(plot)
+					end
 
-		repeat
-			local plot = israel.plot(lplr)
-			if plot then
-				if Collect.Enabled then
-					collectPad(plot)
-				end
-
-				if Buy.Enabled and os.clock() >= nextBuy then
-					local pad = cheapestAffordable(plot)
-					if pad then
-						touch(pad)
-						nextBuy = os.clock() + (BuyDelay.Value / 60)
+					if Buy.Enabled and os.clock() >= nextBuy then
+						local pad = cheapestAffordable(plot)
+						if pad then
+							touch(pad)
+							nextBuy = os.clock() + (BuyDelay.Value / 60)
+						end
 					end
 				end
-			end
 
-			task.wait()
-		until not AutoFarm.Enabled
+				task.wait()
+			until not AutoFarm.Enabled
+		end
 	end,
 	Tooltip = 'Collects the cash pad and buys the cheapest upgrade it can afford'
 })

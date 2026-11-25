@@ -37,28 +37,28 @@ SilentAim = vape.Categories.Combat:CreateModule({
 	Function = function(callback)
 		disconnectAll()
 
-		if not callback then return end
+		if callback then
+			repeat
+				local tool = redwood.meleeTool()
+				if tool and not connections[tool] then
+					connections[tool] = tool.Activated:Connect(function()
+						if not SilentAim.Enabled then return end
 
-		repeat
-			local tool = redwood.meleeTool()
-			if tool and not connections[tool] then
-				connections[tool] = tool.Activated:Connect(function()
-					if not SilentAim.Enabled then return end
+						local entity = aimEntity()
+						if not entity then return end
+						if not redwood.attack(entity, Part.Value) then return end
 
-					local entity = aimEntity()
-					if not entity then return end
-					if not redwood.attack(entity, Part.Value) then return end
+						if ShowTarget.Enabled then
+							targetinfo.Targets[entity] = os.clock() + 1
+						end
+					end)
+				end
 
-					if ShowTarget.Enabled then
-						targetinfo.Targets[entity] = os.clock() + 1
-					end
-				end)
-			end
+				task.wait(1)
+			until not SilentAim.Enabled or vape.Loaded == nil
 
-			task.wait(1)
-		until not SilentAim.Enabled or vape.Loaded == nil
-
-		disconnectAll()
+			disconnectAll()
+		end
 	end,
 	Tooltip = 'Adds a melee hit on the closest target inside the FOV every time you attack'
 })

@@ -26,104 +26,104 @@ AimAssist = vape.Categories.Combat:CreateModule({
 			CircleObject.Visible = callback
 		end
 
-		if not callback then return end
-
-		local entity
-		local rightClicked = inputService:IsMouseButtonPressed(1)
-		local pressed = false
-		local cameraMode = AimAssistMethod.Value == 'Camera'
-		local touch = inputService.TouchEnabled
-		local clickgui = vape.gui.ScaledGui.ClickGui
-		local mouseScale
-		if not cameraMode then
-			mouseScale = moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity
-		end
-
-		local positionMode = Mode.Value == 'Position'
-		local selector = positionMode and entitylib.EntityPosition or entitylib.EntityMouse
-
-		local function step(dt)
-			if CircleObject then
-				CircleObject.Position = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
+		if callback then
+			local entity
+			local rightClicked = inputService:IsMouseButtonPressed(1)
+			local pressed = false
+			local cameraMode = AimAssistMethod.Value == 'Camera'
+			local touch = inputService.TouchEnabled
+			local clickgui = vape.gui.ScaledGui.ClickGui
+			local mouseScale
+			if not cameraMode then
+				mouseScale = moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity
 			end
 
-			if clickgui.Visible then return end
-			if not cameraMode and inputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then return end
-			if not cameraMode and RightClick.Enabled and not rightClicked then return end
-			if KeyToggle.Enabled and not pressed then return end
+			local positionMode = Mode.Value == 'Position'
+			local selector = positionMode and entitylib.EntityPosition or entitylib.EntityMouse
 
-			local camCF = gameCamera.CFrame
-			local origin, partName = camCF.Position, Part.Value
+			local function step(dt)
+				if CircleObject then
+					CircleObject.Position = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
+				end
 
-			entity = selector({
-				Range = FOV.Value,
-				Part = partName,
-				Players = Targets.Players.Enabled,
-				NPCs = Targets.NPCs.Enabled,
-				Wallcheck = Targets.Walls.Enabled,
-				Origin = positionMode and origin or nil
-			})
+				if clickgui.Visible then return end
+				if not cameraMode and inputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then return end
+				if not cameraMode and RightClick.Enabled and not rightClicked then return end
+				if KeyToggle.Enabled and not pressed then return end
 
-			if not entity then return end
+				local camCF = gameCamera.CFrame
+				local origin, partName = camCF.Position, Part.Value
 
-			local part = entity[partName]
-			if not part then return end
+				entity = selector({
+					Range = FOV.Value,
+					Part = partName,
+					Players = Targets.Players.Enabled,
+					NPCs = Targets.NPCs.Enabled,
+					Wallcheck = Targets.Walls.Enabled,
+					Origin = positionMode and origin or nil
+				})
 
-			local target = (part.Position - origin).Unit
-			target = target == target and target or Vector3.zero
+				if not entity then return end
 
-			if ShowTarget.Enabled then
-				targetinfo.Targets[entity] = os.clock() + 1
-			end
+				local part = entity[partName]
+				if not part then return end
 
-			if target == Vector3.zero then return end
+				local target = (part.Position - origin).Unit
+				target = target == target and target or Vector3.zero
 
-			local alpha = math.min(Speed.Value * dt, 1)
+				if ShowTarget.Enabled then
+					targetinfo.Targets[entity] = os.clock() + 1
+				end
 
-			if cameraMode then
-				local blended = camCF.LookVector:Lerp(target, alpha)
-				local magnitude = blended.Magnitude
-				if magnitude < 0.01 then return end
+				if target == Vector3.zero then return end
 
-				gameCamera.CFrame = CFrame.lookAt(origin, origin + blended / magnitude)
-			else
-				local facing = camCF.LookVector
-				local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - wrapAngle(math.atan2(target.X, target.Z)))
-				local diffPitch = math.asin(facing.Y) - math.asin(target.Y)
-				local angle = Vector2.new(diffYaw, diffPitch) // mouseScale
+				local alpha = math.min(Speed.Value * dt, 1)
 
-				angle = angle * alpha
+				if cameraMode then
+					local blended = camCF.LookVector:Lerp(target, alpha)
+					local magnitude = blended.Magnitude
+					if magnitude < 0.01 then return end
 
-				if typeof(mousemoverel) == 'function' then
-					mousemoverel(angle.X, angle.Y)
+					gameCamera.CFrame = CFrame.lookAt(origin, origin + blended / magnitude)
+				else
+					local facing = camCF.LookVector
+					local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - wrapAngle(math.atan2(target.X, target.Z)))
+					local diffPitch = math.asin(facing.Y) - math.asin(target.Y)
+					local angle = Vector2.new(diffYaw, diffPitch) // mouseScale
+
+					angle = angle * alpha
+
+					if typeof(mousemoverel) == 'function' then
+						mousemoverel(angle.X, angle.Y)
+					end
 				end
 			end
-		end
 
-		if cameraMode then
-			runService:BindToRenderStep('InhalerAimAssist', Enum.RenderPriority.Camera.Value + 1, step)
-			AimAssist:Clean(function()
-				runService:UnbindFromRenderStep('InhalerAimAssist')
-			end)
-		else
-			AimAssist:Clean(runService.RenderStepped:Connect(step))
-		end
-
-		AimAssist:Clean(Key.Triggered:Connect(function(isDown)
-			pressed = KeyToggle.Enabled and isDown
-		end))
-
-		AimAssist:Clean(inputService.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton2 then
-				rightClicked = true
+			if cameraMode then
+				runService:BindToRenderStep('InhalerAimAssist', Enum.RenderPriority.Camera.Value + 1, step)
+				AimAssist:Clean(function()
+					runService:UnbindFromRenderStep('InhalerAimAssist')
+				end)
+			else
+				AimAssist:Clean(runService.RenderStepped:Connect(step))
 			end
-		end))
 
-		AimAssist:Clean(inputService.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton2 then
-				rightClicked = false
-			end
-		end))
+			AimAssist:Clean(Key.Triggered:Connect(function(isDown)
+				pressed = KeyToggle.Enabled and isDown
+			end))
+
+			AimAssist:Clean(inputService.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton2 then
+					rightClicked = true
+				end
+			end))
+
+			AimAssist:Clean(inputService.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton2 then
+					rightClicked = false
+				end
+			end))
+		end
 	end,
 	Tooltip = 'Smoothly aims to closest valid target'
 })

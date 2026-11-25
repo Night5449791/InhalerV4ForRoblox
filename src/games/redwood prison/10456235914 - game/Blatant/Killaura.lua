@@ -25,25 +25,25 @@ end
 Killaura = vape.Categories.Blatant:CreateModule({
 	Name = 'Killaura',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			local swingAt = 0
 
-		local swingAt = 0
+			repeat
+				local tool = redwood.meleeTool()
+				local character = lplr.Character
+				local root = character and character:FindFirstChild('HumanoidRootPart')
 
-		repeat
-			local tool = redwood.meleeTool()
-			local character = lplr.Character
-			local root = character and character:FindFirstChild('HumanoidRootPart')
-
-			if tool and root and os.clock() >= swingAt then
-				local target = closestTarget(root, Range.Value, TeamCheck.Enabled)
-				if target then
-					redwood.attack(target, Part.Value)
-					swingAt = os.clock() + Delay.Value
+				if tool and root and os.clock() >= swingAt then
+					local target = closestTarget(root, Range.Value, TeamCheck.Enabled)
+					if target then
+						redwood.attack(target, Part.Value)
+						swingAt = os.clock() + Delay.Value
+					end
 				end
-			end
 
-			task.wait(0.05)
-		until not Killaura.Enabled or vape.Loaded == nil
+				task.wait(0.05)
+			until not Killaura.Enabled or vape.Loaded == nil
+		end
 	end,
 	Tooltip = 'Hits everyone in range with your equipped melee weapon'
 })

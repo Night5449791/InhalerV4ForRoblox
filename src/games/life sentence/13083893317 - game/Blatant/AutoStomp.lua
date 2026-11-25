@@ -6,30 +6,30 @@ local StompTeamCheck
 AutoStomp = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoStomp',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			repeat
+				local root = sentence.root(lplr)
 
-		repeat
-			local root = sentence.root(lplr)
+				if root then
+					local range = StompRange.Value
+					local teamCheck = StompTeamCheck.Enabled
+					local origin = root.Position
 
-			if root then
-				local range = StompRange.Value
-				local teamCheck = StompTeamCheck.Enabled
-				local origin = root.Position
+					for _, plr in playersService:GetPlayers() do
+						if plr == lplr or not sentence.isDowned(plr) then continue end
+						if teamCheck and not sentence.isTarget(plr) then continue end
 
-				for _, plr in playersService:GetPlayers() do
-					if plr == lplr or not sentence.isDowned(plr) then continue end
-					if teamCheck and not sentence.isTarget(plr) then continue end
-
-					local other = sentence.root(plr)
-					if other and (other.Position - origin).Magnitude <= range then
-						sentence.fire('CarryStompEvent', 'EPress')
-						break
+						local other = sentence.root(plr)
+						if other and (other.Position - origin).Magnitude <= range then
+							sentence.fire('CarryStompEvent', 'EPress')
+							break
+						end
 					end
 				end
-			end
 
-			task.wait(StompDelay.Value)
-		until not AutoStomp.Enabled or vape.Loaded == nil
+				task.wait(StompDelay.Value)
+			until not AutoStomp.Enabled or vape.Loaded == nil
+		end
 	end,
 	Tooltip = 'Presses the stomp key on downed players in range'
 })

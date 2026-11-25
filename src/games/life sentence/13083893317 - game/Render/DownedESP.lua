@@ -25,40 +25,40 @@ DownedESP = vape.Categories.Render:CreateModule({
 	Function = function(callback)
 		clearHighlights()
 
-		if not callback then return end
+		if callback then
+			repeat
+				local localCharacter = lplr.Character
 
-		repeat
-			local localCharacter = lplr.Character
+				for _, plr in playersService:GetPlayers() do
+					local character = plr.Character
+					local record = highlights[plr]
+					local downed = character ~= nil and character ~= localCharacter and sentence.isDowned(plr)
 
-			for _, plr in playersService:GetPlayers() do
-				local character = plr.Character
-				local record = highlights[plr]
-				local downed = character ~= nil and character ~= localCharacter and sentence.isDowned(plr)
+					if record and (not downed or record.Character ~= character) then
+						record.Highlight:Destroy()
+						highlights[plr] = nil
+						record = nil
+					end
 
-				if record and (not downed or record.Character ~= character) then
-					record.Highlight:Destroy()
-					highlights[plr] = nil
-					record = nil
+					if downed and not record then
+						local color = Color3.fromHSV(DownedColor.Hue, DownedColor.Sat, DownedColor.Value)
+						local highlight = Instance.new('Highlight')
+						highlight.FillColor = color
+						highlight.FillTransparency = 0.65
+						highlight.OutlineColor = color
+						highlight.OutlineTransparency = 0
+						highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+						highlight.Adornee = character
+						highlight.Parent = character
+						highlights[plr] = {Character = character, Highlight = highlight}
+					end
 				end
 
-				if downed and not record then
-					local color = Color3.fromHSV(DownedColor.Hue, DownedColor.Sat, DownedColor.Value)
-					local highlight = Instance.new('Highlight')
-					highlight.FillColor = color
-					highlight.FillTransparency = 0.65
-					highlight.OutlineColor = color
-					highlight.OutlineTransparency = 0
-					highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-					highlight.Adornee = character
-					highlight.Parent = character
-					highlights[plr] = {Character = character, Highlight = highlight}
-				end
-			end
+				task.wait(0.5)
+			until not DownedESP.Enabled or vape.Loaded == nil
 
-			task.wait(0.5)
-		until not DownedESP.Enabled or vape.Loaded == nil
-
-		clearHighlights()
+			clearHighlights()
+		end
 	end,
 	Tooltip = 'Highlights players that are downed and can be arrested or stomped'
 })

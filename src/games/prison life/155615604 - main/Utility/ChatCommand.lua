@@ -655,11 +655,11 @@ local commands = {
 local toggles = {
 	{Name = 'ShareCommands', Default = false, Tooltip = 'Allows whitelisted users to directly access chat commands.'},
 	{Name = 'PlayerTP', Tooltip = '.tp <plr>'},
-	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(enabled)
-		if not enabled then stopFollow() end
+	{Name = 'PlayerFollow', Tooltip = '.follow <plr>\n.unfollow', Function = function(callback)
+		if not callback then stopFollow() end
 	end},
-	{Name = 'PlayerView', Tooltip = '.view <plr>\n.unview', Function = function(enabled)
-		if not enabled then restoreCamera() end
+	{Name = 'PlayerView', Tooltip = '.view <plr>\n.unview', Function = function(callback)
+		if not callback then restoreCamera() end
 	end},
 	{Name = 'Rejoin', Tooltip = '.rj\n.rejoin'},
 	{Name = 'ServerHop', Tooltip = '.hop\n.serverhop'},
@@ -722,40 +722,40 @@ end
 ChatCommand = vape.Categories.Utility:CreateModule({
 	Name = 'ChatCommand',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			ChatCommand:Clean(restoreCamera)
+			ChatCommand:Clean(stopFollow)
+			ChatCommand:Clean(playersService.PlayerRemoving:Connect(function(plr)
+				untrackPlayer(plr)
 
-		ChatCommand:Clean(restoreCamera)
-		ChatCommand:Clean(stopFollow)
-		ChatCommand:Clean(playersService.PlayerRemoving:Connect(function(plr)
-			untrackPlayer(plr)
+				if plr == viewPlayer then
+					restoreCamera()
+				end
 
-			if plr == viewPlayer then
-				restoreCamera()
+				if plr == followPlayer then
+					stopFollow()
+				end
+			end))
+			ChatCommand:Clean(entitylib.Events.EntityAdded:Connect(function(entity)
+				if entity.Player and entity.Player == viewPlayer then
+					gameCamera.CameraSubject = entity.Humanoid
+				end
+			end))
+
+			for _, plr in playersService:GetPlayers() do
+				trackPlayer(plr)
 			end
 
-			if plr == followPlayer then
-				stopFollow()
-			end
-		end))
-		ChatCommand:Clean(entitylib.Events.EntityAdded:Connect(function(entity)
-			if entity.Player and entity.Player == viewPlayer then
-				gameCamera.CameraSubject = entity.Humanoid
-			end
-		end))
+			ChatCommand:Clean(playersService.PlayerAdded:Connect(trackPlayer))
+			ChatCommand:Clean(function()
+				for _, connection in sharedConnections do
+					connection:Disconnect()
+				end
 
-		for _, plr in playersService:GetPlayers() do
-			trackPlayer(plr)
+				table.clear(sharedConnections)
+			end)
+			ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
 		end
-
-		ChatCommand:Clean(playersService.PlayerAdded:Connect(trackPlayer))
-		ChatCommand:Clean(function()
-			for _, connection in sharedConnections do
-				connection:Disconnect()
-			end
-
-			table.clear(sharedConnections)
-		end)
-		ChatCommand:Clean(lplr.Chatted:Connect(onChatted))
 	end,
 	Tooltip = 'Chat commands, every command is a toggleable option'
 })

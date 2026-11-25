@@ -14,30 +14,30 @@ end
 PlayerFling = vape.Categories.Blatant:CreateModule({
 	Name = 'Player Fling',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			repeat
+				local character = lplr.Character
+				local myRoot = character and character:FindFirstChild('HumanoidRootPart')
+				if myRoot then
+					local entity = entitylib.EntityPosition({
+						Part = 'RootPart',
+						Range = Range.Value,
+						Origin = myRoot.Position,
+						Players = Targets.Players.Enabled,
+						NPCs = Targets.NPCs.Enabled
+					})
 
-		repeat
-			local character = lplr.Character
-			local myRoot = character and character:FindFirstChild('HumanoidRootPart')
-			if myRoot then
-				local entity = entitylib.EntityPosition({
-					Part = 'RootPart',
-					Range = Range.Value,
-					Origin = myRoot.Position,
-					Players = Targets.Players.Enabled,
-					NPCs = Targets.NPCs.Enabled
-				})
-
-				local root = entity and rootOf(entity)
-				if root then
-					root.CFrame = CFrame.new(root.Position + Vector3.new(0, Speed.Value, 0)) * root.CFrame.Rotation
+					local root = entity and rootOf(entity)
+					if root then
+						root.CFrame = CFrame.new(root.Position + Vector3.new(0, Speed.Value, 0)) * root.CFrame.Rotation
+					end
 				end
-			end
 
-			for _ = 1, Step.Value do
-				task.wait()
-			end
-		until not PlayerFling.Enabled
+				for _ = 1, Step.Value do
+					task.wait()
+				end
+			until not PlayerFling.Enabled
+		end
 	end,
 	Tooltip = 'Lifts the closest player in small CFrame steps the server treats as movement instead of a teleport'
 })

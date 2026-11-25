@@ -6,27 +6,27 @@ local guards = nil
 AutoReset = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoReset',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			guards = sentence.Teams.Guards
 
-		guards = sentence.Teams.Guards
+			repeat
+				local reset = ResetWhileDowned.Enabled and sentence.status(lplr, 'Downed') == true
 
-		repeat
-			local reset = ResetWhileDowned.Enabled and sentence.status(lplr, 'Downed') == true
-
-			if not reset then
-				local distance = ResetDistance.Value
-				if distance > 0 then
-					reset = sentence.nearestPlayer(guards, distance) ~= nil
+				if not reset then
+					local distance = ResetDistance.Value
+					if distance > 0 then
+						reset = sentence.nearestPlayer(guards, distance) ~= nil
+					end
 				end
-			end
 
-			if reset then
-				sentence.fire('WeaponEvent', 'Reset')
-				task.wait(0.5)
-			else
-				task.wait(0.1)
-			end
-		until not AutoReset.Enabled or vape.Loaded == nil
+				if reset then
+					sentence.fire('WeaponEvent', 'Reset')
+					task.wait(0.5)
+				else
+					task.wait(0.1)
+				end
+			until not AutoReset.Enabled or vape.Loaded == nil
+		end
 	end,
 	Tooltip = 'Resets your character before a guard can arrest you'
 })

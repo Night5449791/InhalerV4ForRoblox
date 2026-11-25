@@ -27,15 +27,15 @@ end
 AutoJoinTeam = vape.Categories.Utility:CreateModule({
 	Name = 'AutoJoinTeam',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			repeat
+				if redwood.team(lplr) ~= Team.Value then
+					joinTeam(Team.Value)
+				end
 
-		repeat
-			if redwood.team(lplr) ~= Team.Value then
-				joinTeam(Team.Value)
-			end
-
-			task.wait(Retry.Value)
-		until not AutoJoinTeam.Enabled or vape.Loaded == nil
+				task.wait(Retry.Value)
+			until not AutoJoinTeam.Enabled or vape.Loaded == nil
+		end
 	end,
 	Tooltip = 'Joins the selected team through the game team changer'
 })

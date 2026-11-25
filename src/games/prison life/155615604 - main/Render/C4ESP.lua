@@ -34,9 +34,9 @@ local function Added(c4)
 
 	Reference[c4] = cham
 
-	c4.Destroying:Connect(function()
+	C4ESP:Clean(c4.Destroying:Connect(function()
 		Removed(c4)
-	end)
+	end))
 end
 
 C4ESP = vape.Categories.Render:CreateModule({

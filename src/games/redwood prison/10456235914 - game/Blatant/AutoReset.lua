@@ -6,33 +6,33 @@ local OnlyPrisoners
 AutoReset = vape.Categories.Blatant:CreateModule({
 	Name = 'AutoReset',
 	Function = function(callback)
-		if not callback then return end
+		if callback then
+			local lastReset = 0
 
-		local lastReset = 0
+			repeat
+				local character = lplr.Character
+				local humanoid = redwood.humanoid(character)
+				local alive = humanoid ~= nil and humanoid.Health > 0
+				local reset = false
 
-		repeat
-			local character = lplr.Character
-			local humanoid = redwood.humanoid(character)
-			local alive = humanoid ~= nil and humanoid.Health > 0
-			local reset = false
+				if alive and os.clock() - lastReset > 1 then
+					reset = OnArrest.Enabled and redwood.hasState(character, 'ArrestCurrent')
 
-			if alive and os.clock() - lastReset > 1 then
-				reset = OnArrest.Enabled and redwood.hasState(character, 'ArrestCurrent')
+					if not reset and Distance.Value > 0 then
+						if not OnlyPrisoners.Enabled or redwood.isTeam(lplr, redwood.Teams.Prisoners) or redwood.isTeam(lplr, redwood.Teams.Fugitive) then
+							reset = redwood.nearestPlayer(redwood.Teams.Guards, Distance.Value) ~= nil
+						end
+					end
 
-				if not reset and Distance.Value > 0 then
-					if not OnlyPrisoners.Enabled or redwood.isTeam(lplr, redwood.Teams.Prisoners) or redwood.isTeam(lplr, redwood.Teams.Fugitive) then
-						reset = redwood.nearestPlayer(redwood.Teams.Guards, Distance.Value) ~= nil
+					if reset then
+						redwood.fire('Reset')
+						lastReset = os.clock()
 					end
 				end
 
-				if reset then
-					redwood.fire('Reset')
-					lastReset = os.clock()
-				end
-			end
-
-			task.wait(reset and 0.5 or 0.1)
-		until not AutoReset.Enabled or vape.Loaded == nil
+				task.wait(reset and 0.5 or 0.1)
+			until not AutoReset.Enabled or vape.Loaded == nil
+		end
 	end,
 	Tooltip = 'Resets your character before a guard can arrest you'
 })

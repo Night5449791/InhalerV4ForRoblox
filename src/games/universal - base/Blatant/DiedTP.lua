@@ -151,34 +151,34 @@ DiedTP = vape.Categories.Blatant:CreateModule({
 		enabled = callback
 		generation = generation + 1
 		local currentGeneration = generation
-		if not callback then return end
+		if callback then
+			DiedTP:Clean(entitylib.Events.LocalAdded:Connect(function(entity)
+				if not enabled or currentGeneration ~= generation then return end
+				local char = entity and entity.Character
+				if not char then return end
+				watchDeath(char, currentGeneration)
+				if lastDeath then
+					returnToDeath(char, currentGeneration)
+				end
+			end))
 
-		DiedTP:Clean(entitylib.Events.LocalAdded:Connect(function(entity)
-			if not enabled or currentGeneration ~= generation then return end
-			local char = entity and entity.Character
-			if not char then return end
-			watchDeath(char, currentGeneration)
-			if lastDeath then
-				returnToDeath(char, currentGeneration)
+			DiedTP:Clean(entitylib.Events.LocalRemoved:Connect(function(entity)
+				if not enabled or currentGeneration ~= generation or lastDeath then return end
+				captureDeath(entity and entity.Character)
+			end))
+
+			aliveConnection = runService.PreSimulation:Connect(function()
+				local clock = os.clock()
+				if clock - aliveClock < 0.15 then return end
+				aliveClock = clock
+				rememberAlive(lplr.Character)
+			end)
+			DiedTP:Clean(aliveConnection)
+
+			if entitylib.isAlive and entitylib.character then
+				watchDeath(entitylib.character.Character, currentGeneration)
+				rememberAlive(entitylib.character.Character)
 			end
-		end))
-
-		DiedTP:Clean(entitylib.Events.LocalRemoved:Connect(function(entity)
-			if not enabled or currentGeneration ~= generation or lastDeath then return end
-			captureDeath(entity and entity.Character)
-		end))
-
-		aliveConnection = runService.PreSimulation:Connect(function()
-			local clock = os.clock()
-			if clock - aliveClock < 0.15 then return end
-			aliveClock = clock
-			rememberAlive(lplr.Character)
-		end)
-		DiedTP:Clean(aliveConnection)
-
-		if entitylib.isAlive and entitylib.character then
-			watchDeath(entitylib.character.Character, currentGeneration)
-			rememberAlive(entitylib.character.Character)
 		end
 	end,
 	Tooltip = 'Returns you to your last death position when you respawn.'

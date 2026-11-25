@@ -225,10 +225,10 @@ run(function()
 		Name = 'Auto Fire',
 		Tooltip = 'Fires while a target is in range; the weapon keeps its own ammo and fire rate',
 		Function = function(callback)
-			if not callback then return end
-
-			weapon = weapon or findWeapon()
-			task.spawn(autoFireLoop)
+			if callback then
+				weapon = weapon or findWeapon()
+				task.spawn(autoFireLoop)
+			end
 		end
 	})
 end)

@@ -78,12 +78,12 @@ PlotSpy = vape:CreateOverlay({
 	Size = UDim2.fromOffset(16, 12),
 	Position = UDim2.fromOffset(12, 14),
 	Function = function(callback)
-		if not callback then return end
-
-		repeat
-			render()
-			task.wait(1)
-		until not PlotSpy.Button or not PlotSpy.Button.Enabled
+		if callback then
+			repeat
+				render()
+				task.wait(1)
+			until not PlotSpy.Button or not PlotSpy.Button.Enabled
+		end
 	end
 })
 FontOption = PlotSpy:CreateFont({

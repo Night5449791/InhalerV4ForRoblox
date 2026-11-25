@@ -627,8 +627,8 @@ cheaterOptions.Notifications = CheaterDetector:CreateToggle({
 cheaterOptions.AutomaticAdd = CheaterDetector:CreateToggle({
 	Name = 'Automatic Add',
 	Default = false,
-	Function = function(enabled)
-		setMovementOptionsVisible(enabled)
+	Function = function(callback)
+		setMovementOptionsVisible(callback)
 	end,
 	Tooltip = 'Adds a player to the cheater list when CheatDetector flags an invalid humanoid state or an invalid animation; the two options below add the movement flags as well.\nThe reason is logged as exploits/<flag>.'
 })

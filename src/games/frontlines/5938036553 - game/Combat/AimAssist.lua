@@ -17,84 +17,84 @@ AimAssist = vape.Categories.Combat:CreateModule({
 			CircleObject.Visible = callback
 		end
 
-		if not callback then return end
+		if callback then
+			local cameraMode = AimAssistMethod.Value == 'Camera'
+			local touch = inputService.TouchEnabled
 
-		local cameraMode = AimAssistMethod.Value == 'Camera'
-		local touch = inputService.TouchEnabled
+			local function step(dt)
+				if CircleObject then
+					CircleObject.Position = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
+				end
 
-		local function step(dt)
-			if CircleObject then
-				CircleObject.Position = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
+				if not cameraMode and not inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
+
+				local main = frontlines and frontlines.Main
+				local globals = main and main.globals
+				if not globals then return end
+
+				local instances = globals.fpv_sol_instances
+				local bone = instances and instances.camera_bone
+				local origin = bone and bone.WorldPosition or gameCamera.CFrame.Position
+
+				local ent = entitylib.EntityMouse({
+					Range = FOV.Value,
+					Players = true,
+					Wallcheck = true,
+					Part = 'RootPart',
+					Origin = origin
+				})
+
+				if not ent then return end
+
+				local equipment = globals.fpv_sol_equipment
+				local gun = equipment and equipment.curr_equipment
+				if not gun or not gun.fire_params then return end
+
+				local node = ent.RootPart
+				for _, name in headChain do
+					node = node and node[name]
+				end
+
+				local targetpos = node and node.WorldCFrame.Position
+				if not targetpos then return end
+
+				rayCheck.FilterDescendantsInstances = {gameCamera, ent.Character}
+				rayCheck.CollisionGroup = ent.RootPart.CollisionGroup
+				local calc = prediction.SolveTrajectory(origin, gun.fire_params.muzzle_velocity, workspace.Gravity, targetpos, Vector3.zero, workspace.Gravity, ent.HipHeight, nil, rayCheck)
+				if not calc then return end
+
+				targetinfo.Targets[ent] = os.clock() + 1
+
+				if cameraMode then
+					local camCF = gameCamera.CFrame
+					local blended = camCF.LookVector:Lerp((calc - camCF.Position).Unit, math.min(Speed.Value * dt, 1))
+					local magnitude = blended.Magnitude
+					if magnitude < 0.01 then return end
+
+					gameCamera.CFrame = CFrame.lookAt(camCF.Position, camCF.Position + blended / magnitude)
+				else
+					if not main.exe_set or not main.exe_set_t then return end
+
+					local pos = gameCamera:WorldToViewportPoint(calc)
+					local cursor = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
+					local localmouse = (cursor - Vector2.new(pos.X, pos.Y)) * dt * (Speed.Value / 10000)
+
+					main.exe_set(main.exe_set_t.CTRL_SOL_ATT_ROT, localmouse.Y, localmouse.X)
+				end
 			end
-
-			if not cameraMode and not inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
-
-			local main = frontlines and frontlines.Main
-			local globals = main and main.globals
-			if not globals then return end
-
-			local instances = globals.fpv_sol_instances
-			local bone = instances and instances.camera_bone
-			local origin = bone and bone.WorldPosition or gameCamera.CFrame.Position
-
-			local ent = entitylib.EntityMouse({
-				Range = FOV.Value,
-				Players = true,
-				Wallcheck = true,
-				Part = 'RootPart',
-				Origin = origin
-			})
-
-			if not ent then return end
-
-			local equipment = globals.fpv_sol_equipment
-			local gun = equipment and equipment.curr_equipment
-			if not gun or not gun.fire_params then return end
-
-			local node = ent.RootPart
-			for _, name in headChain do
-				node = node and node[name]
-			end
-
-			local targetpos = node and node.WorldCFrame.Position
-			if not targetpos then return end
-
-			rayCheck.FilterDescendantsInstances = {gameCamera, ent.Character}
-			rayCheck.CollisionGroup = ent.RootPart.CollisionGroup
-			local calc = prediction.SolveTrajectory(origin, gun.fire_params.muzzle_velocity, workspace.Gravity, targetpos, Vector3.zero, workspace.Gravity, ent.HipHeight, nil, rayCheck)
-			if not calc then return end
-
-			targetinfo.Targets[ent] = os.clock() + 1
 
 			if cameraMode then
-				local camCF = gameCamera.CFrame
-				local blended = camCF.LookVector:Lerp((calc - camCF.Position).Unit, math.min(Speed.Value * dt, 1))
-				local magnitude = blended.Magnitude
-				if magnitude < 0.01 then return end
-
-				gameCamera.CFrame = CFrame.lookAt(camCF.Position, camCF.Position + blended / magnitude)
+				runService:BindToRenderStep('InhalerAimAssist', Enum.RenderPriority.Camera.Value + 1, step)
+				AimAssist:Clean(function()
+					runService:UnbindFromRenderStep('InhalerAimAssist')
+				end)
 			else
-				if not main.exe_set or not main.exe_set_t then return end
-
-				local pos = gameCamera:WorldToViewportPoint(calc)
-				local cursor = touch and gameCamera.ViewportSize / 2 or inputService:GetMouseLocation()
-				local localmouse = (cursor - Vector2.new(pos.X, pos.Y)) * dt * (Speed.Value / 10000)
-
-				main.exe_set(main.exe_set_t.CTRL_SOL_ATT_ROT, localmouse.Y, localmouse.X)
+				repeat
+					local dt = task.wait()
+					if not AimAssist.Enabled then break end
+					step(dt)
+				until not AimAssist.Enabled
 			end
-		end
-
-		if cameraMode then
-			runService:BindToRenderStep('InhalerAimAssist', Enum.RenderPriority.Camera.Value + 1, step)
-			AimAssist:Clean(function()
-				runService:UnbindFromRenderStep('InhalerAimAssist')
-			end)
-		else
-			repeat
-				local dt = task.wait()
-				if not AimAssist.Enabled then break end
-				step(dt)
-			until not AimAssist.Enabled
 		end
 	end,
 	Tooltip = 'Uses game functions to move the camera towards players'

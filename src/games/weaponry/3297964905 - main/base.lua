@@ -25,7 +25,7 @@ local cloneref = cloneref or function(obj)
 end
 
 local playersService = cloneref(game:GetService('Players'))
-local replicatedStorage = cloneref(game:FindFirstChildOfClass('ReplicatedStorage'))
+local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 local runService = cloneref(game:GetService('RunService'))
 local inputService = cloneref(game:GetService('UserInputService'))
 local httpService = cloneref(game:GetService('HttpService'))

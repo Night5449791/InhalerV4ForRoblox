@@ -41,54 +41,54 @@ CuffedESP = vape.Categories.Render:CreateModule({
 	Function = function(callback)
 		clearHighlights()
 
-		if not callback then return end
+		if callback then
+			local removed = workspace.ChildRemoved:Connect(function(child)
+				removeHighlight(child)
+			end)
 
-		local removed = workspace.ChildRemoved:Connect(function(child)
-			removeHighlight(child)
-		end)
+			repeat
+				for _, plr in playersService:GetPlayers() do
+					local character = plr.Character
+					if character and character ~= lplr.Character then
+						local humanoid = redwood.humanoid(character)
+						local alive = humanoid and humanoid.Health > 0
+						local cuffed = alive and redwood.hasState(character, 'Handcuffed_')
+						local highlight = highlights[character]
 
-		repeat
-			for _, plr in playersService:GetPlayers() do
-				local character = plr.Character
-				if character and character ~= lplr.Character then
-					local humanoid = redwood.humanoid(character)
-					local alive = humanoid and humanoid.Health > 0
-					local cuffed = alive and redwood.hasState(character, 'Handcuffed_')
-					local highlight = highlights[character]
-
-					if cuffed and not highlight then
-						highlight = Instance.new('Highlight')
-						local color = highlightColor(character)
-						highlight.FillColor = color
-						highlight.FillTransparency = 0.65
-						highlight.OutlineColor = color
-						highlight.OutlineTransparency = 0
-						highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-						highlight.Adornee = character
-						highlight.Parent = character
-						highlights[character] = highlight
-					elseif not cuffed and highlight then
-						removeHighlight(character)
-					elseif highlight then
-						local color = highlightColor(character)
-						highlight.FillColor = color
-						highlight.OutlineColor = color
+						if cuffed and not highlight then
+							highlight = Instance.new('Highlight')
+							local color = highlightColor(character)
+							highlight.FillColor = color
+							highlight.FillTransparency = 0.65
+							highlight.OutlineColor = color
+							highlight.OutlineTransparency = 0
+							highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+							highlight.Adornee = character
+							highlight.Parent = character
+							highlights[character] = highlight
+						elseif not cuffed and highlight then
+							removeHighlight(character)
+						elseif highlight then
+							local color = highlightColor(character)
+							highlight.FillColor = color
+							highlight.OutlineColor = color
+						end
 					end
 				end
-			end
 
-			for character in highlights do
-				local plr = playersService:GetPlayerFromCharacter(character)
-				if not plr or plr.Character ~= character then
-					removeHighlight(character)
+				for character in highlights do
+					local plr = playersService:GetPlayerFromCharacter(character)
+					if not plr or plr.Character ~= character then
+						removeHighlight(character)
+					end
 				end
-			end
 
-			task.wait(0.5)
-		until not CuffedESP.Enabled or vape.Loaded == nil
+				task.wait(0.5)
+			until not CuffedESP.Enabled or vape.Loaded == nil
 
-		removed:Disconnect()
-		clearHighlights()
+			removed:Disconnect()
+			clearHighlights()
+		end
 	end,
 	Tooltip = 'Highlights players that are already handcuffed'
 })
