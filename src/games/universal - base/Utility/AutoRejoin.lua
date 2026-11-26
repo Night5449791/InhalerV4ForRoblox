@@ -18,6 +18,6 @@ AutoRejoin = vape.Categories.Utility:CreateModule({
 })
 Sort = AutoRejoin:CreateDropdown({
 	Name = 'Sort',
-	List = {'Descending', 'Ascending'},
-	Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers'
+	List = {'Descending', 'Ascending', 'Best Ping'},
+	Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers\nBest Ping - Prefers the lowest ping server'
 })
