@@ -13,8 +13,8 @@ ServerHop = vape.Categories.Utility:CreateModule({
 })
 Sort = ServerHop:CreateDropdown({
 	Name = 'Sort',
-	List = {'Descending', 'Ascending'},
-	Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers'
+	List = {'Descending', 'Ascending', 'Best Ping'},
+	Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers\nBest Ping - Prefers the lowest ping server'
 })
 ServerHop:CreateButton({
 	Name = 'Rejoin Previous Server',

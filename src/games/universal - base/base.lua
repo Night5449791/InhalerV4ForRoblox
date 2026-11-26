@@ -167,6 +167,42 @@ local function serverHop(pointer, filter)
 		notif('Inhaler', 'Searching for an available server.', 2)
 	end
 
+	if filter == 'Best Ping' then
+		local best, bestPing, nextPointer = nil, nil, pointer
+
+		for _ = 1, 5 do
+			local success, httpdata = pcall(function()
+				return game:HttpGet('https://games.roblox.com/v1/games/'..game.PlaceId..'/servers/Public?sortOrder=1&excludeFullGames=true&limit=100'..(nextPointer and '&cursor='..nextPointer or ''))
+			end)
+
+			local data = success and httpService:JSONDecode(httpdata) or nil
+			if not data or not data.data then
+				notif('Inhaler', 'Failed to grab servers. ('..(data and data.errors and data.errors[1] and data.errors[1].message or 'no data')..')', 5, 'warning')
+				return
+			end
+
+			for _, v in data.data do
+				local ping = tonumber(v.ping)
+				if ping and (not bestPing or ping < bestPing) and tonumber(v.playing) < playersService.MaxPlayers and not table.find(visited, v.id) and not table.find(attempted, v.id) then
+					best, bestPing = v.id, ping
+				end
+			end
+
+			cacheExpire, cache = os.clock() + 60, httpdata
+			nextPointer = data.nextPageCursor
+			if not nextPointer then break end
+		end
+
+		if best then
+			table.insert(attempted, best)
+			notif('Inhaler', 'Found! Teleporting to a '..bestPing..'ms server.', 5)
+			teleportService:TeleportToPlaceInstance(game.PlaceId, best)
+		else
+			notif('Inhaler', 'Failed to find an available server.', 5, 'warning')
+		end
+		return
+	end
+
 	local success, httpdata = pcall(function()
 		return cacheExpire < os.clock() and game:HttpGet('https://games.roblox.com/v1/games/'..game.PlaceId..'/servers/Public?sortOrder='..(filter == 'Ascending' and 1 or 2)..'&excludeFullGames=true&limit=100'..(pointer and '&cursor='..pointer or '')) or cache
 	end)
