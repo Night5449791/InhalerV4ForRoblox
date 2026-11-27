@@ -188,7 +188,6 @@ local function serverHop(pointer, filter)
 				end
 			end
 
-			cacheExpire, cache = os.clock() + 60, httpdata
 			nextPointer = data.nextPageCursor
 			if not nextPointer then break end
 		end
