@@ -701,7 +701,7 @@ run(function()
 			end)
 
 			local localizationService = game:GetService('LocalizationService')
-			local root = game:GetService('CorePackages').Workspace.Packages._Index.NotificationModalsManager.NotificationModalsManager
+			local root = game:GetService('CorePackages').Workspace.Packages._Index.NotificationModalsManager
 			local reactBlox = getrenv().require(root.ReactRoblox)
 			local react = getrenv().require(root.React)
 			local UIBlox = getrenv().require(root.UIBlox)

@@ -3,7 +3,9 @@ local overlapCheck = OverlapParams.new()
 local whitelist = {
 	BarbedWire = true,
 	Part = true,
-	Lavatouch = true
+	Lavatouch = true,
+	Light = true,
+	Touch = true
 }
 
 LazerGodmode = vape.Categories.Blatant:CreateModule({
@@ -17,6 +19,10 @@ LazerGodmode = vape.Categories.Blatant:CreateModule({
 					local parts = workspace:GetPartBoundsInRadius(entitylib.character.RootPart.Position, 10, overlapCheck)
 					for _, part in parts do
 						if whitelist[part.Name] then
+							if part.Name == 'Touch' and part.Parent.Name == 'ExitDoor' then
+								continue
+							end
+
 							modified[part] = true
 							part.CanTouch = false
 						end
@@ -37,6 +43,8 @@ LazerGodmode = vape.Categories.Blatant:CreateModule({
 
 			table.clear(modified)
 		end
+
+		debug.setconstant(jb.Turret.Update, 33, callback and '_Target' or 'Target')
 	end,
 	Tooltip = 'Allow you to ignore specific damage sources'
 })

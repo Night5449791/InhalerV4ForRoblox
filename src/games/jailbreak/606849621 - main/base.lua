@@ -1,6 +1,6 @@
 local loadstring = function(...)
 	local res, err = loadstring(...)
-	if err and vape then vape:CreateNotification('Vape', 'Failed to load : '..err, 30, 'alert') end
+	if err and vape then vape:CreateNotification('Inhaler', 'Failed to load : '..err, 30, 'alert') end
 	return res
 end
 local isfile = isfile or function(file)
@@ -59,6 +59,7 @@ local LazerGodmode = {Enabled = false}
 local InvTracker = {Inventories = {}, Connections = {}}
 local oldBulletUpdate
 local aimTimer, shootTimer, aimVec = os.clock(), os.clock()
+local getInCallback
 
 local function getTableSize(dict)
 	local size = 0
@@ -103,7 +104,7 @@ local function isIllegal(entity, teamCheck)
 
 	if entity.Player and entity.Player.Team == teams.Prisoner then
 		for tool in InvTracker.Inventories[entity.Player] do
-			if tool ~= 'MansionInvite' and tool ~= 'Donut' then
+			if tool ~= 'Donut' then
 				return true
 			end
 		end
@@ -355,7 +356,20 @@ run(function()
 	entitylib.getUpdateConnections = function(entity)
 		local hum = entity.Humanoid
 		entity.InVehicle = not entity.Character:GetAttribute('HasHandcuffs') and (entity.Character:GetAttribute('InVehicle') or entity.InVehicle)
+		entity.Tazed = entity.Character:FindFirstChild('RagdollNeck') and true or false
 		entity.Illegal = isIllegal(entity, true)
+
+		table.insert(entity.Connections, entity.Character.ChildAdded:Connect(function(obj)
+			if obj.Name == 'RagdollNeck' then
+				entity.Tazed = true
+			end
+		end))
+
+		table.insert(entity.Connections, entity.Character.ChildRemoved:Connect(function(obj)
+			if obj.Name == 'RagdollNeck' then
+				entity.Tazed = false
+			end
+		end))
 
 		return {
 			hum:GetPropertyChangedSignal('Health'),
@@ -652,6 +666,7 @@ run(function()
 	end
 
 	jb = {
+		ActionButtonService = require(replicatedStorage.ActionButton.ActionButtonService),
 		AlexChassis = require(replicatedStorage.Module.AlexChassis),
 		Audio = require(replicatedStorage.Std.Audio),
 		Boat = require(replicatedStorage.Game.Boat.Boat),
@@ -663,10 +678,14 @@ run(function()
 		InventoryItemBinder = require(replicatedStorage.Inventory.InventoryItemBinder),
 		InventoryItemSystem = require(replicatedStorage.Inventory.InventoryItemSystem),
 		ItemSystemController = require(replicatedStorage.Game.ItemSystem.ItemSystem),
+		JetSki = require(replicatedStorage.Game.VehicleSystem.JetSki),
 		LightningUtils = require(replicatedStorage.Game.LightningUtils),
-		PlayerUtils = require(replicatedStorage.Game.PlayerUtils),
 		PlasmaController = require(replicatedStorage.Game.Item.PlasmaGun),
+		PlayerUtils = require(replicatedStorage.Game.PlayerUtils),
+		PuzzleFlow = require(replicatedStorage.Game.Robbery.PuzzleFlow),
 		TeamChooseController = require(replicatedStorage.TeamSelect.TeamChooseUI),
+		Turret = require(replicatedStorage.Turret2.Turret),
+		UI = require(replicatedStorage.Module.UI),
 		VehicleController = require(replicatedStorage.Vehicle.VehicleUtils),
 		VehicleSystem = require(replicatedStorage.Game.VehicleSystem)
 	}
@@ -693,7 +712,8 @@ run(function()
 		replicatedStorage.Game.Item.Donut,
 		replicatedStorage.Game.Item.Gun,
 		replicatedStorage.Game.Falling,
-		lplr.PlayerScripts.LocalScript
+		lplr.PlayerScripts.LocalScript,
+		replicatedStorage.Game.Paraglide
 	}, {
 		Action3 = 'Pickup',
 		beginArrestHold = 'ArrestBegin',
@@ -729,7 +749,8 @@ run(function()
 
 		if InfNitro.Enabled and remote == 'UseNitro' then return end
 		if LazerGodmode.Enabled and remote == 'SelfDamage' then return end
-		if remote ~= 'LookAngle' and remote ~= 'AimPosition' and shared.VapeDeveloper then
+		if remote == 'GetIn' and getInCallback then getInCallback() end
+		if remote ~= 'LookAngle' and shared.VapeDeveloper then
 			local called = getfenv(3)
 			called = called and called.script
 			if called and (not remote) then
@@ -757,6 +778,10 @@ run(function()
 
 	local arrests = sessioninfo:AddItem('Arrested')
 	local moneymade = sessioninfo:AddItem('Money Made', 0, toMoney, true)
+	sessioninfo:AddItem('Mansion Invites', 0, function()
+		return lplr:GetAttribute('MansionInvites') or 0
+	end, false)
+
 	local bounty = sessioninfo:AddItem('Bounty List', '', function()
 		local text = ''
 
@@ -871,7 +896,7 @@ run(function()
 	end
 
 	function Spring:Update(DeltaTime)
-		local IterationsThisFrame = DeltaTime / ((1 / 60) / 8)
+		local IterationsThisFrame = 8
 		local ScaledDeltaTime = DeltaTime * self.Speed / IterationsThisFrame
 
 		for i = 1, math.round(IterationsThisFrame) do
