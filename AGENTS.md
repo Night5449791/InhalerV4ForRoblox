@@ -4,7 +4,7 @@ Guidance for any AI agent (Claude, Codex, Gemini, Copilot, Cursor, …) working 
 
 ## 0. What this repo is
 
-`Night5449791/InhalerV4ForRoblox` — a fork of Vape V4, a Roblox combat/utility script. The runtime is **Luau inside an executor** (Synapse-like), not standard Lua and not Node. `src/` is the only editable source; an external bundler flattens it into `Night5449791/InhalerCompiled`, which the loader downloads at injection time. The fork is CC BY 4.0, upstream CC0 1.0.
+`Night5449791/InhalerV4ForRoblox` — a fork of Vape V4, a Roblox combat/utility script. The runtime is **Luau inside an executor** (Synapse-like), not standard Lua and not Node. `src/` is the only editable source; an external bundler flattens it into `Night5449791/InhalerCompiled`, which the loader downloads at injection time. The fork is CC BY 4.0, upstream CC0 1.0. The root `commit` file (no extension) records the `7GrandDadPGN/VapeV4ForRoblox` git hash this fork is based on — use it when judging which lines are upstream-identical (§10); it is not the runtime `InhalerV4/profiles/commit.txt` cache (§2, §6).
 
 Rules for agents:
 
